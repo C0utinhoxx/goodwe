@@ -1,7 +1,11 @@
 <!DOCTYPE html>
+<html lang="pt-BR">
 <html>
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Login</title>
     <link rel="stylesheet" href="{{asset('css/login.css')}}">
     <link rel="icon" href="{{ asset('imagens/logo.png') }}" type="image/x-icon">
@@ -9,60 +13,65 @@
 
 <body>
     
-    <div class="container">
-        <div class="left">
-            <h1>Bem-Vindo<br>De Volta</h1>
-            <p>Ainda não possui uma conta?</p>
-            <a href="{{ route('user.cadastro') }}" class="cadastrar" id="btn-cadastrar">Cadastrar</a>
+    <div class="container-login">
+        <div class="lado-visual">
+            <div class="conteudo-visual">
+                <h1>Energia inteligente para uma mobilidade mais sustentável.</h1>
+
+                <p>
+                    Gestão inteligente de recargas, mais eficiência para hoje
+                    e mais sustentabilidade para o amanhã.
+                </p>
+            </div>
         </div>
 
-        <div class="right">
+        <div class="lado-formulario">
+            <div class="conteudo-formulario">
 
-            <h2>Login</h2>
+                <h2>Bem-vindo!</h2>
 
-            <form class="form" action="{{ route('login-user') }}" method="POST">
-                @csrf
-                @method('POST')
+                <p>
+                    Acesse sua conta para continuar.
+                </p>
 
-                <!-- E-mail -->
+                <form class="form" action="{{ route('login-user') }}" method="POST">
+                    @csrf
+                    @method('POST')
 
-                <label for="email">E-mail</label>
+                    <label for="email">E-mail</label>
 
-                <input type="email" name="email" class="email @error('email') is-invalid @enderror" id="email" placeholder="Insira seu e-mail" value="{{ old('email') }}">
+                    <input type="email" name="email" class="email @error('email') is-invalid @enderror" id="email" placeholder="Insira seu e-mail" value="{{ old('email') }}">
 
-                @error('email')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
+                    @error('email')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
 
+                    <label for="password">Senha</label>
 
-                <!-- Senha -->
+                    <input type="password" name="password" class="senha @error('password') is-invalid @enderror" id="password" placeholder="Digite sua senha">
+                    @error('password')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
 
-                <label for="password">Senha</label>
+                    <div class="opcoes-login">
+                        <label>
+                            <input type="checkbox" name="lembrar">
+                            Lembrar de mim
+                        </label>
 
-                <input type="password" name="password" class="senha @error('password') is-invalid @enderror" id="password" placeholder="Digite sua senha">
-                @error('password')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-                <!-- Botão de envio -->
-                <button type="submit" class="logar">Entrar</button>
-            </form>
+                        <a href="#">Esqueci minha senha</a>
+                    </div>
+
+                    <button type="submit" class="logar">Entrar</button>
+                </form>
+
+                <p class="texto-cadastro">
+                    Não possui uma conta?
+                    <a href="{{ route('user.cadastro') }}">Cadastre-se</a>
+                </p>
+            </div>
         </div>
     </div>
-
-    <script>
-        document.getElementById('btn-cadastrar').addEventListener('click', function(event) {
-            event.preventDefault(); // cancela o comportamento padrão do link
-
-            document.body.style.transition = "opacity 0.5s";
-            document.body.style.opacity = 0;
-
-            setTimeout(() => {
-                window.location.href = this.href; // navega para login após animação
-            }, 500); // tempo da animação (500ms)
-        });
-    </script>
-
-
 </body>
 
 </html>
