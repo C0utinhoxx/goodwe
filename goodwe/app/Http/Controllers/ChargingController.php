@@ -29,17 +29,17 @@ class ChargingController extends Controller
         );
 
         if (! $scheduled) {
-            return back()->with('error', 'Este carregador não está disponível agora.');
+            return back()->with('error', __('chargers.not_available'));
         }
 
         return redirect()->route('chargers.index')
-            ->with('success', 'Recarga agendada com sucesso!');
+            ->with('success', __('chargers.scheduled'));
     }
 
     public function release(string $code): mixed
     {
         ChargingSimulator::release($code);
 
-        return back()->with('success', 'Carregador liberado.');
+        return back()->with('success', __('chargers.released'));
     }
 }

@@ -1,402 +1,171 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
-
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Cadastro</title>
+    <title>{{ __('auth.register_title') }}</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="icon" href="{{ asset('imagens/logo.png') }}" type="image/x-icon">
 </head>
-
-<style>
-    * {
-        margin: 0;
-        padding:0;
-        box-sizing: border-box;
-    }
-
-    body {
-        min-height: 100vh;
-        font-family: Arial, sans-serif;
-    }
-
-    .container-cadastro {
-        display: flex;
-        min-height: 100vh;
-    }
-
-    .lado-visual {
-        width: 60%;
-        background-color: #1a1a1a;
-        background-image: url('/imagens/login-goodwe.png');
-        background-size: cover;
-        background-position: 20% center;
-        background-repeat: no-repeat;
-        position: relative;
-    }
-
-    .logo-goodwe {
-        position: absolute;
-        top: 30px;
-        left: 35px;
-        color: #e53935;
-        font-size: 28px;
-        font-weight: bold;
-    }
-
-    .conteudo-visual {
-        position: absolute;
-        left: 35px;
-        top: 15%;
-        width: 70%;
-        max-width: 620px;
-        color: white;
-    }
-
-    .conteudo-visual h1 {
-        font-size: 36px;
-        line-height: 1.2;
-    }
-
-    .conteudo-visual p {
-        font-size: 16px;
-        line-height: 1.6;
-        color: #c7c7c7;
-        max-width: 480px;
-    }
-
-    .linha-visual {
-        width: 45px;
-        height: 3px;
-        background-color: #e53935;
-        margin: 18px 0 20px;
-    }
-
-    .beneficios {
-        position: absolute;
-        bottom: 55px;
-        left: 35px;
-        display: flex;
-        gap: 30px;
-    }
-
-    .beneficio-card {
-        background-color: rgba(15, 17, 23, 0.45);
-        border-radius: 8px;
-        padding: 12px 16px;
-    }
-
-    .beneficio-card span {
-        color: white;
-        font-size: 14px;
-        font-weight: bold;
-    }
-
-    .lado-formulario {
-        width: calc(40% + 28px);
-        margin-left: -28px;
-        background-color: #0f1117;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        border-radius: 28px 0 0 28px;
-        z-index: 2;
-    }
-
-    .idioma {
-        position: absolute;
-        top: 25px;
-        right: 30px;
-    }
-
-    .botao-idioma {
-        background-color: #2a2d34;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    .menu-idioma {
-        display:none;
-        position: absolute;
-        top: 42px;
-        right: 0;
-        width: 120px;
-        background-color: #2a2d34;
-        border-radius: 8px;
-        padding: 8px 0;
-    }
-
-    .menu-idioma a {
-        display: block;
-        padding: 8px 12px;
-        color: white;
-        text-decoration: none;
-        font-size: 14px;
-    }
-
-    .menu-idioma a:hover {
-        background-color: #3a3d45;
-    }
-
-    .idioma:hover .menu-idioma {
-        display: block;
-    }
-
-    .conteudo-formulario {
-        width: 85%;
-        max-width: 460px;
-        color: white;
-    }
-
-    .conteudo-formulario h2 {
-        font-size: 32px;
-        margin-bottom: 10px;
-    }
-
-    .linha-vermelha {
-        width: 45px;
-        height: 3px;
-        background-color: #e53935;
-        margin: 12px 0 20px;
-    }
-
-    .conteudo-formulario h3 {
-        font-size: 18px;
-        margin-bottom: 8px;
-        font-weight: normal;
-    }
-
-    .subtitulo-formulario {
-        color: #a0a0a0;
-        margin-bottom: 30px;
-    }
-
-    .form {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .form > label {
-        font-size: 14px;
-        margin-bottom: 10px;
-    }
-
-    .name,
-    .email,
-    .senha,
-    .confirmar-senha {
-        width: 100%;
-        padding: 14px;
-        margin-bottom: 24px;
-        border: 1px solid #343843;
-        border-radius: 6px;
-        background-color: #181b22;
-        color: white;
-    }
-
-    .name::placeholder,
-    .email::placeholder,
-    .senha::placeholder,
-    .confirmar-senha::placeholder {
-        color: #8a8f98;
-    }
-
-    .name:focus,
-    .email:focus,
-    .senha:focus,
-    .confirmar-senha:focus {
-        outline: none;
-        border-color: #e53935;
-    }
-
-    .invalid-feedback {
-        color: #ff5a55;
-        font-size: 12px;
-        margin-top: -18px;
-        margin-bottom: 18px;
-    }
-
-    .is-invalid {
-        border-color: #e53935;
-    }
-
-    .cadastrar {
-        width: 100%;
-        padding: 15px;
-        border: none;
-        border-radius: 8px;
-        background-color: #e53935;
-        color: white;
-        font-size: 16px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: 0.3s;
-    }
-
-    .cadastrar:hover {
-        background-color: #c62828;
-    }
-
-    .texto-login {
-        text-align: center;
-        margin-top: 25px;
-        font-size: 14px;
-        color: #a0a0a0;
-    }
-
-    .texto-login a {
-        color: #e53935;
-        text-decoration: none;
-        font-weight: bold;
-    }
-
-    .rodape-cadastro {
-        position: absolute;
-        bottom: 25px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 85%;
-        text-align: center;
-        color: #8a8f98;
-        font-size: 12px;
-    }
-
-    .rodape-cadastro p {
-        margin-bottom: 8px;
-        font-size: 14px;
-        color: #b0b4bc;
-    }
-
-    @media (max-width: 768px) {
-        .lado-visual {
-            display: none;
-        }
-
-        .lado-formulario {
-            width: 100%;
-            min-height: 100vh;
-            margin-left: 0;
-            border-radius: 0;
-            overflow-y: auto;
-        }
-
-        .conteudo-formulario {
-            width: 85%;
-            max-width: 460px;
-            padding-top: 70px;
-            padding-bottom: 90px;
-        }
-
-        .idioma {
-            top: 20px;
-            right: 20px;
-        }
-
-        .rodape-cadastro {
-            bottom: 20px;
-        }
-    }
-</style>
-
-
-<body>
-    <div class="container-cadastro">
-        <div class="lado-visual">
-            <div class="logo-goodwe">
+<body class="min-h-screen font-sans bg-white dark:bg-[#0a0a0a]">
+    <div class="flex min-h-screen">
+        {{-- Lado Visual --}}
+        <div class="hidden lg:flex w-[60%] bg-gray-100 dark:bg-[#1a1a1a] bg-cover bg-[20%_center] bg-no-repeat relative" style="background-image: url('/imagens/login-goodwe.png')">
+            <div class="absolute top-8 left-9 text-[#e53935] text-2xl font-bold z-10">
                 GOODWE
             </div>
 
-            <div class="conteudo-visual">
-                <h1>Energia inteligente para uma mobilidade mais sustentável.</h1>
-
-                <div class="linha-visual"></div>
-
-                <p>
-                    Gestão inteligente de recargas, mais eficiência para hoje
-                    e mais sustentabilidade para o amanhã.
-                </p>
+            <div class="w-[70%] max-w-[620px] absolute left-9 top-[15%] z-10">
+                <h1 class="text-3xl leading-tight text-white">{{ __('visual.smart_energy') }}</h1>
+                <div class="w-[45px] h-[3px] bg-[#e53935] mt-4 mb-5"></div>
+                <p class="text-base leading-relaxed text-[#c7c7c7] max-w-[480px]">{{ __('visual.description') }}</p>
             </div>
 
-            <div class="beneficios">
-                <div class="beneficio-card">
-                    <span>Recarga inteligente</span>
+            <div class="absolute bottom-14 left-9 flex gap-8 z-10">
+                <div class="bg-black/45 rounded-lg px-4 py-3">
+                    <span class="text-white text-sm font-bold">{{ __('visual.smart_charging') }}</span>
                 </div>
-                <div class="beneficio-card">
-                    <span>Gestão de energia</span>
+                <div class="bg-black/45 rounded-lg px-4 py-3">
+                    <span class="text-white text-sm font-bold">{{ __('visual.energy_management') }}</span>
                 </div>
-                <div class="beneficio-card">
-                    <span>Sustentabilidade em cada escolha</span>
+                <div class="bg-black/45 rounded-lg px-4 py-3">
+                    <span class="text-white text-sm font-bold">{{ __('visual.sustainability') }}</span>
                 </div>
             </div>
         </div>
 
-        <div class="lado-formulario">
-            <div class="idioma">
-                <button type="button" class="botao-idioma">
-                    Português
-                </button>
-                <div class="menu-idioma">
-                    <a href="#">Português</a>
-                    <a href="#">English</a>
-                    <a href="#">Español</a>
+        {{-- Lado Formulário --}}
+        <div class="w-full lg:w-[calc(40%+28px)] lg:-ml-7 bg-white dark:bg-[#0a0a0a] flex items-center justify-center relative lg:rounded-l-[28px] z-20">
+            {{-- Seletor de Idioma --}}
+            <div class="absolute top-6 right-8 z-10">
+                <div class="relative">
+                    <button type="button" id="lang-toggle" class="flex items-center gap-2 bg-gray-100 dark:bg-[#2a2d34] text-gray-800 dark:text-white border border-gray-200 dark:border-none rounded-lg px-3 py-2 cursor-pointer text-sm hover:bg-gray-200 dark:hover:bg-[#3a3d45] transition-colors">
+                        <span class="text-base leading-none">@if(app()->getLocale() === 'pt') 🇧🇷 @elseif(app()->getLocale() === 'en') 🇺🇸 @else 🇪🇸 @endif</span>
+                        <span>{{ __('language.' . app()->getLocale()) }}</span>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div id="lang-menu" class="hidden absolute right-0 top-full mt-2 w-[160px] bg-white dark:bg-[#2a2d34] border border-gray-200 dark:border-none rounded-lg py-1 shadow-lg">
+                        <a href="{{ route('locale.set', 'pt') }}" class="flex items-center gap-3 px-4 py-2.5 text-gray-800 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-[#3a3d45] transition-colors {{ app()->getLocale() === 'pt' ? 'font-bold' : '' }}">
+                            <span class="text-base leading-none">🇧🇷</span> {{ __('language.pt') }}
+                        </a>
+                        <a href="{{ route('locale.set', 'en') }}" class="flex items-center gap-3 px-4 py-2.5 text-gray-800 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-[#3a3d45] transition-colors {{ app()->getLocale() === 'en' ? 'font-bold' : '' }}">
+                            <span class="text-base leading-none">🇺🇸</span> {{ __('language.en') }}
+                        </a>
+                        <a href="{{ route('locale.set', 'es') }}" class="flex items-center gap-3 px-4 py-2.5 text-gray-800 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-[#3a3d45] transition-colors {{ app()->getLocale() === 'es' ? 'font-bold' : '' }}">
+                            <span class="text-base leading-none">🇪🇸</span> {{ __('language.es') }}
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            <div class="conteudo-formulario">
-                <h2>Crie sua conta</h2>
+            {{-- Toggle de Tema --}}
+            <div class="absolute top-6 left-8 z-10">
+                <button type="button" id="theme-toggle" class="text-gray-400 dark:text-[#A1A09A] hover:text-gray-800 dark:hover:text-white transition-colors cursor-pointer">
+                    <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    <svg class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                    </svg>
+                </button>
+            </div>
 
-                <div class="linha-vermelha"></div>
+            <div class="w-[85%] max-w-[460px]">
+                <h2 class="text-3xl mb-3 text-gray-900 dark:text-white">{{ __('auth.create_account') }}</h2>
+                <div class="w-[45px] h-[3px] bg-[#e53935] mb-5"></div>
+                <h3 class="text-lg mb-2 font-normal text-gray-900 dark:text-white">{{ __('auth.platform_name') }}</h3>
+                <p class="text-gray-500 dark:text-[#a0a0a0] mb-8">{{ __('auth.register_subtitle') }}</p>
 
-                <h3>Plataforma de Gestão de Recargas</h3>
+                @if (session('success'))
+                    <div class="mb-4 px-4 py-3 rounded-lg border border-green-500/30 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-sm">
+                        {{ session('success') }}
+                    </div>
+                @endif
 
-                <p class="subtitulo-formulario">
-                    Cadastre-se para começar.
-                </p>
+                @if (session('error'))
+                    <div class="mb-4 px-4 py-3 rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+                        {{ session('error') }}
+                    </div>
+                @endif
 
-                <form action="{{ route('user-store') }}" method="POST" class="form">
+                <form action="{{ route('user-store') }}" method="POST" class="flex flex-col">
                     @csrf
-                    @method('POST')
 
-                    <label for="name">Nome</label>
-                    <input type="text" name="name" class="name @error('name') is-invalid @enderror" id="name" placeholder="Nome completo" value="{{ old('name') }}">
+                    <label for="name" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.name') }}</label>
+                    <input
+                        type="text"
+                        name="name"
+                        id="name"
+                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('name') border-[#e53935] @enderror"
+                        placeholder="{{ __('auth.name_placeholder') }}"
+                        value="{{ old('name') }}"
+                    >
                     @error('name')
-                    <div class="invalid-feedback">{{ $message }}</div>
+                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
                     @enderror
 
-                    <label for="email">E-mail</label>
-                    <input type="email" name="email" class="email @error('email') is-invalid @enderror" id="email" placeholder="Insira seu e-mail" value="{{ old('email') }}">
+                    <label for="email" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.email') }}</label>
+                    <input
+                        type="email"
+                        name="email"
+                        id="email"
+                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('email') border-[#e53935] @enderror"
+                        placeholder="{{ __('auth.email_placeholder') }}"
+                        value="{{ old('email') }}"
+                    >
                     @error('email')
-                    <div class="invalid-feedback">{{ $message }}</div>
+                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
                     @enderror
 
-                    <label for="password">Senha</label>
-                    <input type="password" name="password" class="senha @error('password') is-invalid @enderror" id="password" placeholder="Senha com no mínimo 6 caracteres">
+                    <label for="password" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.password') }}</label>
+                    <input
+                        type="password"
+                        name="password"
+                        id="password"
+                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('password') border-[#e53935] @enderror"
+                        placeholder="{{ __('auth.password_placeholder') }}"
+                    >
                     @error('password')
-                    <div class="invalid-feedback">{{ $message }}</div>
+                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
                     @enderror
 
-                    <label for="password_confirmation">Confirmar senha</label>
-                    <input type="password" name="password_confirmation" class="confirmar-senha" id="password_confirmation" placeholder="Digite sua senha novamente">
+                    <label for="password_confirmation" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.password_confirmation') }}</label>
+                    <input
+                        type="password"
+                        name="password_confirmation"
+                        id="password_confirmation"
+                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935]"
+                        placeholder="{{ __('auth.password_confirmation_placeholder') }}"
+                    >
 
-                    <button type="submit" class="cadastrar">Cadastrar</button>
+                    <button type="submit" class="w-full py-3.5 border-none rounded-lg bg-[#e53935] text-white text-base font-bold cursor-pointer transition-colors hover:bg-[#c62828]">
+                        {{ __('auth.register_button') }}
+                    </button>
                 </form>
 
-                <p class="texto-login">
-                    Já possui uma conta?
-                    <a href="{{ route('user.login') }}">Entrar</a>
+                <p class="text-center mt-6 text-sm text-gray-500 dark:text-[#a0a0a0]">
+                    {{ __('auth.has_account') }}
+                    <a href="{{ route('user.login') }}" class="text-[#e53935] no-underline font-bold">{{ __('auth.login_link') }}</a>
                 </p>
             </div>
 
-            <div class="rodape-cadastro">
-                <p>Smart Energy for a Better Future</p>
-                <span>EQUIPE2 1CCPX GOODWE © 2026. Todos os direitos reservados.</span>
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[85%] text-center">
+                <p class="text-sm text-gray-400 dark:text-[#b0b4bc] mb-2">{{ __('app.footer_tagline') }}</p>
+                <span class="text-xs text-gray-400 dark:text-[#8a8f98]">{{ __('app.footer_copyright') }}</span>
             </div>
         </div>
     </div>
+
+    <script src="{{ asset('js/theme.js') }}"></script>
 </body>
 </html>

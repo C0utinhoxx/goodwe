@@ -2,59 +2,58 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\UserRequest;
 use App\Http\Requests\LoginRequest;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Requests\UserRequest;
 use App\Models\User;
-use Illuminate\Http\Request;
-use App\Models\Livro;
-
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
-
-    public function index() {
-        $user = Auth::user();  // pega o usuário autenticado
-    }
     public function login()
     {
-    return view('user.login');
-    }   
+        return view('user.login');
+    }
+
     public function create()
     {
-        // Carregar a VIEW
         return view('user.cadastro');
     }
 
     public function store(UserRequest $request)
     {
-        // Validar o formulário
         $request->validated();
 
-        // Cadastrar o usuário no BD
         User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => bcrypt($request->password),
         ]);
 
-        // Redirecionar o usuário, enviar a mensagem de sucesso
-        return redirect()->route('user.login')->with('success', 'Usuário cadastrado com sucesso!');
-
+        return redirect()->route('user.login')->with('success', __('auth.registered'));
     }
 
-    // Processa a tentativa de login
-   public function logar(LoginRequest $request)
-{
-    $credentials = $request->only('email', 'password');
+    public function logar(LoginRequest $request)
+    {
+        $credentials = $request->only('email', 'password');
 
-    if (Auth::attempt($credentials)) {
-        return redirect()->route('chargers.index')->with('success', 'Usuário logado com sucesso!');
+        if (Auth::attempt($credentials)) {
+            request()->session()->regenerate();
+
+            return redirect()->route('chargers.index')->with('success', __('auth.logged_in'));
+        }
+
+        return back()->withErrors([
+            'email' => __('auth.failed'),
+        ]);
     }
 
-    return back()->withErrors([
-        'email' => 'Credenciais inválidas.',
-    ]);
-}
-    
+    public function logout()
+    {
+        Auth::logout();
+
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+
+        return redirect()->route('user.login');
+    }
 }

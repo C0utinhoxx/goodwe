@@ -1,9 +1,9 @@
 <x-app-layout>
     <div class="flex items-end justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-semibold">Carregadores</h1>
+            <h1 class="text-2xl font-semibold">{{ __('chargers.title') }}</h1>
             <p class="text-sm text-[#706f6c] dark:text-[#A1A09A] mt-1">
-                {{ count($chargers) }} pontos disponíveis na rede
+                {{ __('chargers.available_count', ['count' => count($chargers)]) }}
             </p>
         </div>
     </div>
@@ -20,12 +20,12 @@
                     @if ($charger->isAvailable())
                         <span class="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400">
                             <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                            Livre
+                            {{ __('chargers.available') }}
                         </span>
                     @else
                         <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-700 dark:text-red-400">
                             <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                            Ocupado
+                            {{ __('chargers.occupied') }}
                         </span>
                     @endif
                 </div>
@@ -40,7 +40,7 @@
                         <input
                             type="text"
                             name="vehicle_plate"
-                            placeholder="Placa do veículo"
+                            placeholder="{{ __('chargers.plate_placeholder') }}"
                             required
                             maxlength="8"
                             class="rounded-sm border border-[#e3e3e0] dark:border-[#3E3E3A] bg-transparent px-3 py-2 text-sm"
@@ -57,18 +57,18 @@
                             type="submit"
                             class="rounded-sm bg-[#1b1b18] dark:bg-white px-4 py-2 text-sm font-medium text-white dark:text-[#1b1b18]"
                         >
-                            Agendar
+                            {{ __('chargers.schedule_button') }}
                         </button>
                     </form>
                 @else
                     <div class="mt-4 flex items-center justify-between gap-3">
                         <p class="text-sm text-[#706f6c] dark:text-[#A1A09A]">
-                            Ocupado por <span class="text-[#1b1b18] dark:text-[#EDEDEC]">{{ $charger->vehiclePlate }}</span>
-                            · libera em ~{{ $charger->availableInMinutes() }} min
+                            {{ __('chargers.occupied_by') }} <span class="text-[#1b1b18] dark:text-[#EDEDEC]">{{ $charger->vehiclePlate }}</span>
+                            · {{ __('chargers.releases_in', ['minutes' => $charger->availableInMinutes()]) }}
                         </p>
                         <form method="POST" action="{{ route('chargers.release', $charger->id) }}">
                             @csrf
-                            <button type="submit" class="text-sm underline underline-offset-4">Liberar (simular)</button>
+                            <button type="submit" class="text-sm underline underline-offset-4">{{ __('chargers.release_button') }}</button>
                         </form>
                     </div>
                 @endif

@@ -3,11 +3,23 @@
 namespace Tests\Feature;
 
 use App\Models\ChargingPoint;
+use App\Models\User;
 use App\Services\ChargingSimulator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $user = User::factory()->create();
+        $this->actingAs($user);
+    }
+
     public function test_the_application_redirects_to_the_chargers_list(): void
     {
         $response = $this->get('/');
@@ -20,7 +32,7 @@ class ExampleTest extends TestCase
         $response = $this->get(route('chargers.index'));
 
         $response->assertOk();
-        $response->assertSee('Carregadores');
+        $response->assertSee(__('chargers.title'));
     }
 
     public function test_a_charging_point_starts_available(): void
@@ -75,5 +87,14 @@ class ExampleTest extends TestCase
         $charger = ChargingSimulator::find('CG-002');
 
         $this->assertTrue($charger->isAvailable());
+    }
+
+    public function test_unauthenticated_user_is_redirected_to_login(): void
+    {
+        auth()->logout();
+
+        $response = $this->get(route('chargers.index'));
+
+        $response->assertRedirect(route('user.login'));
     }
 }
