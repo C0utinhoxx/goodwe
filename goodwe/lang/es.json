@@ -34,6 +34,8 @@
     "auth.email_not_registered": "Este correo no está registrado en nuestro sistema.",
     "auth.password_required": "La contraseña es obligatoria.",
     "auth.password_min": "La contraseña debe tener al menos 6 caracteres.",
+    "validation.confirm_required": "La confirmación de contraseña es obligatoria.",
+    "validation.confirm_same": "La confirmación de contraseña debe ser igual a la contraseña.",
 
     "chargers.title": "Cargadores",
     "chargers.available_count": ":count puntos de carga disponibles en la red",

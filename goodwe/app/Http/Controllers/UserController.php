@@ -19,6 +19,11 @@ class UserController extends Controller
         return view('user.cadastro');
     }
 
+    public function forgotPassword()
+    {
+        return view('user.senha');
+    }
+
     public function store(UserRequest $request)
     {
         $request->validated();
@@ -27,6 +32,7 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => bcrypt($request->password),
+            
         ]);
 
         return redirect()->route('user.login')->with('success', __('auth.registered'));
@@ -45,6 +51,17 @@ class UserController extends Controller
         return back()->withErrors([
             'email' => __('auth.failed'),
         ]);
+    }
+
+    public function update_password(UserRequest $request, User $user)
+    {
+        $request->validated();
+
+        $user->update([
+            'password' => bcrypt($request->password),
+        ]);
+        return redirect()->route('user.login')->with('success', __('auth.password_updated'));
+
     }
 
     public function logout()

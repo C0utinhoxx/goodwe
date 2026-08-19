@@ -34,6 +34,8 @@
     "auth.email_not_registered": "This e-mail is not registered in our system.",
     "auth.password_required": "Password is required.",
     "auth.password_min": "Password must be at least 6 characters.",
+    "validation.confirm_required": "Password confirmation is required.",
+    "validation.confirm_same": "Password confirmation must be the same as the password",
 
     "chargers.title": "Chargers",
     "chargers.available_count": ":count charging points available on the network",

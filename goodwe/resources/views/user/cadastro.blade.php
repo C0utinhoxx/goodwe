@@ -147,6 +147,9 @@
                         class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935]"
                         placeholder="{{ __('auth.password_confirmation_placeholder') }}"
                     >
+                    @error('password_confirmation')
+                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
+                    @enderror
 
                     <button type="submit" class="w-full py-3.5 border-none rounded-lg bg-[#e53935] text-white text-base font-bold cursor-pointer transition-colors hover:bg-[#c62828]">
                         {{ __('auth.register_button') }}

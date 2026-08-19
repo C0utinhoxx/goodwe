@@ -19,6 +19,7 @@ class UserRequest extends FormRequest
             'name' => 'required',
             'email' => 'required|email|unique:users,email,'.($userId ? $userId->id : null),
             'password' => 'required|min:6',
+            'password_confirmation' => 'required|same:password',
         ];
     }
 
@@ -31,6 +32,8 @@ class UserRequest extends FormRequest
             'email.unique' => __('validation.email_unique'),
             'password.required' => __('validation.password_required'),
             'password.min' => __('validation.password_min'),
+            'password_confirmation.required' => __('validation.confirm_required'),
+            'password_confirmation.same' => __('validation.confirm_same'),
         ];
     }
 }
