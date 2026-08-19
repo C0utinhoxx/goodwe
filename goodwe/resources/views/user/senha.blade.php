@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ __('auth.login_title') }}</title>
+    <title>{{ __('auth.forgot') }}</title>
     <script>
         (function() {
             var theme = localStorage.getItem('theme');
@@ -98,54 +98,78 @@
                     </div>
                 @endif
 
-                <form class="flex flex-col" action="{{ route('login-user') }}" method="POST">
-                    @csrf
+                <form class="flex flex-col" action="{{ route('user.update-password') }}" method="POST">
+    @csrf
 
-                    <label for="email" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.email') }}</label>
-                    <input
-                        type="email"
-                        name="email"
-                        id="email"
-                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('email') border-[#e53935] @enderror"
-                        placeholder="{{ __('auth.email_placeholder') }}"
-                        value="{{ old('email') }}"
-                    >
-                    @error('email')
-                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
-                    @enderror
+    <label for="email" class="text-sm mb-2 text-gray-900 dark:text-white">
+        {{ __('auth.email') }}
+    </label>
 
-                    <label for="password" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.password') }}</label>
-                    <input
-                        type="password"
-                        name="password"
-                        id="password"
-                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('password') border-[#e53935] @enderror"
-                        placeholder="{{ __('auth.password_placeholder') }}"
-                    >
-                    @error('password')
-                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
-                    @enderror
+    <input
+        type="email"
+        name="email"
+        id="email"
+        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('email') border-[#e53935] @enderror"
+        placeholder="{{ __('auth.email_placeholder') }}"
+        value="{{ old('email') }}"
+    >
 
-                    <label for="password" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.forgot_password') }}</label>
-                    <input
-                        type="password"
-                        name="password"
-                        id="password"
-                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('password') border-[#e53935] @enderror"
-                        placeholder="{{ __('auth.password_placeholder') }}"
-                    >
-                    @error('password')
-                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
-                    @enderror
+    @error('email')
+        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">
+            {{ $message }}
+        </div>
+    @enderror
 
-                    <button type="submit" class="w-full py-3.5 border-none rounded-lg bg-[#e53935] text-white text-base font-bold cursor-pointer transition-colors hover:bg-[#c62828]">
-                        Redefinir Senha
-                    </button>
-                </form>
+
+    <label for="password" class="text-sm mb-2 text-gray-900 dark:text-white">
+        {{ __('auth.new_password') }}
+    </label>
+
+    <input
+        type="password"
+        name="password"
+        id="password"
+        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('password') border-[#e53935] @enderror"
+        placeholder="{{ __('auth.password_placeholder') }}"
+    >
+
+    @error('password')
+        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">
+            {{ $message }}
+        </div>
+    @enderror
+
+
+    <label for="password_confirmation" class="text-sm mb-2 text-gray-900 dark:text-white">
+        {{ __('auth.password_confirmation') }}
+    </label>
+
+    <input
+        type="password"
+        name="password_confirmation"
+        id="password_confirmation"
+        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('password_confirmation') border-[#e53935] @enderror"
+        placeholder="{{ __('auth.password_confirmation_placeholder') }}"
+    >
+
+    @error('password_confirmation')
+        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">
+            {{ $message }}
+        </div>
+    @enderror
+
+
+    <button
+        type="submit"
+        class="w-full py-3.5 border-none rounded-lg bg-[#e53935] text-white text-base font-bold cursor-pointer transition-colors hover:bg-[#c62828]"
+    >
+        {{ __('auth.reset_password') }}
+    </button>
+</form>
 
                 <p class="text-center mt-6 text-sm text-gray-500 dark:text-[#a0a0a0]">
-                    {{ __('auth.no_account') }}
-                    <a href="{{ route('user.cadastro') }}" class="text-[#e53935] no-underline font-bold">{{ __('auth.register_link') }}</a>
+                    {{ __('auth.has_account') }}
+                    <a href="{{ route('user.login') }}" class="text-[#e53935] no-underline font-bold">{{ __('auth.login_link') }}</a>
                 </p>
             </div>
 

@@ -13,7 +13,7 @@ Route::get('/create-user', [UserController::class, 'create'])->name('user.cadast
 Route::post('/store-user', [UserController::class, 'store'])->name('user-store');
 
 Route::get('/forgot-password', [UserController::class, 'forgotPassword'])->name('user.forgot-password');
-Route::post('/update-password/{user}', [UserController::class, 'update_password'])->name('user.update-password');   
+Route::post('/update-password', [UserController::class, 'update_password'])->name('user.update-password');   
 
 Route::post('/logout', [UserController::class, 'logout'])->name('logout');
 
