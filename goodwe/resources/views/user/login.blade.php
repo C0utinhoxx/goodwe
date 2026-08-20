@@ -138,6 +138,7 @@
                             {{ __('auth.remember_me') }}
                         </label>
                         <a href="{{ route('user.forgot-password') }}" class="text-[#e53935] no-underline hover:underline">{{ __('auth.forgot_password') }}</a>
+                        <a href="{{ route('user.password.recovery') }}" class="text-[#e53935] no-underline hover:underline">{{ __('auth.forgot_password') }}</a>
                     </div>
 
                     <button type="submit" class="w-full py-3.5 border-none rounded-lg bg-[#e53935] text-white text-base font-bold cursor-pointer transition-colors hover:bg-[#c62828]">
