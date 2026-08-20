@@ -9,6 +9,10 @@ Route::get('/', fn () => redirect()->route('chargers.index'));
 Route::get('/login-user', [UserController::class, 'login'])->name('user.login');
 Route::post('/login', [UserController::class, 'logar'])->name('login-user');
 
+Route::get('/recover-password', [UserController::class, 'showPasswordRecovery'])->name('user.password.recovery');
+Route::post('/recover-password/verify', [UserController::class, 'verifyPasswordRecovery'])->name('user.password.verify');
+Route::post('/recover-password/update', [UserController::class, 'updatePassword'])->name('user.password.update');
+
 Route::get('/create-user', [UserController::class, 'create'])->name('user.cadastro');
 Route::post('/store-user', [UserController::class, 'store'])->name('user-store');
 
