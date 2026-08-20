@@ -20,6 +20,7 @@ class UserRequest extends FormRequest
             'email' => 'required|email|unique:users,email,'.($userId ? $userId->id : null),
             'phone' => 'required|string|regex:/^[0-9+\-\s()]+$/|min:10|max:20',
             'password' => 'required|min:6',
+            'password_confirmation' => 'required|same:password',
         ];
     }
 
@@ -35,6 +36,8 @@ class UserRequest extends FormRequest
             'phone.min' => __('validation.phone_min'),
             'password.required' => __('validation.password_required'),
             'password.min' => __('validation.password_min'),
+            'password_confirmation.required' => __('validation.confirm_required'),
+            'password_confirmation.same' => __('validation.confirm_same'),
         ];
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\PasswordRecoveryRequest;
 use App\Http\Requests\PasswordResetRequest;
 use App\Http\Requests\UserRequest;
+use App\Http\Requests\RedefinirRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +24,12 @@ class UserController extends Controller
         return view('user.cadastro');
     }
 
+    public function forgotPassword()
+    {
+        return view('user.senha');
+    }
+
+    public function store(UserRequest $request)
     public function store(UserRequest $request): RedirectResponse
     {
         $request->validated();
@@ -32,6 +39,7 @@ class UserController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => bcrypt($request->password),
+            
         ]);
 
         return redirect()->route('user.login')->with('success', __('auth.registered'));
@@ -52,6 +60,7 @@ class UserController extends Controller
         ]);
     }
 
+    public function update_password(RedefinirRequest $request)
     public function showPasswordRecovery(): View
     {
         return view('user.recover');
@@ -62,6 +71,20 @@ class UserController extends Controller
         $request->validated();
 
         $user = User::where('email', $request->email)->first();
+        if(!$user){
+            return back()->withErrors([
+                'email' => __('auth.user_not_found'),
+            ]);
+        }
+
+        $user->update([
+            'password' => bcrypt($request->password),
+        ]);
+        return redirect()->route('user.login')->with('success', __('auth.password_updated'));
+
+    }
+
+    public function logout()
 
         if ($user->phone === null || $user->phone !== $request->phone) {
             session()->forget([
