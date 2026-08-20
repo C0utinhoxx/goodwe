@@ -127,6 +127,20 @@
                         <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
                     @enderror
 
+                    <label for="phone" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.phone') }}</label>
+                    <input
+                        type="tel"
+                        name="phone"
+                        id="phone"
+                        class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('phone') border-[#e53935] @enderror"
+                        placeholder="{{ __('auth.phone_placeholder') }}"
+                        value="{{ old('phone') }}"
+                        maxlength="20"
+                    >
+                    @error('phone')
+                        <div class="text-[#ff5a55] text-xs -mt-4 mb-4">{{ $message }}</div>
+                    @enderror
+
                     <label for="password" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.password') }}</label>
                     <input
                         type="password"
