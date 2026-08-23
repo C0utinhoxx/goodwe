@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ __('auth.login_title') }}</title>
+    <link rel="icon" href="{{ asset('imagens/logo.png') }}" type="image/x-icon">
     <script>
         (function() {
             var theme = localStorage.getItem('theme');
@@ -15,9 +16,8 @@
         })();
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <link rel="icon" href="{{ asset('imagens/logo.png') }}" type="image/x-icon">
 </head>
-<body class="min-h-screen font-sans bg-white dark:bg-[#0f1117]">
+<body class="min-h-screen font-sans bg-[#FDFDFC] dark:bg-[#0f1117]">
     <div class="flex min-h-screen">
         {{-- Lado Visual --}}
         <div class="hidden lg:flex w-[60%] bg-gray-100 dark:bg-[#1a1a1a] bg-cover bg-[20%_center] bg-no-repeat items-center justify-center relative overflow-hidden" style="background-image: url('/imagens/login-goodwe.png')">
@@ -46,40 +46,16 @@
             </div>
         </div>
 
-        {{-- Lado Formulário --}}
-        <div class="w-full lg:w-[calc(40%+28px)] lg:-ml-7 bg-white dark:bg-[#0f1117] flex items-center justify-center relative lg:rounded-l-[28px] z-20">
+        {{-- Lado Formulario --}}
+        <div class="w-full lg:w-[calc(40%+28px)] lg:-ml-7 bg-[#FDFDFC] dark:bg-[#0f1117] flex items-center justify-center relative lg:rounded-l-[28px] z-20">
             {{-- Seletor de Idioma --}}
             <div class="absolute top-6 right-8 z-10">
-                <div class="relative">
-                    <button type="button" id="lang-toggle" class="flex items-center gap-2 bg-gray-100 dark:bg-[#2a2d34] text-gray-800 dark:text-white border border-gray-200 dark:border-none rounded-lg px-3 py-2 cursor-pointer text-sm hover:bg-gray-200 dark:hover:bg-[#3a3d45] transition-colors">
-                        <span class="text-base leading-none">@if(app()->getLocale() === 'pt') 🇧🇷 @elseif(app()->getLocale() === 'en') 🇺🇸 @else 🇪🇸 @endif</span>
-                        <span>{{ __('language.' . app()->getLocale()) }}</span>
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </button>
-                    <div id="lang-menu" class="hidden absolute right-0 top-full mt-2 w-[160px] bg-white dark:bg-[#2a2d34] border border-gray-200 dark:border-none rounded-lg py-1 shadow-lg">
-                        <a href="{{ route('locale.set', 'pt') }}" class="flex items-center gap-3 px-4 py-2.5 text-gray-800 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-[#3a3d45] transition-colors {{ app()->getLocale() === 'pt' ? 'font-bold' : '' }}">
-                            <span class="text-base leading-none">🇧🇷</span> {{ __('language.pt') }}
-                        </a>
-                        <a href="{{ route('locale.set', 'en') }}" class="flex items-center gap-3 px-4 py-2.5 text-gray-800 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-[#3a3d45] transition-colors {{ app()->getLocale() === 'en' ? 'font-bold' : '' }}">
-                            <span class="text-base leading-none">🇺🇸</span> {{ __('language.en') }}
-                        </a>
-                        <a href="{{ route('locale.set', 'es') }}" class="flex items-center gap-3 px-4 py-2.5 text-gray-800 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-[#3a3d45] transition-colors {{ app()->getLocale() === 'es' ? 'font-bold' : '' }}">
-                            <span class="text-base leading-none">🇪🇸</span> {{ __('language.es') }}
-                        </a>
-                    </div>
-                </div>
+                <x-lang-switcher variant="boxed" />
             </div>
 
             {{-- Toggle de Tema --}}
             <div class="absolute top-6 left-8 z-10">
-                <button type="button" id="theme-toggle" class="text-gray-400 dark:text-[#A1A09A] hover:text-gray-800 dark:hover:text-white transition-colors cursor-pointer">
-                    <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                    </svg>
-                    <svg class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                    </svg>
-                </button>
+                <x-theme-toggle />
             </div>
 
             <div class="w-[85%] max-w-[460px]">
@@ -88,17 +64,7 @@
                 <h3 class="text-lg mb-2 font-normal text-gray-900 dark:text-white">{{ __('auth.platform_name') }}</h3>
                 <p class="text-gray-500 dark:text-[#a0a0a0] mb-8">{{ __('auth.login_subtitle') }}</p>
 
-                @if (session('success'))
-                    <div class="mb-4 px-4 py-3 rounded-lg border border-green-500/30 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-sm">
-                        {{ session('success') }}
-                    </div>
-                @endif
-
-                @if (session('error'))
-                    <div class="mb-4 px-4 py-3 rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
-                        {{ session('error') }}
-                    </div>
-                @endif
+                <x-flash-messages />
 
                 <form class="flex flex-col" action="{{ route('login-user') }}" method="POST">
                     @csrf

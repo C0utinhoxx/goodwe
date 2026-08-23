@@ -39,12 +39,22 @@ class UserController extends Controller
         if (Auth::attempt($credentials)) {
             request()->session()->regenerate();
 
-            return redirect()->route('chargers.index')->with('success', __('auth.logged_in'));
+            return redirect()->route('user.home')->with('success', __('auth.logged_in'));
         }
 
         return back()->withErrors([
             'email' => __('auth.failed'),
         ]);
+    }
+
+    public function profile()
+    {
+        return view('user.profile');
+    }
+
+    public function home()
+    {
+        return view('user.home-usuario');
     }
 
     public function logout()

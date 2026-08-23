@@ -2,9 +2,14 @@
 
 use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => redirect()->route('chargers.index'));
+Route::get('/', function () {
+    return auth()->check()
+        ? redirect()->route('user.home')
+        : redirect()->route('user.login');
+});
 
 Route::get('/login-user', [UserController::class, 'login'])->name('user.login');
 Route::post('/login', [UserController::class, 'logar'])->name('login-user');
@@ -30,4 +35,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/{charger}/agendar', [ChargingController::class, 'schedule'])->name('schedule');
         Route::post('/{charger}/liberar', [ChargingController::class, 'release'])->name('release');
     });
+
+    Route::prefix('carteira')->name('wallet.')->group(function () {
+        Route::get('/', [WalletController::class, 'index'])->name('index');
+        Route::get('/adicionar', [WalletController::class, 'depositForm'])->name('deposit.form');
+        Route::post('/adicionar', [WalletController::class, 'storeDeposit'])->name('deposit.store');
+        Route::get('/historico', [WalletController::class, 'history'])->name('history');
+    });
+
+    Route::get('/meu-perfil', [UserController::class, 'profile'])->name('user.profile');
+    Route::get('/inicio', [UserController::class, 'home'])->name('user.home');
 });
