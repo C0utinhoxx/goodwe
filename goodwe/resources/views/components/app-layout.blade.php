@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{{ config('app.name', 'Laravel') }}</title>
+        <link rel="icon" href="{{ asset('imagens/logo.png') }}" type="image/x-icon">
         <script>
             (function() {
                 var theme = localStorage.getItem('theme');
@@ -16,68 +17,102 @@
         </script>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="bg-[#FDFDFC] dark:bg-[#0a0a0a] text-[#1b1b18] dark:text-[#EDEDEC] min-h-screen antialiased">
-        <header class="border-b border-[#e3e3e0] dark:border-[#3E3E3A]">
-            <nav class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-                <a href="{{ route('chargers.index') }}" class="font-medium">{{ __('app.name') }}</a>
-                <div class="flex items-center gap-4">
-                    <span class="text-sm text-[#706f6c] dark:text-[#A1A09A]">{{ __('app.subtitle') }}</span>
+    <body class="bg-[#FDFDFC] dark:bg-[#0f1117] text-[#1b1b18] dark:text-[#EDEDEC] min-h-screen antialiased">
+        <div class="flex min-h-screen">
+            <aside class="hidden w-64 shrink-0 flex-col border-r border-[#e3e3e0] dark:border-[#343843] bg-white dark:bg-[#1a1a1a] lg:flex">
+                <div class="px-6 pb-6 pt-8">
+                    <a href="{{ route('user.home') }}" class="flex items-center gap-2.5">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e53935]">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                            </svg>
+                        </div>
+                        <span class="text-lg font-bold tracking-tight text-gray-900 dark:text-white">GOODWE</span>
+                    </a>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-[#a0a0a0]">{{ __('app.subtitle') }}</p>
+                </div>
 
-                    <div class="relative">
-                        <button type="button" id="lang-toggle" class="flex items-center gap-2 text-sm text-[#706f6c] dark:text-[#A1A09A] hover:text-[#1b1b18] dark:hover:text-[#EDEDEC] transition-colors cursor-pointer">
-                            <span class="text-base leading-none">@if(app()->getLocale() === 'pt') 🇧🇷 @elseif(app()->getLocale() === 'en') 🇺🇸 @else 🇪🇸 @endif</span>
-                            <span>{{ __('language.' . app()->getLocale()) }}</span>
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                <nav class="space-y-1 px-4">
+                    <a href="{{ route('user.home') }}" class="flex items-center gap-3 rounded-lg border border-[#e53935]/40 bg-[#e53935]/10 px-4 py-2.5 text-sm font-medium text-[#e53935]">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                        </svg>
+                        <span>{{ __('nav.home') }}</span>
+                    </a>
+                    <a href="{{ route('chargers.index') }}" class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-[#706f6c] hover:bg-[#e3e3e0]/50 hover:text-[#1b1b18] dark:text-[#a0a0a0] dark:hover:bg-[#343843] dark:hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                        </svg>
+                        <span>{{ __('nav.chargers') }}</span>
+                    </a>
+                    <a href="{{ route('user.profile') }}" class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-[#706f6c] hover:bg-[#e3e3e0]/50 hover:text-[#1b1b18] dark:text-[#a0a0a0] dark:hover:bg-[#343843] dark:hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                        </svg>
+                        <span>{{ __('nav.profile') }}</span>
+                    </a>
+                </nav>
+
+                <div class="mt-auto space-y-1 border-t border-[#e3e3e0] dark:border-[#343843] px-4 pb-6 pt-4">
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-[#706f6c] hover:bg-[#e3e3e0]/50 hover:text-[#1b1b18] dark:text-[#a0a0a0] dark:hover:bg-[#343843] dark:hover:text-white transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                            </svg>
+                            <span>{{ __('app.logout') }}</span>
                         </button>
-                        <div id="lang-menu" class="hidden absolute right-0 top-full mt-2 bg-white dark:bg-[#161615] border border-[#e3e3e0] dark:border-[#3E3E3A] rounded-md shadow-lg z-50 min-w-[160px] overflow-hidden">
-                            <a href="{{ route('locale.set', 'pt') }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1b1b18] dark:text-[#EDEDEC] hover:bg-[#e3e3e0] dark:hover:bg-[#3E3E3A] transition-colors {{ app()->getLocale() === 'pt' ? 'font-bold bg-[#e3e3e0]/50 dark:bg-[#3E3E3A]/50' : '' }}">
-                                <span class="text-base leading-none">🇧🇷</span> {{ __('language.pt') }}
-                            </a>
-                            <a href="{{ route('locale.set', 'en') }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1b1b18] dark:text-[#EDEDEC] hover:bg-[#e3e3e0] dark:hover:bg-[#3E3E3A] transition-colors {{ app()->getLocale() === 'en' ? 'font-bold bg-[#e3e3e0]/50 dark:bg-[#3E3E3A]/50' : '' }}">
-                                <span class="text-base leading-none">🇺🇸</span> {{ __('language.en') }}
-                            </a>
-                            <a href="{{ route('locale.set', 'es') }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1b1b18] dark:text-[#EDEDEC] hover:bg-[#e3e3e0] dark:hover:bg-[#3E3E3A] transition-colors {{ app()->getLocale() === 'es' ? 'font-bold bg-[#e3e3e0]/50 dark:bg-[#3E3E3A]/50' : '' }}">
-                                <span class="text-base leading-none">🇪🇸</span> {{ __('language.es') }}
+                    </form>
+                </div>
+            </aside>
+
+            <main class="min-w-0 flex-1">
+                <header class="border-b border-[#e3e3e0] dark:border-[#343843] bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-sm sticky top-0 z-30">
+                    <nav class="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
+                        <div class="flex items-center gap-4 lg:hidden">
+                            <a href="{{ route('user.home') }}" class="flex items-center gap-2">
+                                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e53935]">
+                                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                                    </svg>
+                                </div>
+                                <span class="text-sm font-bold tracking-tight text-gray-900 dark:text-white">GOODWE</span>
                             </a>
                         </div>
-                    </div>
 
-                    <button type="button" id="theme-toggle" class="text-[#706f6c] dark:text-[#A1A09A] hover:text-[#1b1b18] dark:hover:text-[#EDEDEC] transition-colors cursor-pointer">
-                        <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                        </svg>
-                        <svg class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                        </svg>
-                    </button>
+                        <div class="flex-1 lg:flex-none"></div>
 
-                    @auth
-                        <form method="POST" action="{{ route('logout') }}" class="inline">
-                            @csrf
-                            <button type="submit" class="text-sm text-[#706f6c] dark:text-[#A1A09A] hover:text-[#1b1b18] dark:hover:text-[#EDEDEC] transition-colors cursor-pointer">
-                                {{ __('app.logout') }}
-                            </button>
-                        </form>
-                    @endauth
+                        <div class="flex items-center gap-3">
+                            <x-lang-switcher variant="boxed" />
+                            <x-theme-toggle variant="boxed" />
+
+                            @auth
+                                <div class="hidden sm:flex items-center gap-2 pl-2 border-l border-[#e3e3e0] dark:border-[#343843]">
+                                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[#e53935]/10 text-[#e53935] text-xs font-semibold">
+                                        {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-900 dark:text-white">{{ Auth::user()->name }}</span>
+                                </div>
+
+                                <form method="POST" action="{{ route('logout') }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 dark:border-[#343843] bg-gray-50 dark:bg-[#181b22] text-gray-500 dark:text-[#a0a0a0] hover:border-[#e53935]/40 hover:text-[#e53935] dark:hover:text-[#e53935] transition-all cursor-pointer" title="{{ __('app.logout') }}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            @endauth
+                        </div>
+                    </nav>
+                </header>
+
+                <div class="max-w-5xl mx-auto px-6 py-8">
+                    <x-flash-messages />
+                    {{ $slot }}
                 </div>
-            </nav>
-        </header>
-
-        <main class="max-w-4xl mx-auto px-6 py-8">
-            @if (session('success'))
-                <div class="mb-6 px-4 py-3 rounded-sm border border-green-600/30 bg-green-600/10 text-green-700 dark:text-green-400 text-sm">
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if (session('error'))
-                <div class="mb-6 px-4 py-3 rounded-sm border border-red-600/30 bg-red-600/10 text-red-700 dark:text-red-400 text-sm">
-                    {{ session('error') }}
-                </div>
-            @endif
-
-            {{ $slot }}
-        </main>
+            </main>
+        </div>
 
         <script src="{{ asset('js/theme.js') }}"></script>
     </body>

@@ -20,11 +20,11 @@ class ExampleTest extends TestCase
         $this->actingAs($user);
     }
 
-    public function test_the_application_redirects_to_the_chargers_list(): void
+    public function test_the_application_redirects_to_the_home_page(): void
     {
         $response = $this->get('/');
 
-        $response->assertRedirect(route('chargers.index'));
+        $response->assertRedirect(route('user.home'));
     }
 
     public function test_chargers_index_lists_all_charging_points(): void

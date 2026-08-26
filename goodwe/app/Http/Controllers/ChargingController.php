@@ -2,12 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\InsufficientBalanceException;
 use App\Services\ChargingSimulator;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ChargingController extends Controller
 {
+    public function __construct(
+        private WalletService $walletService,
+    ) {}
+
     public function index(): View
     {
         return view('chargers.index', [
@@ -30,6 +36,16 @@ class ChargingController extends Controller
 
         if (! $scheduled) {
             return back()->with('error', __('chargers.not_available'));
+        }
+
+        $user = auth()->user();
+        $amount = $validated['duration_minutes'] * 0.65;
+        $energyKwh = $validated['duration_minutes'] * 0.37;
+
+        try {
+            $this->walletService->payCharging($user, $amount, $code, $energyKwh);
+        } catch (InsufficientBalanceException $e) {
+            return back()->with('error', __('wallet.insufficient_balance'));
         }
 
         return redirect()->route('chargers.index')
