@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ChargingController;
+use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -45,4 +46,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/meu-perfil', [UserController::class, 'profile'])->name('user.profile');
     Route::get('/inicio', [UserController::class, 'home'])->name('user.home');
+
+    Route::middleware('gestor')->prefix('gestor')->name('manager.')->group(function () {
+        Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
+    });
 });

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -43,5 +44,15 @@ class User extends Authenticatable
     public function chargingSessions(): HasMany
     {
         return $this->hasMany(ChargingSession::class);
+    }
+
+    public function establishment(): HasOne
+    {
+        return $this->hasOne(Establishment::class);
+    }
+
+    public function isGestor(): bool
+    {
+        return $this->is_admin === true;
     }
 }

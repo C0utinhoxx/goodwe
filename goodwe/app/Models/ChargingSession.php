@@ -9,6 +9,7 @@ class ChargingSession extends Model
 {
     protected $fillable = [
         'user_id',
+        'establishment_id',
         'charger_name',
         'energy_kwh',
         'amount_charged',
@@ -36,5 +37,10 @@ class ChargingSession extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function establishment(): BelongsTo
+    {
+        return $this->belongsTo(Establishment::class);
     }
 }

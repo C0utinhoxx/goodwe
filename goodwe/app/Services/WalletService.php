@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientBalanceException;
+use App\Exceptions\InsufficientPointsException;
 use App\Models\ChargingSession;
 use App\Models\Transaction;
 use App\Models\User;
@@ -45,7 +47,7 @@ class WalletService
     {
         return DB::transaction(function () use ($user, $amount, $chargerName, $energyKwh) {
             if ($user->balance < $amount) {
-                throw new \InsufficientBalanceException('Saldo insuficiente para realizar a recarga.');
+                throw new InsufficientBalanceException('Saldo insuficiente para realizar a recarga.');
             }
 
             $user->decrement('balance', $amount);
@@ -86,7 +88,7 @@ class WalletService
     {
         return DB::transaction(function () use ($user, $points) {
             if ($user->points < $points) {
-                throw new \InsufficientPointsException('Pontos insuficientes para resgate.');
+                throw new InsufficientPointsException('Pontos insuficientes para resgate.');
             }
 
             $creditAmount = $points / 100;
