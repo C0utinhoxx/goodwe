@@ -21,6 +21,8 @@ import {
     ChevronDown
 } from 'lucide';
 
+import Chart from 'chart.js/auto';
+
 createIcons({
     icons: {
         House,
@@ -44,3 +46,5 @@ createIcons({
         ChevronDown
     }
 });
+
+window.Chart = Chart;
