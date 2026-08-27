@@ -1,5 +1,5 @@
 <x-user-layout>
-    <div class="max-w-2xl">
+    <div class="max-w-2xl mx-auto">
         <div class="rounded-xl border border-gray-200 dark:border-[#343843] bg-white dark:bg-[#1a1a1a] p-6">
             <div class="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-[#343843]">
                 <div class="flex h-16 w-16 items-center justify-center rounded-full bg-[#e53935]/10 text-[#e53935] text-xl font-bold">
