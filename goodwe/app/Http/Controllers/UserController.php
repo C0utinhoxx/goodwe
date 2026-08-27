@@ -23,11 +23,6 @@ class UserController extends Controller
         return view('user.cadastro');
     }
 
-    public function forgotPassword()
-    {
-        return view('user.senha');
-    }
-
     public function store(UserRequest $request): RedirectResponse
     {
         $request->validated();

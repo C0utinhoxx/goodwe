@@ -23,9 +23,7 @@
             <div class="px-6 pb-6 pt-8">
                 <a href="{{ route('user.home') }}" class="flex items-center gap-2.5">
                     <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e53935]">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                        </svg>
+                        <span class="text-white font-bold text-base">W</span>
                     </div>
                     <span class="text-lg font-bold tracking-tight text-gray-900 dark:text-white">GOODWE</span>
                 </a>

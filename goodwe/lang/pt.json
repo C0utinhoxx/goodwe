@@ -161,6 +161,7 @@
     "wallet.insufficient_balance": "Saldo insuficiente para realizar a recarga.",
     "wallet.insufficient_points": "Pontos insuficientes para resgate.",
     "wallet.no_transactions": "Nenhuma transacao encontrada.",
+    "wallet.back": "Voltar",
     "wallet.full_history": "Historico completo",
     "wallet.type": "Tipo",
     "wallet.value": "Valor",

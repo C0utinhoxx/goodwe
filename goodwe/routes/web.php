@@ -22,9 +22,6 @@ Route::post('/recover-password/update', [UserController::class, 'updatePassword'
 Route::get('/create-user', [UserController::class, 'create'])->name('user.cadastro');
 Route::post('/store-user', [UserController::class, 'store'])->name('user-store');
 
-Route::get('/forgot-password', [UserController::class, 'forgotPassword'])->name('user.forgot-password');
-Route::post('/update-password', [UserController::class, 'update_password'])->name('user.update-password');
-
 Route::post('/logout', [UserController::class, 'logout'])->name('logout');
 
 Route::get('/locale/{locale}', function (string $locale) {

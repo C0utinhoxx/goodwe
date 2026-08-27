@@ -1,4 +1,11 @@
-<x-app-layout>
+<x-user-layout>
+    <x-slot name="header">
+        <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">{{ __('profile.title') }}</h1>
+        <p class="mt-2 text-sm text-gray-500 dark:text-[#a0a0a0]">
+            {{ __('profile.subtitle') }}
+        </p>
+    </x-slot>
+
     <div class="max-w-2xl">
         <div class="mb-8">
             <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">{{ __('profile.title') }}</h1>
@@ -59,4 +66,4 @@
             </div>
         </div>
     </div>
-</x-app-layout>
+</x-user-layout>
