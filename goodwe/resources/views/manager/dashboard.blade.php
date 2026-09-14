@@ -194,11 +194,11 @@
         </div>
     </section>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
-        const isDark = document.documentElement.classList.contains('dark');
-        const gridColor = isDark ? '#343843' : '#e3e3e0';
-        const textColor = isDark ? '#a0a0a0' : '#706f6c';
+        document.addEventListener('DOMContentLoaded', () => {
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? '#343843' : '#e3e3e0';
+            const textColor = isDark ? '#a0a0a0' : '#706f6c';
 
         const labels = @json($dailyLabels);
         const kwhData = @json($dailyKwh);
@@ -297,6 +297,7 @@
                     legend: { position: 'bottom', labels: { color: textColor, padding: 16 } }
                 }
             }
-        });
-    </script>
+});
+    });
+</script>
 </x-user-layout>

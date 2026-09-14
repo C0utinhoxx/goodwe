@@ -53,7 +53,7 @@
                         href="{{ route('wallet.index') }}"
                         class="rounded-lg border border-gray-300 px-6 py-3 text-sm font-medium hover:bg-gray-100 dark:border-[#343843] dark:hover:bg-[#22252d] transition-colors text-gray-900 dark:text-white"
                     >
-                        {{ __('app.logout') }}
+                        {{ __('wallet.back') }}
                     </a>
                     <button
                         type="submit"

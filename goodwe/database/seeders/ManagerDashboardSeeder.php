@@ -16,10 +16,12 @@ class ManagerDashboardSeeder extends Seeder
 
     public function run(): void
     {
+        $email = $this->command->option('email') ?? 'brunoriquelme2801@icloud.com';
+
         $gestor = User::firstOrCreate(
-            ['email' => 'brunoriquelme2801@icloud.com'],
+            ['email' => $email],
             [
-                'name' => 'Bruno Riquelme',
+                'name' => explode('@', $email)[0],
                 'password' => Hash::make('123456'),
                 'is_admin' => true,
             ]
@@ -40,6 +42,14 @@ class ManagerDashboardSeeder extends Seeder
                 'cost_per_kwh' => 1.8500,
             ]
         );
+
+        $existingSessions = ChargingSession::where('establishment_id', $establishment->id)->count();
+
+        if ($existingSessions > 0) {
+            $this->command->warn("Estabelecimento ja possui {$existingSessions} sessoes. Pulando criacao de dados.");
+
+            return;
+        }
 
         $chargerNames = [
             'Torre A - Norte',
@@ -94,7 +104,7 @@ class ManagerDashboardSeeder extends Seeder
         }
 
         $this->command->info('Dados de gestor criados com sucesso!');
-        $this->command->info('Email: brunoriquelme2801@icloud.com');
+        $this->command->info("Email: {$email}");
         $this->command->info("Estabelecimento: {$establishment->name}");
         $this->command->info('Sessoes criadas: 60 registros nos ultimos 30 dias');
     }
