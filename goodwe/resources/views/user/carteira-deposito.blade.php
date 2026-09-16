@@ -26,7 +26,7 @@
                 </div>
             </div>
 
-            <form method="POST" action="{{ route('wallet.deposit.store') }}">
+            <form method="POST" action="{{ route('checkout') }}">
                 @csrf
                 <div class="mb-6">
                     <label for="amount" class="block text-sm font-medium text-gray-700 dark:text-[#a0a0a0] mb-2">

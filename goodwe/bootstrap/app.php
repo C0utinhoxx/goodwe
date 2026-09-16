@@ -20,6 +20,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => route('user.login'));
         $middleware->redirectUsersTo(fn () => route('chargers.index'));
     })
+    ->withMiddleware(function (Middleware $middleware) {
+    $middleware->validateCsrfTokens(except: [
+        'webhook/mercadopago',
+    ]);
+})
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

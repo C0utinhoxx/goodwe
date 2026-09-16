@@ -4,6 +4,8 @@ use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\MercadoPagoController;
+
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -54,4 +56,11 @@ Route::middleware('auth')->group(function () {
     Route::middleware('gestor')->prefix('gestor')->name('manager.')->group(function () {
         Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
     });
+
+   Route::post('/checkout', [MercadoPagoController::class, 'checkout'])->name('checkout');
+   Route::get('/pagamento/sucesso', [MercadoPagoController::class, 'sucesso'])->name('pagamento.sucesso');
+   Route::get('/pagamento/erro', [MercadoPagoController::class, 'erro'])->name('pagamento.erro');
+   Route::get('/pagamento/pendente', [MercadoPagoController::class, 'pendente'])->name('pagamento.pendente');
+   Route::post('/webhook/mercadopago', [MercadoPagoController::class, 'webhook'])
+    ->name('mercadopago.webhook');
 });
