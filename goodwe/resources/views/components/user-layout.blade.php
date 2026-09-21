@@ -19,7 +19,7 @@
 </head>
 <body class="min-h-screen bg-[#FDFDFC] text-[#1b1b18] dark:bg-[#0f1117] dark:text-[#EDEDEC]">
     <div class="flex min-h-screen">
-        <aside class="hidden w-64 shrink-0 flex-col border-r border-[#e3e3e0] bg-white dark:border-[#343843] dark:bg-[#1a1a1a] lg:flex">
+        <aside class="fixed inset-y-0 hidden w-64 shrink-0 flex-col border-r border-[#e3e3e0] bg-white dark:border-[#343843] dark:bg-[#1a1a1a] lg:flex">
             <div class="px-6 pb-6 pt-8">
                 <a href="{{ route('user.home') }}" class="flex items-center gap-2.5">
                     <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e53935]">
@@ -100,7 +100,7 @@
             </div>
         </aside>
 
-        <main class="min-w-0 flex-1">
+        <main class="min-w-0 flex-1 lg:ml-64">
             <div class="mx-auto max-w-[1280px] px-5 py-8 sm:px-6 lg:px-8">
                 <header class="flex items-center justify-between gap-4">
                     <div>
