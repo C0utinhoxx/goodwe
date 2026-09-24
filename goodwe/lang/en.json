@@ -202,5 +202,36 @@
     "manager.status_completed": "Completed",
     "manager.status_pending": "Pending",
     "manager.status_cancelled": "Cancelled",
-    "manager.no_sessions": "No sessions found."
+    "manager.no_sessions": "No sessions found.",
+
+"nav.chatbot": "AI Assistant",
+
+"chatbot.title": "GoodWe Assistant",
+"chatbot.subtitle": "Artificial intelligence for charging management",
+"chatbot.welcome": "How can I help?",
+"chatbot.description": "Check your establishment data, charging sessions, revenue and energy consumption.",
+"chatbot.placeholder": "Ask me anything...",
+"chatbot.send": "Send",
+"chatbot.warning": "The GoodWe Assistant can make mistakes. Check important information.",
+
+"chatbot.suggestion_business": "Business summary",
+"chatbot.suggestion_business_desc": "View a summary of current data",
+"chatbot.suggestion_business_question": "Give me a summary of my establishment.",
+
+"chatbot.suggestion_sessions": "Charging sessions",
+"chatbot.suggestion_sessions_desc": "Check registered charging sessions",
+"chatbot.suggestion_sessions_question": "How many charging sessions do we have?",
+
+"chatbot.suggestion_revenue": "Total revenue",
+"chatbot.suggestion_revenue_desc": "Check the recorded revenue",
+"chatbot.suggestion_revenue_question": "What is the establishment's total revenue?",
+
+"chatbot.suggestion_energy": "Energy consumed",
+"chatbot.suggestion_energy_desc": "Check energy consumption",
+"chatbot.suggestion_energy_question": "How much energy has been consumed?",
+
+"chatbot.thinking": "Analyzing...",
+"chatbot.no_answer": "I couldn't generate a response.",
+"chatbot.error": "The assistant is unavailable right now.",
+"chatbot.connection_error": "Unable to connect to the assistant."
 }

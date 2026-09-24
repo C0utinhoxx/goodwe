@@ -202,5 +202,36 @@
     "manager.status_completed": "Concluida",
     "manager.status_pending": "Pendente",
     "manager.status_cancelled": "Cancelada",
-    "manager.no_sessions": "Nenhuma sessao encontrada."
+   "manager.no_sessions": "Nenhuma sessao encontrada.",
+
+"nav.chatbot": "Assistente IA",
+
+"chatbot.title": "Assistente GoodWe",
+"chatbot.subtitle": "Inteligencia artificial para gestao de recargas",
+"chatbot.welcome": "Como posso ajudar?",
+"chatbot.description": "Consulte os dados do seu estabelecimento, sessoes de carregamento, receita e consumo de energia.",
+"chatbot.placeholder": "Pergunte alguma coisa...",
+"chatbot.send": "Enviar",
+"chatbot.warning": "O Assistente GoodWe pode cometer erros. Verifique informacoes importantes.",
+
+"chatbot.suggestion_business": "Resumo do negocio",
+"chatbot.suggestion_business_desc": "Veja um resumo dos dados atuais",
+"chatbot.suggestion_business_question": "Faca um resumo do meu estabelecimento.",
+
+"chatbot.suggestion_sessions": "Sessoes de recarga",
+"chatbot.suggestion_sessions_desc": "Consulte as sessoes registradas",
+"chatbot.suggestion_sessions_question": "Quantas sessoes de carregamento temos?",
+
+"chatbot.suggestion_revenue": "Receita total",
+"chatbot.suggestion_revenue_desc": "Consulte o faturamento registrado",
+"chatbot.suggestion_revenue_question": "Qual e a receita total do estabelecimento?",
+
+"chatbot.suggestion_energy": "Energia consumida",
+"chatbot.suggestion_energy_desc": "Consulte o consumo de energia",
+"chatbot.suggestion_energy_question": "Quanto de energia foi consumida?",
+
+"chatbot.thinking": "Analisando...",
+"chatbot.no_answer": "Nao consegui gerar uma resposta.",
+"chatbot.error": "Nao foi possivel consultar o assistente agora.",
+"chatbot.connection_error": "Nao foi possivel conectar com o assistente."
 }
