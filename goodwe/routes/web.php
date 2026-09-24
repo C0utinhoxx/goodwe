@@ -3,6 +3,7 @@
 use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ManagerController;
+use App\Http\Controllers\MercadoPagoController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalletController;
@@ -111,10 +112,6 @@ Route::middleware('auth')->group(function () {
         ->prefix('gestor')
         ->name('manager.')
         ->group(function () {
-
-            Route::get('/dashboard', [ManagerController::class, 'dashboard'])
-                ->name('dashboard');
-
             Route::get('/assistente', [ChatbotController::class, 'page'])
                 ->name('chatbot.page');
 
@@ -124,4 +121,16 @@ Route::middleware('auth')->group(function () {
             Route::delete('/chatbot', [ChatbotController::class, 'clear'])
                 ->name('chatbot.clear');
         });
+
+    Route::post('/checkout', [MercadoPagoController::class, 'checkout'])
+        ->name('checkout');
+    Route::get('/pagamento/sucesso', [MercadoPagoController::class, 'sucesso'])
+        ->name('pagamento.sucesso');
+    Route::get('/pagamento/erro', [MercadoPagoController::class, 'erro'])
+        ->name('pagamento.erro');
+    Route::get('/pagamento/pendente', [MercadoPagoController::class, 'pendente'])
+        ->name('pagamento.pendente');
 });
+
+Route::post('/webhook/mercadopago', [MercadoPagoController::class, 'webhook'])
+    ->name('mercadopago.webhook');
