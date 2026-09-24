@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('gestor')->prefix('gestor')->name('manager.')->group(function () {
         Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
+        Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])->name('dashboard.export');
     });
 
    Route::post('/checkout', [MercadoPagoController::class, 'checkout'])->name('checkout');
