@@ -1,11 +1,32 @@
 <x-user-layout>
     <x-slot name="header">
-        <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">
-            {{ __('manager.dashboard') }}
-        </h1>
-        <p class="mt-2 text-sm text-gray-500 dark:text-[#a0a0a0]">
-            {{ $establishment->name }} &bull; {{ $establishment->address }}
-        </p>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">
+                    {{ __('manager.dashboard') }}
+                </h1>
+                <p class="mt-2 text-sm text-gray-500 dark:text-[#a0a0a0]">
+                    {{ $establishment->name }} &bull; {{ $establishment->address }}
+                </p>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <form method="GET" action="{{ route('manager.dashboard') }}" class="flex items-center gap-2">
+                    <label for="period" class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_label') }}</label>
+                    <select name="period" id="period" onchange="this.form.submit()" class="rounded-md border border-gray-300 dark:border-[#343843] bg-gray-50 dark:bg-[#181b22] px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935]">
+                        <option value="7" @selected($period === 7)>{{ __('manager.period_7') }}</option>
+                        <option value="30" @selected($period === 30)>{{ __('manager.period_30') }}</option>
+                        <option value="90" @selected($period === 90)>{{ __('manager.period_90') }}</option>
+                    </select>
+                </form>
+                <a href="{{ route('manager.dashboard.export', ['period' => $period]) }}" class="inline-flex items-center gap-1.5 rounded-md border border-[#e53935]/30 px-3 py-2 text-sm font-medium text-[#e53935] transition-all hover:bg-[#e53935]/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    {{ __('manager.export_csv') }}
+                </a>
+            </div>
+        </div>
     </x-slot>
 
     <section class="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -66,12 +87,80 @@
         </div>
     </section>
 
+    <section class="mt-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ __('manager.period_summary') }}</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-md bg-gray-50 dark:bg-[#181b22] p-4">
+                <p class="text-xs text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_sessions') }}</p>
+                <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ $periodSessionsCount }}</p>
+            </div>
+            <div class="rounded-md bg-gray-50 dark:bg-[#181b22] p-4">
+                <p class="text-xs text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_revenue') }}</p>
+                <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">R$ {{ number_format($periodRevenue, 2, ',', '.') }}</p>
+            </div>
+            <div class="rounded-md bg-gray-50 dark:bg-[#181b22] p-4">
+                <p class="text-xs text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_energy') }}</p>
+                <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($periodEnergy, 1, ',', '.') }} kWh</p>
+            </div>
+            <div class="rounded-md bg-gray-50 dark:bg-[#181b22] p-4">
+                <p class="text-xs text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.active_users') }}</p>
+                <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ $periodActiveUsers }} <span class="text-sm font-normal text-gray-400">/ {{ $totalUsers }} {{ __('manager.total_users') }}</span></p>
+            </div>
+        </div>
+    </section>
+
+    <section class="mt-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ __('manager.live_network') }}</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.live_network_subtitle') }}</p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-[#e53935]/30 bg-[#e53935]/5 px-3 py-1.5">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e53935] opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#e53935]"></span>
+                </span>
+                <span class="text-xs text-[#e53935] font-medium">{{ __('chargers.live_status') }}</span>
+            </span>
+        </div>
+
+        <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            @forelse($liveChargers as $charger)
+                <div class="rounded-lg border border-gray-200 dark:border-[#343843] p-4">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <p class="font-medium text-gray-900 dark:text-white">{{ $charger['name'] }}</p>
+                            <p class="text-xs text-gray-500 dark:text-[#a0a0a0]">{{ $charger['location'] }}</p>
+                        </div>
+                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {{ $charger['is_available'] ? 'bg-emerald-500/10 text-emerald-500' : 'bg-gray-200 dark:bg-[#343843] text-gray-400 dark:text-[#a0a0a0]' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $charger['is_available'] ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-[#a0a0a0]' }}"></span>
+                            {{ $charger['is_available'] ? __('manager.charger_available') : __('manager.charger_occupied') }}
+                        </span>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-[#a0a0a0]">
+                        <span class="rounded-md bg-gray-100 dark:bg-[#181b22] px-2 py-1">{{ $charger['power_kw'] }} kW</span>
+                        <span class="rounded-md bg-gray-100 dark:bg-[#181b22] px-2 py-1">{{ $charger['connector'] }}</span>
+                        <span class="rounded-md bg-gray-100 dark:bg-[#181b22] px-2 py-1 font-mono">{{ $charger['id'] }}</span>
+                    </div>
+                    @if(! $charger['is_available'])
+                        <p class="mt-3 text-xs text-gray-500 dark:text-[#a0a0a0]">
+                            {{ __('chargers.occupied_by') }} <span class="font-medium text-gray-900 dark:text-white">{{ $charger['vehicle_plate'] }}</span>
+                            &bull; {{ __('manager.releases_in', ['minutes' => $charger['available_in_minutes']]) }}
+                        </p>
+                    @endif
+                </div>
+            @empty
+                <p class="col-span-full py-6 text-center text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.no_chargers') }}</p>
+            @endforelse
+        </div>
+    </section>
+
     <section class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
         <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
                 {{ __('manager.energy_usage') }}
             </h2>
-            <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.last_30_days') }}</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_' . $period) }}</p>
             <div class="mt-4" style="height: 280px;">
                 <canvas id="energyChart"></canvas>
             </div>
@@ -81,7 +170,7 @@
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
                 {{ __('manager.revenue_chart') }}
             </h2>
-            <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.last_30_days') }}</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_' . $period) }}</p>
             <div class="mt-4" style="height: 280px;">
                 <canvas id="revenueChart"></canvas>
             </div>
@@ -110,37 +199,71 @@
         </div>
     </section>
 
-    <section class="mt-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
-        <div class="flex items-center justify-between gap-4">
+    <section class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                {{ __('manager.top_users') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.top_users_subtitle') }}</p>
+            <div class="mt-5 overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="border-b border-gray-200 text-gray-500 dark:border-[#343843] dark:text-[#a0a0a0]">
+                        <tr>
+                            <th class="py-2 font-medium">{{ __('manager.rank') }}</th>
+                            <th class="py-2 font-medium">{{ __('manager.table_user') }}</th>
+                            <th class="py-2 font-medium">{{ __('manager.table_sessions') }}</th>
+                            <th class="py-2 font-medium">{{ __('manager.table_energy') }}</th>
+                            <th class="py-2 font-medium">{{ __('manager.table_value') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($topUsers as $index => $row)
+                            <tr class="border-b border-gray-200 dark:border-[#343843]">
+                                <td class="py-3 text-gray-500 dark:text-[#a0a0a0]">{{ $index + 1 }}</td>
+                                <td class="py-3 text-gray-900 dark:text-white">{{ $row->user->name ?? '-' }}</td>
+                                <td class="py-3 text-gray-900 dark:text-white">{{ $row->sessions_count }}</td>
+                                <td class="py-3 text-gray-900 dark:text-white">{{ number_format($row->total_kwh, 1, ',', '.') }} kWh</td>
+                                <td class="py-3 text-gray-900 dark:text-white">R$ {{ number_format($row->total_spent, 2, ',', '.') }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.no_users') }}</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
                 {{ __('manager.establishment_info') }}
             </h2>
-        </div>
-
-        <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-                <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_name') }}</p>
-                <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->name }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_address') }}</p>
-                <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->address }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_type') }}</p>
-                <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ ucfirst($establishment->type) }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_hours') }}</p>
-                <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->operating_hours }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_phone') }}</p>
-                <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->phone ?? '-' }}</p>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_cost') }}</p>
-                <p class="mt-1 font-medium text-gray-900 dark:text-white">R$ {{ number_format($establishment->cost_per_kwh, 4, ',', '.') }}/kWh</p>
+            <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_name') }}</p>
+                    <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->name }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_address') }}</p>
+                    <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->address }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_type') }}</p>
+                    <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ ucfirst($establishment->type) }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_hours') }}</p>
+                    <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->operating_hours }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_phone') }}</p>
+                    <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->phone ?? '-' }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_cost') }}</p>
+                    <p class="mt-1 font-medium text-gray-900 dark:text-white">R$ {{ number_format($establishment->cost_per_kwh, 4, ',', '.') }}/kWh</p>
+                </div>
             </div>
         </div>
     </section>

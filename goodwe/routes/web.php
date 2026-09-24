@@ -81,6 +81,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/inicio', [UserController::class, 'home'])
         ->name('user.home');
 
+    Route::middleware('gestor')->prefix('gestor')->name('manager.')->group(function () {
+        Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
+        Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])->name('dashboard.export');
+    });
+
     /*
     |--------------------------------------------------------------------------
     | Assistente IA do usuário
