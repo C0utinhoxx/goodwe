@@ -24,6 +24,8 @@ class ChargingPoint
         public readonly string $connector,
         public ?CarbonImmutable $occupiedUntil = null,
         public ?string $vehiclePlate = null,
+        public readonly ?float $lat = null,
+        public readonly ?float $lng = null,
     ) {}
 
     public function status(): string

@@ -43,6 +43,36 @@ class WalletService
         });
     }
 
+    /**
+     * Credit a deposit that was pending confirmation from an external payment
+     * gateway (e.g. MercadoPago), applying the same cashback rules used for
+     * instant deposits.
+     */
+    public function creditApprovedDeposit(Transaction $transaction): void
+    {
+        DB::transaction(function () use ($transaction) {
+            $user = $transaction->user;
+
+            $user->increment('balance', $transaction->amount);
+
+            $cashbackAmount = round($transaction->amount * self::CASHBACK_RATE, 2);
+
+            if ($cashbackAmount > 0) {
+                $points = (int) ($cashbackAmount * 100);
+                $user->increment('points', $points);
+
+                Transaction::create([
+                    'user_id' => $user->id,
+                    'type' => Transaction::TYPE_CASHBACK,
+                    'amount' => $cashbackAmount,
+                    'description' => "Cashback de 10% - {$points} pontos",
+                    'reference' => $transaction->reference,
+                    'status' => Transaction::STATUS_APPROVED,
+                ]);
+            }
+        });
+    }
+
     public function payCharging(User $user, float $amount, string $chargerName, float $energyKwh): ChargingSession
     {
         return DB::transaction(function () use ($user, $amount, $chargerName, $energyKwh) {
