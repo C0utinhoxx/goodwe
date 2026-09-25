@@ -21,12 +21,11 @@
     <div class="flex min-h-screen">
         <aside class="fixed inset-y-0 hidden w-64 shrink-0 flex-col border-r border-[#e3e3e0] bg-white dark:border-[#343843] dark:bg-[#1a1a1a] lg:flex">
             <div class="px-6 pb-6 pt-8">
-
             
 				<a href="{{ route('user.home') }}" class="flex items-center gap-2.5">
 				    <img src="{{ asset('/imagens/goodwe-logo.png') }}" alt="Website logo" class="h-10 w-auto object-contain">
 				</a>
-
+				
 				<p class="mt-2 text-xs text-gray-500 dark:text-[#a0a0a0]">
 				    {{ __('app.subtitle') }}
 				</p>
