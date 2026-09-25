@@ -52,6 +52,14 @@
                     {{ __('app.subtitle') }}
                 </p>
 
+            
+				<a href="{{ route('user.home') }}" class="flex items-center gap-2.5">
+				    <img src="{{ asset('/imagens/goodwe-logo.png') }}" alt="Website logo" class="h-10 w-auto object-contain">
+				</a>
+
+				<p class="mt-2 text-xs text-gray-500 dark:text-[#a0a0a0]">
+				    {{ __('app.subtitle') }}
+				</p>
             </div>
 
             @php
