@@ -6,6 +6,8 @@ use App\Services\ChargingSimulator;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class UserChatbotController extends Controller
 {
@@ -293,6 +295,12 @@ REGRAS
                 );
 
             if ($response->failed()) {
+                Log::error('User chatbot: OpenAI request failed.', [
+                    'status' => $response->status(),
+                    'body' => Str::limit($response->body(), 500),
+                    'has_key' => filled(config('services.openai.key')),
+                ]);
+
                 $errorMessage = match ($locale) {
                     'en' => 'The assistant is unavailable right now.',
 
@@ -332,6 +340,10 @@ REGRAS
                 ?? $fallbackMessage;
 
         } catch (\Throwable $e) {
+            Log::error('User chatbot: unexpected error while calling OpenAI.', [
+                'message' => $e->getMessage(),
+            ]);
+
             $errorMessage = match ($locale) {
                 'en' => 'The assistant is unavailable right now.',
 

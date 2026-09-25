@@ -52,8 +52,6 @@
                 $isChargers = request()->routeIs('chargers.*');
                 $isProfile = request()->routeIs('user.profile');
                 $isManager = request()->routeIs('manager.dashboard');
-                $isUserChatbot = request()->routeIs('user.chatbot.page');
-                $isManagerChatbot = request()->routeIs('manager.chatbot.page');
             @endphp
 
             <nav class="space-y-1 px-4">
@@ -152,33 +150,6 @@
 
                     <span>{{ __('nav.history') }}</span>
 
-                </a>
-
-                {{-- ASSISTENTE IA DO USUÁRIO --}}
-                <a
-                    href="{{ Auth::user()->isGestor() ? route('manager.chatbot.page') : route('user.chatbot.page') }}"
-                    class="{{ ($isUserChatbot || $isManagerChatbot) ? $navActive : $navInactive }}"
-                >
-                    <svg
-                        class="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        stroke-width="1.5"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm3.75 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm3.75 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-                        />
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M21 12c0 4.142-4.03 7.5-9 7.5a10.22 10.22 0 01-3.243-.52L3 21l1.85-4.626A6.828 6.828 0 013 12c0-4.142 4.03-7.5 9-7.5s9 3.358 9 7.5z"
-                        />
-                    </svg>
-
-                    <span>{{ __('nav.chatbot') }}</span>
                 </a>
 
                 {{-- AJUDA --}}
@@ -374,6 +345,1038 @@
         </main>
 
     </div>
+
+    @php
+        $newConversationLabel = match (app()->getLocale()) {
+            'en' => 'New conversation',
+            'es' => 'Nueva conversación',
+            default => 'Nova conversa',
+        };
+    @endphp
+
+    {{-- BOTAO FLUTUANTE DO ASSISTENTE (canto inferior esquerdo) --}}
+    <button
+        id="chatbotLauncher"
+        class="goodwe-widget-launcher"
+        type="button"
+        aria-label="{{ __('nav.chatbot') }}"
+        aria-expanded="false"
+        aria-controls="chatbotWidget"
+        title="{{ __('nav.chatbot') }}"
+    >
+        <span class="goodwe-widget-launcher-core" aria-hidden="true">
+            <svg class="goodwe-widget-launcher-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8V4H8" />
+                <rect width="16" height="12" x="4" y="8" rx="2" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2 14h2" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20 14h2" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13v2" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 13v2" />
+            </svg>
+        </span>
+    </button>
+
+    {{-- PAINEL DE CHAT FLUTUANTE --}}
+    <div id="chatbotWidgetOverlay" class="goodwe-widget-overlay" style="display: none;"></div>
+
+    <div id="chatbotWidget" class="goodwe-widget-panel" role="dialog" aria-modal="true" aria-labelledby="chatbotWidgetTitle" style="display: none;">
+
+        <div class="goodwe-widget-header">
+            <div class="goodwe-widget-header-info">
+                <div class="goodwe-widget-header-avatar">W</div>
+                <div class="goodwe-widget-header-text">
+                    <h2 id="chatbotWidgetTitle">{{ __('chatbot.title') }}</h2>
+                    <p class="goodwe-widget-header-status">
+                        <span class="goodwe-widget-status-dot"></span>
+                        Online
+                    </p>
+                </div>
+            </div>
+
+            <div class="goodwe-widget-header-actions">
+                <button id="chatbotWidgetNew" class="goodwe-widget-header-btn" type="button" aria-label="{{ $newConversationLabel }}" title="{{ $newConversationLabel }}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                </button>
+
+                <button id="chatbotWidgetClose" class="goodwe-widget-header-btn" type="button" aria-label="Fechar">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="chatbotWidgetMessages" class="goodwe-widget-messages">
+
+            <div id="chatbotWidgetWelcome" class="goodwe-widget-welcome">
+                <div class="goodwe-widget-welcome-logo">W</div>
+
+                <h3 class="goodwe-widget-welcome-title">{{ __('chatbot.welcome') }}</h3>
+
+                <p class="goodwe-widget-welcome-text">{{ __('chatbot.description') }}</p>
+
+                <div class="goodwe-widget-suggestions">
+
+                    @if(Auth::user()->isGestor())
+                        <button type="button" class="goodwe-widget-suggestion" data-question="{{ __('chatbot.suggestion_business_question') }}">
+                            📊 <span>{{ __('chatbot.suggestion_business') }}</span>
+                        </button>
+                        <button type="button" class="goodwe-widget-suggestion" data-question="{{ __('chatbot.suggestion_sessions_question') }}">
+                            ⚡ <span>{{ __('chatbot.suggestion_sessions') }}</span>
+                        </button>
+                        <button type="button" class="goodwe-widget-suggestion" data-question="{{ __('chatbot.suggestion_revenue_question') }}">
+                            💰 <span>{{ __('chatbot.suggestion_revenue') }}</span>
+                        </button>
+                        <button type="button" class="goodwe-widget-suggestion" data-question="{{ __('chatbot.suggestion_energy_question') }}">
+                            🔋 <span>{{ __('chatbot.suggestion_energy') }}</span>
+                        </button>
+                    @else
+                        @php
+                            $widgetSuggestions = match (app()->getLocale()) {
+                                'en' => [
+                                    ['icon' => '💰', 'title' => 'My balance', 'question' => 'What is my current balance?'],
+                                    ['icon' => '⭐', 'title' => 'My points', 'question' => 'How many points do I have?'],
+                                    ['icon' => '⚡', 'title' => 'Available chargers', 'question' => 'Which chargers are available right now?'],
+                                    ['icon' => '🕘', 'title' => 'Recent charges', 'question' => 'What were my latest charging sessions?'],
+                                ],
+                                'es' => [
+                                    ['icon' => '💰', 'title' => 'Mi saldo', 'question' => '¿Cuál es mi saldo actual?'],
+                                    ['icon' => '⭐', 'title' => 'Mis puntos', 'question' => '¿Cuántos puntos tengo?'],
+                                    ['icon' => '⚡', 'title' => 'Cargadores disponibles', 'question' => '¿Qué cargadores están disponibles ahora?'],
+                                    ['icon' => '🕘', 'title' => 'Recargas recientes', 'question' => '¿Cuáles fueron mis últimas recargas?'],
+                                ],
+                                default => [
+                                    ['icon' => '💰', 'title' => 'Meu saldo', 'question' => 'Qual é o meu saldo atual?'],
+                                    ['icon' => '⭐', 'title' => 'Meus pontos', 'question' => 'Quantos pontos eu tenho?'],
+                                    ['icon' => '⚡', 'title' => 'Carregadores disponíveis', 'question' => 'Quais carregadores estão disponíveis agora?'],
+                                    ['icon' => '🕘', 'title' => 'Recargas recentes', 'question' => 'Quais foram minhas últimas recargas?'],
+                                ],
+                            };
+                        @endphp
+
+                        @foreach($widgetSuggestions as $widgetSuggestion)
+                            <button type="button" class="goodwe-widget-suggestion" data-question="{{ $widgetSuggestion['question'] }}">
+                                {{ $widgetSuggestion['icon'] }} <span>{{ $widgetSuggestion['title'] }}</span>
+                            </button>
+                        @endforeach
+                    @endif
+
+                </div>
+            </div>
+
+            <div id="chatbotWidgetConversation" class="goodwe-widget-conversation" style="display: none;"></div>
+
+        </div>
+
+        <div class="goodwe-widget-composer-area">
+
+            <form id="chatbotWidgetForm">
+                @csrf
+
+                <div class="goodwe-widget-composer">
+                    <textarea
+                        id="chatbotWidgetInput"
+                        class="goodwe-widget-input"
+                        rows="1"
+                        maxlength="1000"
+                        autocomplete="off"
+                        placeholder="{{ __('chatbot.placeholder') }}"
+                    ></textarea>
+
+                    <button
+                        id="chatbotWidgetSend"
+                        class="goodwe-widget-send"
+                        type="submit"
+                        disabled
+                        aria-label="{{ __('chatbot.send') }}"
+                        title="{{ __('chatbot.send') }}"
+                    >
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0-5 5m5-5 5 5" />
+                        </svg>
+                    </button>
+                </div>
+
+                <p class="goodwe-widget-disclaimer">{{ __('chatbot.warning') }}</p>
+            </form>
+
+        </div>
+
+    </div>
+
+    <style>
+        .goodwe-widget-launcher {
+            position: fixed;
+            bottom: 26px;
+            right: 26px;
+            width: 60px;
+            height: 60px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1050;
+            background:
+                radial-gradient(circle at 32% 26%, rgba(255, 255, 255, .45), transparent 46%),
+                linear-gradient(160deg, #ff5252 0%, #e53935 45%, #9f1f1f 100%);
+            box-shadow:
+                inset 0 2px 3px rgba(255, 255, 255, .5),
+                inset 0 -5px 9px rgba(0, 0, 0, .38),
+                0 10px 26px rgba(229, 57, 53, .45),
+                0 4px 10px rgba(0, 0, 0, .3);
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .goodwe-widget-launcher::before,
+        .goodwe-widget-launcher::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(229, 57, 53, .55);
+            animation: goodwe-widget-pulse 2.6s ease-out infinite;
+            pointer-events: none;
+        }
+
+        .goodwe-widget-launcher::after {
+            animation-delay: 1.3s;
+        }
+
+        @keyframes goodwe-widget-pulse {
+            0% { transform: scale(1); opacity: .85; }
+            100% { transform: scale(1.95); opacity: 0; }
+        }
+
+        .goodwe-widget-launcher:hover {
+            transform: translateY(-4px) scale(1.06);
+            box-shadow:
+                inset 0 2px 3px rgba(255, 255, 255, .55),
+                inset 0 -5px 9px rgba(0, 0, 0, .38),
+                0 18px 38px rgba(229, 57, 53, .55),
+                0 0 28px rgba(229, 57, 53, .45);
+        }
+
+        .goodwe-widget-launcher:active {
+            transform: translateY(1px) scale(.96);
+            box-shadow:
+                inset 0 4px 8px rgba(0, 0, 0, .45),
+                inset 0 -1px 2px rgba(255, 255, 255, .2),
+                0 4px 12px rgba(229, 57, 53, .4);
+        }
+
+        .goodwe-widget-launcher.is-open::before,
+        .goodwe-widget-launcher.is-open::after {
+            animation: none;
+            opacity: 0;
+        }
+
+        .goodwe-widget-launcher.is-open {
+            transform: scale(.94);
+            box-shadow:
+                inset 0 3px 6px rgba(0, 0, 0, .35),
+                0 0 0 3px rgba(229, 57, 53, .18),
+                0 8px 20px rgba(229, 57, 53, .35);
+        }
+
+        .goodwe-widget-launcher-core {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+        }
+
+        .goodwe-widget-launcher-icon {
+            display: block;
+            width: 28px;
+            height: 28px;
+            filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35));
+        }
+
+        .goodwe-widget-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(to top left, rgba(229, 57, 53, .1), rgba(0, 0, 0, .45));
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            z-index: 1040;
+            animation: goodwe-widget-fade .2s ease;
+        }
+
+        .goodwe-widget-panel {
+            position: fixed;
+            bottom: 104px;
+            right: 26px;
+            width: min(400px, calc(100vw - 48px));
+            height: min(570px, calc(100vh - 145px));
+            display: flex;
+            flex-direction: column;
+            background: rgba(253, 253, 252, .92);
+            backdrop-filter: blur(20px) saturate(1.4);
+            -webkit-backdrop-filter: blur(20px) saturate(1.4);
+            border: 1px solid rgba(255, 255, 255, .65);
+            border-radius: 22px;
+            overflow: hidden;
+            z-index: 1050;
+            transform-origin: bottom right;
+            box-shadow:
+                0 0 0 1px rgba(229, 57, 53, .2),
+                0 24px 60px rgba(0, 0, 0, .25),
+                0 0 50px rgba(229, 57, 53, .14),
+                inset 0 1px 0 rgba(255, 255, 255, .8);
+            animation: goodwe-widget-pop .3s cubic-bezier(.16, 1, .3, 1);
+        }
+
+        @keyframes goodwe-widget-fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes goodwe-widget-pop {
+            from { opacity: 0; transform: translateY(18px) scale(.92); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .goodwe-widget-header {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 13px 14px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(250, 250, 249, .85));
+            border-bottom: 1px solid rgba(228, 228, 231, .8);
+            flex-shrink: 0;
+        }
+
+        .goodwe-widget-header::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            height: 2px;
+            background: linear-gradient(90deg, #e53935, #ff4081, #4fc3f7, #e53935);
+            background-size: 300% 100%;
+            animation: goodwe-widget-neonline 5s linear infinite;
+        }
+
+        @keyframes goodwe-widget-neonline {
+            from { background-position: 0% 0; }
+            to { background-position: 300% 0; }
+        }
+
+        .goodwe-widget-header-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .goodwe-widget-header-avatar {
+            width: 34px;
+            height: 34px;
+            flex-shrink: 0;
+            border-radius: 10px;
+            background:
+                radial-gradient(circle at 30% 25%, rgba(255, 255, 255, .4), transparent 50%),
+                linear-gradient(160deg, #ff5252, #c62828);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                inset 0 1px 2px rgba(255, 255, 255, .45),
+                0 4px 12px rgba(229, 57, 53, .4);
+        }
+
+        .goodwe-widget-header-text {
+            min-width: 0;
+        }
+
+        .goodwe-widget-header-text h2 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #18181b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .goodwe-widget-header-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 2px 0 0;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .4px;
+            color: #10b981;
+        }
+
+        .goodwe-widget-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px rgba(16, 185, 129, .9);
+            animation: goodwe-widget-blink 1.8s ease-in-out infinite;
+        }
+
+        @keyframes goodwe-widget-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .35; }
+        }
+
+        .goodwe-widget-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .goodwe-widget-header-btn {
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: #71717a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+
+        .goodwe-widget-header-btn:hover {
+            background: #f4f4f5;
+            color: #e53935;
+        }
+
+        .goodwe-widget-header-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .goodwe-widget-messages {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            background: transparent;
+        }
+
+        .goodwe-widget-welcome {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 18px;
+            text-align: center;
+        }
+
+        .goodwe-widget-welcome-logo {
+            width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            background:
+                radial-gradient(circle at 30% 25%, rgba(255, 255, 255, .45), transparent 50%),
+                linear-gradient(160deg, #ff5252, #c62828);
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                inset 0 1px 2px rgba(255, 255, 255, .5),
+                0 8px 24px rgba(229, 57, 53, .4),
+                0 0 30px rgba(229, 57, 53, .25);
+            animation: goodwe-widget-float 3.5s ease-in-out infinite;
+        }
+
+        @keyframes goodwe-widget-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .goodwe-widget-welcome-title {
+            margin: 12px 0 0;
+            font-size: 17px;
+            font-weight: 650;
+            color: #18181b;
+        }
+
+        .goodwe-widget-welcome-text {
+            margin: 6px 0 0;
+            max-width: 280px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #71717a;
+        }
+
+        .goodwe-widget-suggestions {
+            margin-top: 16px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .goodwe-widget-suggestion {
+            padding: 10px 10px;
+            border: 1px solid rgba(229, 57, 53, .22);
+            border-radius: 12px;
+            background: linear-gradient(160deg, rgba(255, 255, 255, .9), rgba(250, 250, 249, .7));
+            color: #18181b;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            transition: .18s ease;
+        }
+
+        .goodwe-widget-suggestion:hover {
+            border-color: rgba(229, 57, 53, .65);
+            background: #fff;
+            box-shadow: 0 0 16px rgba(229, 57, 53, .22), 0 4px 12px rgba(0, 0, 0, .06);
+            transform: translateY(-2px);
+        }
+
+        .goodwe-widget-conversation {
+            padding: 16px 14px 4px;
+        }
+
+        .goodwe-widget-row {
+            display: flex;
+            width: 100%;
+            margin-bottom: 14px;
+        }
+
+        .goodwe-widget-row.user {
+            justify-content: flex-end;
+        }
+
+        .goodwe-widget-row.assistant {
+            justify-content: flex-start;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .goodwe-widget-bubble {
+            max-width: 78%;
+            padding: 8px 12px;
+            border-radius: 16px;
+            background: #eeeeef;
+            color: #18181b;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .goodwe-widget-avatar {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+            border-radius: 8px;
+            background: #e53935;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .goodwe-widget-reply {
+            flex: 1;
+            min-width: 0;
+            padding-top: 3px;
+            color: #27272a;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .goodwe-widget-loading {
+            display: flex;
+            gap: 3px;
+            padding-top: 7px;
+        }
+
+        .goodwe-widget-loading span {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #a1a1aa;
+            animation: goodwe-widget-bounce 1s infinite alternate;
+        }
+
+        .goodwe-widget-loading span:nth-child(2) { animation-delay: .15s; }
+        .goodwe-widget-loading span:nth-child(3) { animation-delay: .3s; }
+
+        @keyframes goodwe-widget-bounce {
+            from { transform: translateY(0); opacity: .45; }
+            to { transform: translateY(-3px); opacity: 1; }
+        }
+
+        .goodwe-widget-composer-area {
+            flex-shrink: 0;
+            padding: 10px 12px 12px;
+            border-top: 1px solid rgba(228, 228, 231, .8);
+            background: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(250, 250, 249, .85));
+        }
+
+        .goodwe-widget-composer {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .goodwe-widget-input {
+            flex: 1;
+            min-height: 40px;
+            max-height: 110px;
+            padding: 10px 46px 10px 12px;
+            border: 1px solid #d4d4d8;
+            border-radius: 20px;
+            background: #fff;
+            color: #18181b;
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 20px;
+            resize: none;
+            overflow-y: auto;
+            outline: none;
+            transition: border-color .15s ease;
+        }
+
+        .goodwe-widget-input:focus {
+            border-color: rgba(229, 57, 53, .7);
+            box-shadow: 0 0 0 3px rgba(229, 57, 53, .15), 0 0 14px rgba(229, 57, 53, .12);
+        }
+
+        .goodwe-widget-input::placeholder {
+            color: #a1a1aa;
+        }
+
+        .goodwe-widget-send {
+            position: absolute;
+            right: 5px;
+            bottom: 4px;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background:
+                radial-gradient(circle at 32% 26%, rgba(255, 255, 255, .45), transparent 48%),
+                linear-gradient(160deg, #ff5252, #c62828);
+            box-shadow:
+                inset 0 1px 2px rgba(255, 255, 255, .45),
+                inset 0 -2px 4px rgba(0, 0, 0, .25),
+                0 4px 12px rgba(229, 57, 53, .4);
+            transition: .15s ease;
+        }
+
+        .goodwe-widget-send:hover:not(:disabled) {
+            transform: translateY(-1px) scale(1.05);
+            box-shadow:
+                inset 0 1px 2px rgba(255, 255, 255, .5),
+                inset 0 -2px 4px rgba(0, 0, 0, .25),
+                0 6px 18px rgba(229, 57, 53, .55),
+                0 0 18px rgba(229, 57, 53, .4);
+        }
+
+        .goodwe-widget-send:disabled {
+            background: linear-gradient(160deg, #d4d4d8, #b8b8bd);
+            color: #71717a;
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, .5), inset 0 -2px 4px rgba(0, 0, 0, .12);
+            cursor: default;
+        }
+
+        .goodwe-widget-send svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .goodwe-widget-disclaimer {
+            margin: 6px 0 0;
+            text-align: center;
+            font-size: 10px;
+            color: #a1a1aa;
+        }
+
+        html.dark .goodwe-widget-panel {
+            background: rgba(15, 17, 23, .92);
+            border-color: rgba(255, 255, 255, .08);
+            box-shadow:
+                0 0 0 1px rgba(229, 57, 53, .3),
+                0 24px 60px rgba(0, 0, 0, .65),
+                0 0 55px rgba(229, 57, 53, .18),
+                inset 0 1px 0 rgba(255, 255, 255, .06);
+        }
+
+        html.dark .goodwe-widget-header {
+            background: linear-gradient(135deg, rgba(26, 28, 32, .95), rgba(20, 22, 27, .85));
+            border-color: rgba(52, 54, 61, .8);
+        }
+
+        html.dark .goodwe-widget-header-text h2 {
+            color: #f7f7f8;
+        }
+
+        html.dark .goodwe-widget-header-btn {
+            color: #8b8d94;
+        }
+
+        html.dark .goodwe-widget-header-btn:hover {
+            background: #24262c;
+            color: #ef5350;
+        }
+
+        html.dark .goodwe-widget-messages {
+            background: transparent;
+        }
+
+        html.dark .goodwe-widget-welcome-title {
+            color: #f7f7f8;
+        }
+
+        html.dark .goodwe-widget-welcome-text {
+            color: #a1a1aa;
+        }
+
+        html.dark .goodwe-widget-suggestion {
+            border-color: rgba(229, 57, 53, .3);
+            background: linear-gradient(160deg, rgba(36, 38, 44, .9), rgba(24, 26, 32, .7));
+            color: #f7f7f8;
+        }
+
+        html.dark .goodwe-widget-suggestion:hover {
+            border-color: rgba(229, 57, 53, .7);
+            background: #24262c;
+            box-shadow: 0 0 16px rgba(229, 57, 53, .3), 0 4px 12px rgba(0, 0, 0, .35);
+        }
+
+        html.dark .goodwe-widget-bubble {
+            background: #2a2c32;
+            color: #f7f7f8;
+        }
+
+        html.dark .goodwe-widget-reply {
+            color: #ececef;
+        }
+
+        html.dark .goodwe-widget-composer-area {
+            background: linear-gradient(135deg, rgba(24, 26, 32, .95), rgba(20, 22, 27, .85));
+            border-color: rgba(52, 54, 61, .8);
+        }
+
+        html.dark .goodwe-widget-input {
+            border-color: #3a3c43;
+            background: #24262c;
+            color: #f7f7f8;
+        }
+
+        html.dark .goodwe-widget-input::placeholder {
+            color: #8b8d94;
+        }
+
+        html.dark .goodwe-widget-send:disabled {
+            background: linear-gradient(160deg, #41434a, #33353b);
+            color: #85878e;
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, .07), inset 0 -2px 4px rgba(0, 0, 0, .35);
+        }
+
+        html.dark .goodwe-widget-disclaimer {
+            color: #777981;
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const launcher = document.getElementById('chatbotLauncher');
+            const overlay = document.getElementById('chatbotWidgetOverlay');
+            const panel = document.getElementById('chatbotWidget');
+            const closeBtn = document.getElementById('chatbotWidgetClose');
+            const newBtn = document.getElementById('chatbotWidgetNew');
+            const messages = document.getElementById('chatbotWidgetMessages');
+            const welcome = document.getElementById('chatbotWidgetWelcome');
+            const conversation = document.getElementById('chatbotWidgetConversation');
+            const form = document.getElementById('chatbotWidgetForm');
+            const input = document.getElementById('chatbotWidgetInput');
+            const sendButton = document.getElementById('chatbotWidgetSend');
+            const suggestions = document.querySelectorAll('.goodwe-widget-suggestion');
+
+            const postRoute = @json(Auth::user()->isGestor() ? route('manager.chatbot') : route('user.chatbot'));
+            const clearRoute = @json(Auth::user()->isGestor() ? route('manager.chatbot.clear') : route('user.chatbot.clear'));
+            const csrfToken = form.querySelector('input[name="_token"]').value;
+
+            let started = false;
+
+            function openWidget() {
+                panel.style.display = 'flex';
+                overlay.style.display = 'block';
+                launcher.classList.add('is-open');
+                launcher.setAttribute('aria-expanded', 'true');
+                input.focus();
+            }
+
+            function closeWidget() {
+                panel.style.display = 'none';
+                overlay.style.display = 'none';
+                launcher.classList.remove('is-open');
+                launcher.setAttribute('aria-expanded', 'false');
+            }
+
+            launcher.addEventListener('click', function () {
+                if (panel.style.display === 'none') {
+                    openWidget();
+                } else {
+                    closeWidget();
+                }
+            });
+
+            closeBtn.addEventListener('click', closeWidget);
+            overlay.addEventListener('click', closeWidget);
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && panel.style.display !== 'none') {
+                    closeWidget();
+                }
+            });
+
+            function startConversation() {
+                if (started) {
+                    return;
+                }
+
+                started = true;
+                welcome.style.display = 'none';
+                conversation.style.display = 'block';
+            }
+
+            function updateSendButton() {
+                sendButton.disabled = input.value.trim() === '';
+            }
+
+            function resizeInput() {
+                input.style.height = 'auto';
+                input.style.height = Math.min(input.scrollHeight, 110) + 'px';
+            }
+
+            function scrollBottom(animate = true) {
+                requestAnimationFrame(function () {
+                    messages.scrollTo({
+                        top: messages.scrollHeight,
+                        behavior: animate ? 'smooth' : 'auto'
+                    });
+                });
+            }
+
+            function addUserMessage(text) {
+                const row = document.createElement('div');
+                row.className = 'goodwe-widget-row user';
+
+                const bubble = document.createElement('div');
+                bubble.className = 'goodwe-widget-bubble';
+                bubble.textContent = text;
+
+                row.appendChild(bubble);
+                conversation.appendChild(row);
+            }
+
+            function addAssistantMessage(text) {
+                const row = document.createElement('div');
+                row.className = 'goodwe-widget-row assistant';
+
+                const avatar = document.createElement('div');
+                avatar.className = 'goodwe-widget-avatar';
+                avatar.textContent = 'W';
+
+                const content = document.createElement('div');
+                content.className = 'goodwe-widget-reply';
+                content.textContent = text;
+
+                row.appendChild(avatar);
+                row.appendChild(content);
+                conversation.appendChild(row);
+            }
+
+            function addLoading() {
+                const row = document.createElement('div');
+                row.id = 'goodweWidgetLoading';
+                row.className = 'goodwe-widget-row assistant';
+
+                const avatar = document.createElement('div');
+                avatar.className = 'goodwe-widget-avatar';
+                avatar.textContent = 'W';
+
+                const loading = document.createElement('div');
+                loading.className = 'goodwe-widget-loading';
+                loading.innerHTML = '<span></span><span></span><span></span>';
+
+                row.appendChild(avatar);
+                row.appendChild(loading);
+                conversation.appendChild(row);
+            }
+
+            async function sendMessage(message) {
+                const text = message.trim();
+
+                if (!text || input.disabled) {
+                    return;
+                }
+
+                startConversation();
+                addUserMessage(text);
+
+                input.value = '';
+                resizeInput();
+                updateSendButton();
+
+                input.disabled = true;
+                sendButton.disabled = true;
+
+                addLoading();
+                scrollBottom();
+
+                try {
+                    const response = await fetch(postRoute, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify({ message: text })
+                    });
+
+                    const data = await response.json();
+
+                    document.getElementById('goodweWidgetLoading')?.remove();
+
+                    addAssistantMessage(
+                        data.answer ||
+                        @json(__('chatbot.no_answer'))
+                    );
+
+                } catch (error) {
+                    document.getElementById('goodweWidgetLoading')?.remove();
+
+                    addAssistantMessage(
+                        @json(__('chatbot.connection_error'))
+                    );
+                }
+
+                input.disabled = false;
+                input.focus();
+
+                updateSendButton();
+                scrollBottom();
+            }
+
+            async function startNewConversation() {
+                if (input.disabled) {
+                    return;
+                }
+
+                newBtn.disabled = true;
+
+                try {
+                    const response = await fetch(clearRoute, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Unable to clear conversation');
+                    }
+
+                    conversation.innerHTML = '';
+                    conversation.style.display = 'none';
+                    welcome.style.display = 'flex';
+
+                    started = false;
+
+                    input.value = '';
+                    input.disabled = false;
+
+                    resizeInput();
+                    updateSendButton();
+
+                    messages.scrollTo({ top: 0, behavior: 'auto' });
+
+                    input.focus();
+
+                } catch (error) {
+                    alert(@json(
+                        app()->getLocale() === 'en'
+                            ? 'Could not start a new conversation.'
+                            : (app()->getLocale() === 'es'
+                                ? 'No fue posible iniciar una nueva conversación.'
+                                : 'Não foi possível iniciar uma nova conversa.')
+                    ));
+                }
+
+                newBtn.disabled = false;
+            }
+
+            newBtn.addEventListener('click', startNewConversation);
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                sendMessage(input.value);
+            });
+
+            input.addEventListener('input', function () {
+                resizeInput();
+                updateSendButton();
+            });
+
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage(input.value);
+                }
+            });
+
+            suggestions.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    sendMessage(button.dataset.question);
+                });
+            });
+
+            resizeInput();
+            updateSendButton();
+        });
+    </script>
 
     <script src="{{ asset('js/theme.js') }}"></script>
 
