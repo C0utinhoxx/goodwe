@@ -86,6 +86,8 @@ class ChargingSimulator
                 location: 'Parking Norte, Piso 1',
                 powerKw: 22,
                 connector: 'Type 2',
+                lat: -23.5505,
+                lng: -46.6333,
             ),
             new ChargingPoint(
                 id: 'CG-002',
@@ -95,6 +97,8 @@ class ChargingSimulator
                 connector: 'Type 2',
                 occupiedUntil: $now->addMinutes(25),
                 vehiclePlate: 'ABC-1D23',
+                lat: -23.5620,
+                lng: -46.6540,
             ),
             new ChargingPoint(
                 id: 'CG-003',
@@ -102,6 +106,8 @@ class ChargingSimulator
                 location: 'Estacionamento B, vaga 12',
                 powerKw: 50,
                 connector: 'CCS 2',
+                lat: -23.5670,
+                lng: -46.6920,
             ),
             new ChargingPoint(
                 id: 'CG-004',
@@ -111,6 +117,8 @@ class ChargingSimulator
                 connector: 'Type 2',
                 occupiedUntil: $now->addMinutes(70),
                 vehiclePlate: 'XYZ-9Z87',
+                lat: -23.5615,
+                lng: -46.6559,
             ),
         ];
 

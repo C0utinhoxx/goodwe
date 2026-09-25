@@ -13,6 +13,7 @@ class Transaction extends Model
         'amount',
         'description',
         'reference',
+        'status',
     ];
 
     protected $casts = [
@@ -26,6 +27,12 @@ class Transaction extends Model
     public const TYPE_CHARGE_PAYMENT = 'charge_payment';
 
     public const TYPE_POINTS_REDEEM = 'points_redeem';
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_REJECTED = 'rejected';
 
     public function user(): BelongsTo
     {
