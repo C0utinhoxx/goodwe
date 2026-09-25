@@ -30,7 +30,6 @@ class MakeGestorCommand extends Command
                 $password = $this->secret('Usuario nao encontrado. Informe a senha para criar o usuario:');
             }
 
-
             if (strlen($password) < 6) {
                 $this->error('A senha deve ter pelo menos 6 caracteres.');
 

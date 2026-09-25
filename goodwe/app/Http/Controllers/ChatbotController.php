@@ -144,12 +144,12 @@ class ChatbotController extends Controller
                     : 'Data não disponível';
 
                 $recentSessionsText .=
-                    "- Data: {$date}\n" .
-                    "  Usuário: {$sessionUserName}\n" .
-                    "  Carregador: {$session->charger_name}\n" .
-                    "  Energia: {$session->energy_kwh} kWh\n" .
-                    "  Valor: R$ {$session->amount_charged}\n" .
-                    "  Pagamento: {$session->payment_method}\n" .
+                    "- Data: {$date}\n".
+                    "  Usuário: {$sessionUserName}\n".
+                    "  Carregador: {$session->charger_name}\n".
+                    "  Energia: {$session->energy_kwh} kWh\n".
+                    "  Valor: R$ {$session->amount_charged}\n".
+                    "  Pagamento: {$session->payment_method}\n".
                     "  Status: {$session->status}\n";
             }
         }
@@ -195,14 +195,14 @@ class ChatbotController extends Controller
                 );
 
                 $usersText .=
-                    "- ID: {$registeredUser->id}\n" .
-                    "  Nome: {$registeredUser->name}\n" .
-                    "  E-mail: {$registeredUser->email}\n" .
-                    "  Telefone: {$phone}\n" .
-                    "  Tipo de conta: {$accountType}\n" .
-                    "  Saldo: R$ {$balance}\n" .
-                    "  Pontos: {$registeredUser->points}\n" .
-                    "  Total de recargas: {$registeredUser->charging_sessions_count}\n" .
+                    "- ID: {$registeredUser->id}\n".
+                    "  Nome: {$registeredUser->name}\n".
+                    "  E-mail: {$registeredUser->email}\n".
+                    "  Telefone: {$phone}\n".
+                    "  Tipo de conta: {$accountType}\n".
+                    "  Saldo: R$ {$balance}\n".
+                    "  Pontos: {$registeredUser->points}\n".
+                    "  Total de recargas: {$registeredUser->charging_sessions_count}\n".
                     "  Total de transações: {$registeredUser->transactions_count}\n";
             }
         }
@@ -252,12 +252,12 @@ class ChatbotController extends Controller
                     ?? 'Não informada';
 
                 $transactionsText .=
-                    "- Data: {$date}\n" .
-                    "  Usuário: {$transactionUserName}\n" .
-                    "  E-mail: {$transactionUserEmail}\n" .
-                    "  Tipo: {$transaction->type}\n" .
-                    "  Valor: R$ {$amount}\n" .
-                    "  Descrição: {$transaction->description}\n" .
+                    "- Data: {$date}\n".
+                    "  Usuário: {$transactionUserName}\n".
+                    "  E-mail: {$transactionUserEmail}\n".
+                    "  Tipo: {$transaction->type}\n".
+                    "  Valor: R$ {$amount}\n".
+                    "  Descrição: {$transaction->description}\n".
                     "  Referência: {$reference}\n";
             }
         }
@@ -296,13 +296,13 @@ class ChatbotController extends Controller
                     : 'Data não disponível';
 
                 $allRecentSessionsText .=
-                    "- Data: {$date}\n" .
-                    "  Usuário: {$sessionUserName}\n" .
-                    "  E-mail: {$sessionUserEmail}\n" .
-                    "  Carregador: {$session->charger_name}\n" .
-                    "  Energia: {$session->energy_kwh} kWh\n" .
-                    "  Valor: R$ {$session->amount_charged}\n" .
-                    "  Pagamento: {$session->payment_method}\n" .
+                    "- Data: {$date}\n".
+                    "  Usuário: {$sessionUserName}\n".
+                    "  E-mail: {$sessionUserEmail}\n".
+                    "  Carregador: {$session->charger_name}\n".
+                    "  Energia: {$session->energy_kwh} kWh\n".
+                    "  Valor: R$ {$session->amount_charged}\n".
+                    "  Pagamento: {$session->payment_method}\n".
                     "  Status: {$session->status}\n";
             }
         }
@@ -333,11 +333,11 @@ class ChatbotController extends Controller
             }
 
             $chargersText .=
-                "- Código: {$charger->id}\n" .
-                "  Nome: {$charger->name}\n" .
-                "  Localização: {$charger->location}\n" .
-                "  Potência: {$charger->powerKw} kW\n" .
-                "  Conector: {$charger->connector}\n" .
+                "- Código: {$charger->id}\n".
+                "  Nome: {$charger->name}\n".
+                "  Localização: {$charger->location}\n".
+                "  Potência: {$charger->powerKw} kW\n".
+                "  Conector: {$charger->connector}\n".
                 "  Status: {$status}\n";
 
             if (
@@ -357,7 +357,7 @@ class ChatbotController extends Controller
                     : 'Não disponível';
 
                 $chargersText .=
-                    "  Placa: {$vehiclePlate}\n" .
+                    "  Placa: {$vehiclePlate}\n".
                     "  Disponível em: {$minutesText}\n";
             }
         }
@@ -369,14 +369,11 @@ class ChatbotController extends Controller
         */
 
         $languageInstruction = match ($locale) {
-            'en' =>
-                'Always respond in English, regardless of the language used by the user.',
+            'en' => 'Always respond in English, regardless of the language used by the user.',
 
-            'es' =>
-                'Responde siempre en español, independientemente del idioma utilizado por el usuario.',
+            'es' => 'Responde siempre en español, independientemente del idioma utilizado por el usuario.',
 
-            default =>
-                'Responda sempre em português do Brasil, independentemente do idioma utilizado pelo usuário.',
+            default => 'Responda sempre em português do Brasil, independentemente do idioma utilizado pelo usuário.',
         };
 
         /*
@@ -401,13 +398,13 @@ PERFIL DO GESTOR AUTENTICADO
 Nome: {$managerName}
 E-mail: {$managerEmail}
 Telefone: {$managerPhone}
-Saldo da carteira: R$ " .
+Saldo da carteira: R$ ".
             number_format(
                 $managerBalance,
                 2,
                 ',',
                 '.'
-            ) . "
+            )."
 Pontos: {$managerPoints}
 Tipo de conta: {$managerType}
 
@@ -419,7 +416,7 @@ Nome: {$establishment->name}
 Endereço: {$establishment->address}
 Tipo: {$establishment->type}
 Horário de funcionamento: {$establishment->operating_hours}
-Telefone: " . ($establishment->phone ?? 'Não informado') . "
+Telefone: ".($establishment->phone ?? 'Não informado')."
 Custo por kWh: R$ {$establishment->cost_per_kwh}
 
 ==================================================
@@ -431,37 +428,37 @@ Sessões concluídas: {$completedSessions}
 Sessões pendentes: {$pendingSessions}
 Sessões canceladas: {$cancelledSessions}
 
-Receita total das sessões concluídas: R$ " .
+Receita total das sessões concluídas: R$ ".
             number_format(
                 $totalRevenue,
                 2,
                 ',',
                 '.'
-            ) . "
+            ).'
 
-Energia total consumida nas sessões concluídas: " .
+Energia total consumida nas sessões concluídas: '.
             number_format(
                 $totalEnergy,
                 2,
                 ',',
                 '.'
-            ) . " kWh
+            ).' kWh
 
-Valor médio por sessão concluída: R$ " .
+Valor médio por sessão concluída: R$ '.
             number_format(
                 $averageRevenue,
                 2,
                 ',',
                 '.'
-            ) . "
+            ).'
 
-Energia média por sessão concluída: " .
+Energia média por sessão concluída: '.
             number_format(
                 $averageEnergy,
                 2,
                 ',',
                 '.'
-            ) . " kWh
+            )." kWh
 
 ==================================================
 ÚLTIMAS SESSÕES
@@ -580,14 +577,11 @@ REGRAS
 
             if ($response->failed()) {
                 $errorMessage = match ($locale) {
-                    'en' =>
-                        'The assistant is unavailable right now.',
+                    'en' => 'The assistant is unavailable right now.',
 
-                    'es' =>
-                        'No fue posible consultar el asistente en este momento.',
+                    'es' => 'No fue posible consultar el asistente en este momento.',
 
-                    default =>
-                        'Não foi possível consultar o assistente agora.',
+                    default => 'Não foi possível consultar o assistente agora.',
                 };
 
                 return response()->json([
@@ -601,8 +595,7 @@ REGRAS
                 $data['output'] ?? []
             )
                 ->flatMap(
-                    fn ($item) =>
-                        $item['content'] ?? []
+                    fn ($item) => $item['content'] ?? []
                 )
                 ->firstWhere(
                     'type',
@@ -610,14 +603,11 @@ REGRAS
                 );
 
             $fallbackMessage = match ($locale) {
-                'en' =>
-                    'I could not generate a response.',
+                'en' => 'I could not generate a response.',
 
-                'es' =>
-                    'No pude generar una respuesta.',
+                'es' => 'No pude generar una respuesta.',
 
-                default =>
-                    'Não consegui gerar uma resposta.',
+                default => 'Não consegui gerar uma resposta.',
             };
 
             $answer =
@@ -626,14 +616,11 @@ REGRAS
 
         } catch (\Throwable $e) {
             $errorMessage = match ($locale) {
-                'en' =>
-                    'The assistant is unavailable right now.',
+                'en' => 'The assistant is unavailable right now.',
 
-                'es' =>
-                    'No fue posible consultar el asistente en este momento.',
+                'es' => 'No fue posible consultar el asistente en este momento.',
 
-                default =>
-                    'Não foi possível consultar o assistente agora.',
+                default => 'Não foi possível consultar o assistente agora.',
             };
 
             return response()->json([

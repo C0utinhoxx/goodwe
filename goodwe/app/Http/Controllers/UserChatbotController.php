@@ -63,9 +63,9 @@ class UserChatbotController extends Controller
                     : 'Data não disponível';
 
                 $transactionsText .=
-                    "- Data: {$date}\n" .
-                    "  Tipo: {$transaction->type}\n" .
-                    "  Valor: R$ {$transaction->amount}\n" .
+                    "- Data: {$date}\n".
+                    "  Tipo: {$transaction->type}\n".
+                    "  Valor: R$ {$transaction->amount}\n".
                     "  Descrição: {$transaction->description}\n";
             }
         }
@@ -91,11 +91,11 @@ class UserChatbotController extends Controller
                     : 'Data não disponível';
 
                 $sessionsText .=
-                    "- Data: {$date}\n" .
-                    "  Carregador: {$session->charger_name}\n" .
-                    "  Energia: {$session->energy_kwh} kWh\n" .
-                    "  Valor: R$ {$session->amount_charged}\n" .
-                    "  Pagamento: {$session->payment_method}\n" .
+                    "- Data: {$date}\n".
+                    "  Carregador: {$session->charger_name}\n".
+                    "  Energia: {$session->energy_kwh} kWh\n".
+                    "  Valor: R$ {$session->amount_charged}\n".
+                    "  Pagamento: {$session->payment_method}\n".
                     "  Status: {$session->status}\n";
             }
         }
@@ -126,11 +126,11 @@ class UserChatbotController extends Controller
             }
 
             $chargersText .=
-                "- Código: {$charger->id}\n" .
-                "  Nome: {$charger->name}\n" .
-                "  Localização: {$charger->location}\n" .
-                "  Potência: {$charger->powerKw} kW\n" .
-                "  Conector: {$charger->connector}\n" .
+                "- Código: {$charger->id}\n".
+                "  Nome: {$charger->name}\n".
+                "  Localização: {$charger->location}\n".
+                "  Potência: {$charger->powerKw} kW\n".
+                "  Conector: {$charger->connector}\n".
                 "  Status: {$status}\n";
 
             if (
@@ -150,7 +150,7 @@ class UserChatbotController extends Controller
                     : 'Não disponível';
 
                 $chargersText .=
-                    "  Placa: {$vehiclePlate}\n" .
+                    "  Placa: {$vehiclePlate}\n".
                     "  Disponível em: {$minutesText}\n";
             }
         }
@@ -162,14 +162,11 @@ class UserChatbotController extends Controller
         */
 
         $languageInstruction = match ($locale) {
-            'en' =>
-                'Always respond in English, regardless of the language used by the user.',
+            'en' => 'Always respond in English, regardless of the language used by the user.',
 
-            'es' =>
-                'Responde siempre en español, independientemente del idioma utilizado por el usuario.',
+            'es' => 'Responde siempre en español, independientemente del idioma utilizado por el usuario.',
 
-            default =>
-                'Responda sempre em português do Brasil, independentemente do idioma utilizado pelo usuário.',
+            default => 'Responda sempre em português do Brasil, independentemente do idioma utilizado pelo usuário.',
         };
 
         /*
@@ -194,13 +191,13 @@ PERFIL DO USUÁRIO AUTENTICADO
 Nome: {$userName}
 E-mail: {$userEmail}
 Telefone: {$userPhone}
-Saldo da carteira: R$ " .
+Saldo da carteira: R$ ".
             number_format(
                 $userBalance,
                 2,
                 ',',
                 '.'
-            ) . "
+            )."
 Pontos: {$userPoints}
 
 ==================================================
@@ -297,14 +294,11 @@ REGRAS
 
             if ($response->failed()) {
                 $errorMessage = match ($locale) {
-                    'en' =>
-                        'The assistant is unavailable right now.',
+                    'en' => 'The assistant is unavailable right now.',
 
-                    'es' =>
-                        'No fue posible consultar el asistente en este momento.',
+                    'es' => 'No fue posible consultar el asistente en este momento.',
 
-                    default =>
-                        'Não foi possível consultar o assistente agora.',
+                    default => 'Não foi possível consultar o assistente agora.',
                 };
 
                 return response()->json([
@@ -318,8 +312,7 @@ REGRAS
                 $data['output'] ?? []
             )
                 ->flatMap(
-                    fn ($item) =>
-                        $item['content'] ?? []
+                    fn ($item) => $item['content'] ?? []
                 )
                 ->firstWhere(
                     'type',
@@ -327,14 +320,11 @@ REGRAS
                 );
 
             $fallbackMessage = match ($locale) {
-                'en' =>
-                    'I could not generate a response.',
+                'en' => 'I could not generate a response.',
 
-                'es' =>
-                    'No pude generar una respuesta.',
+                'es' => 'No pude generar una respuesta.',
 
-                default =>
-                    'Não consegui gerar uma resposta.',
+                default => 'Não consegui gerar uma resposta.',
             };
 
             $answer =
@@ -343,14 +333,11 @@ REGRAS
 
         } catch (\Throwable $e) {
             $errorMessage = match ($locale) {
-                'en' =>
-                    'The assistant is unavailable right now.',
+                'en' => 'The assistant is unavailable right now.',
 
-                'es' =>
-                    'No fue posible consultar el asistente en este momento.',
+                'es' => 'No fue posible consultar el asistente en este momento.',
 
-                default =>
-                    'Não foi possível consultar o assistente agora.',
+                default => 'Não foi possível consultar o assistente agora.',
             };
 
             return response()->json([
