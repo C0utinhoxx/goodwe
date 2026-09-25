@@ -33,30 +33,11 @@
         <aside class="fixed inset-y-0 hidden w-64 shrink-0 flex-col border-r border-[#e3e3e0] bg-white dark:border-[#343843] dark:bg-[#1a1a1a] lg:flex">
 
             <div class="px-6 pb-6 pt-8">
-
-                <a href="{{ route('user.home') }}" class="flex items-center gap-2.5">
-
-                    <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e53935]">
-                        <span class="text-base font-bold text-white">
-                            W
-                        </span>
-                    </div>
-
-                    <span class="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-                        GOODWE
-                    </span>
-
-                </a>
-
-                <p class="mt-2 text-xs text-gray-500 dark:text-[#a0a0a0]">
-                    {{ __('app.subtitle') }}
-                </p>
-
             
 				<a href="{{ route('user.home') }}" class="flex items-center gap-2.5">
 				    <img src="{{ asset('/imagens/goodwe-logo.png') }}" alt="Website logo" class="h-10 w-auto object-contain">
 				</a>
-
+				
 				<p class="mt-2 text-xs text-gray-500 dark:text-[#a0a0a0]">
 				    {{ __('app.subtitle') }}
 				</p>
