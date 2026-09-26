@@ -275,13 +275,13 @@
 
             <div class="mx-auto max-w-[1280px] px-5 py-8 sm:px-6 lg:px-8">
 
-                <header class="flex items-center justify-between gap-4">
+                <header class="{{ $isManager ? 'flex flex-col items-stretch gap-4 md:flex-row md:items-center md:justify-between' : 'flex items-center justify-between gap-4' }}">
 
                     <div>
                         {{ $header ?? '' }}
                     </div>
 
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-3">
 
                         {{-- IDIOMA --}}
                         <x-lang-switcher variant="boxed" />
