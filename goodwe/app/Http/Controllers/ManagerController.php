@@ -140,7 +140,14 @@ class ManagerController extends Controller
             $period = 30;
         }
 
+        $establishment = $request->user()->establishment;
+
+        if (! $establishment) {
+            abort(403, 'No establishment is associated with this account.');
+        }
+
         $sessions = ChargingSession::with('user:id,name,email')
+            ->where('establishment_id', $establishment->id)
             ->where('created_at', '>=', now()->subDays($period))
             ->latest()
             ->get();
