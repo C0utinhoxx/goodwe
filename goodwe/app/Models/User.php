@@ -33,6 +33,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_admin' => 'boolean',
+        'is_support' => 'boolean',
         'password' => 'hashed',
         'balance' => 'decimal:2',
         'points' => 'integer',
@@ -56,5 +57,10 @@ class User extends Authenticatable
     public function isGestor(): bool
     {
         return $this->is_admin === true;
+    }
+
+    public function isSuporte(): bool
+    {
+        return $this->is_support === true;
     }
 }
