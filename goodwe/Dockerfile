@@ -31,8 +31,9 @@ RUN npm run build
 
 ###############################################################################
 # Etapa 2 — Backend: extensões PHP + dependências Composer
+# PHP 8.4+: o Laravel 13 / Symfony 8 exige PHP >= 8.4 (ver composer.lock)
 ###############################################################################
-FROM php:8.3-apache AS build
+FROM php:8.4-apache AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -72,8 +73,9 @@ RUN composer install --no-dev --no-interaction --prefer-dist \
 
 ###############################################################################
 # Etapa 3 — Imagem final de produção (sem gcc, sem headers de build)
+# Mesma tag da etapa "build" para manter extension_dir e libs idênticos.
 ###############################################################################
-FROM php:8.3-apache
+FROM php:8.4-apache
 
 ENV DEBIAN_FRONTEND=noninteractive
 
