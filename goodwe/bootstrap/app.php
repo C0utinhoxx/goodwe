@@ -14,16 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->appendToGroup('web', SetLocale::class);
-        $middleware->alias([
-            'gestor' => IsGestor::class,
-        ]);
-        $middleware->redirectGuestsTo(fn () => route('user.login'));
-        $middleware->redirectUsersTo(fn () => route('chargers.index'));
-        $middleware->validateCsrfTokens(except: [
-            'webhook/mercadopago',
-        ]);
+      $middleware->validateCsrfTokens(except: ['stripe/webhook']);
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
+

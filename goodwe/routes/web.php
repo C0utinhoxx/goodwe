@@ -3,11 +3,12 @@
 use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ManagerController;
-use App\Http\Controllers\MercadoPagoController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CheckoutController;
+
 
 Route::get('/', function () {
     return auth()->check()
@@ -122,15 +123,9 @@ Route::middleware('auth')->group(function () {
                 ->name('chatbot.clear');
         });
 
-    Route::post('/checkout', [MercadoPagoController::class, 'checkout'])
-        ->name('checkout');
-    Route::get('/pagamento/sucesso', [MercadoPagoController::class, 'sucesso'])
-        ->name('pagamento.sucesso');
-    Route::get('/pagamento/erro', [MercadoPagoController::class, 'erro'])
-        ->name('pagamento.erro');
-    Route::get('/pagamento/pendente', [MercadoPagoController::class, 'pendente'])
-        ->name('pagamento.pendente');
 });
 
-Route::post('/webhook/mercadopago', [MercadoPagoController::class, 'webhook'])
-    ->name('mercadopago.webhook');
+Route::post('/checkout', [CheckoutController::class, 'checkout'])->name('checkout');
+Route::get('/pagamento/sucesso', [CheckoutController::class, 'success'])->name('pagamento.sucesso');
+Route::get('/pagamento/erro', [CheckoutController::class, 'cancel'])->name('pagamento.erro');
+Route::post('/stripe/webhook', [CheckoutController::class, 'webhook']);

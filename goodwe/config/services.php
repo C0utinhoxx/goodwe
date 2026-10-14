@@ -37,5 +37,9 @@ return [
    'openai' => [
     'key' => env('OPENAI_API_KEY') ?: config('openai_shared.key'),
 ],
+'stripe' => [
+    'secret' => env('STRIPE_SECRET'),
+    'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+],
 
 ];
