@@ -1,13 +1,45 @@
-# Imagem base: PHP 8.3 com Apache (compatível com Laravel 13 / PHP ^8.3)
-FROM php:8.3-apache
+###############################################################################
+# PowerTAG — Dockerfile otimizado para deploy no Render
+#
+# POR QUE NÃO COMPILAMOS MAIS gRPC/protobuf DO FONTE:
+#   * `pecl install grpc` compila o core C++ do gRPC do zero (~15 a 30 min),
+#     estourando o tempo limite de build do Render.
+#   * O cliente google/cloud-firestore suporta nativamente o transporte REST
+#     e o Google API Core escolhe automaticamente `rest` quando a extensão
+#     ext-grpc NÃO está carregada (verificado em produção: leitura, escrita,
+#     merge, query com streaming e delete funcionando).
+#   * O protobuf também é dispensado: sem ext-protobuf, o pacote composer
+#     google/protobuf (pure PHP) é usado automaticamente.
+# Resultado: build de poucos minutos (e cacheado pelo Render) + imagem menor,
+# pois os compiladores (gcc/autoconf) só existem na etapa "build".
+###############################################################################
 
-# Evita prompts interativos do apt
+###############################################################################
+# Etapa 1 — Frontend (Vite + Tailwind CSS)
+# Assets compilados em /app/public/build e copiados para a imagem final.
+###############################################################################
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+# Cache de camada: manifests primeiro (mudam pouco)
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --no-audit --no-fund
+
+COPY . .
+RUN npm run build
+
+###############################################################################
+# Etapa 2 — Backend: extensões PHP + dependências Composer
+###############################################################################
+FROM php:8.3-apache AS build
+
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Dependências do sistema + extensões PHP que o Laravel/Firestore exigem
+# Extensões nativas "leves" (compilam em segundos/1-2 min no total).
+# Nenhum pecl/grpc, nenhum C++ pesado.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
-        curl \
         unzip \
         zip \
         libzip-dev \
@@ -15,7 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libonig-dev \
         libxml2-dev \
         libicu-dev \
-    && docker-php-ext-install -j$(nproc) \
+    && docker-php-ext-install -j"$(nproc)" \
         pdo_mysql \
         mbstring \
         exif \
@@ -23,51 +55,79 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bcmath \
         intl \
         zip \
-    && pecl install grpc protobuf \
-    && docker-php-ext-enable grpc protobuf \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Apache: rewrite para o Laravel + DocumentRoot apontando para /public
-RUN a2enmod rewrite headers
+# Composer copiado da imagem oficial (não instala outro PHP)
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+COPY . .
+
+# --ignore-platform-req=ext-grpc: o google/cloud-firestore exige ext-grpc no
+# composer.json, mas funciona 100% via transporte REST (ver etapa 1 de notas).
+RUN composer install --no-dev --no-interaction --prefer-dist \
+        --optimize-autoloader --ignore-platform-req=ext-grpc \
+    && (php artisan storage:link --force 2>/dev/null || true)
+
+###############################################################################
+# Etapa 3 — Imagem final de produção (sem gcc, sem headers de build)
+###############################################################################
+FROM php:8.3-apache
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Bibliotecas de tempo de execução das extensões PHP (mbstring/intl/zip).
+# Instalamos as variantes -dev apenas para não adivinhar a versão da lib em
+# cada release do Debian usada pela imagem base — nenhum compilador entra.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libonig-dev \
+        libicu-dev \
+        libzip-dev \
+    && a2enmod rewrite headers \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Apache: DocumentRoot apontando para /public
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
     && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
-# 3. Composer (copiado da imagem oficial, sem instalar PHP extra)
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Extensões PHP compiladas na etapa "build" (mesma tag base => mesmo caminho
+# de extension_dir e mesmas libs dinâmicas). O enable é explícito e validado,
+# para falhar o build cedo caso alguma extensão não carregue.
+COPY --from=build /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+COPY --from=build /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+RUN docker-php-ext-enable pdo_mysql mbstring exif pcntl bcmath intl zip \
+    && for ext in pdo_mysql mbstring exif pcntl bcmath intl zip; do \
+           php -m | grep -qi "^${ext}$" \
+               || { echo "ERRO: extensão PHP '${ext}' nao carregou na imagem final"; exit 1; }; \
+       done
 
-# 4. Código da aplicação
-WORKDIR /var/www/html
-COPY . .
+# Código da aplicação com vendor já instalado (sem node_modules, sem .env)
+COPY --from=build /var/www/html /var/www/html
 
-# 5. Dependências PHP de produção (sem dev) + frontend build se existir package.json
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    && if [ -f package.json ]; then \
-           (npm ci --ignore-scripts 2>/dev/null || npm install --ignore-scripts) \
-           && (npm run build 2>/dev/null || true); \
-       fi \
-    && php artisan storage:link --force 2>/dev/null || true
+# Assets do frontend compilados
+COPY --from=frontend /app/public/build /var/www/html/public/build
 
-# 6. Permissões: Apache (www-data) precisa escrever em storage e bootstrap/cache.
-#    O credentials.json do Firebase é gerado em runtime via FIREBASE_CREDENTIALS_JSON,
-#    então o diretório storage/app/firebase precisa ser gravável.
-RUN mkdir -p storage/app/firebase storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
+COPY docker-entrypoint.sh /usr/local/bin/laravel-entrypoint
+
+# Permissões: Apache (www-data) precisa escrever em storage e bootstrap/cache.
+# O credentials.json do Firebase é gerado em runtime via FIREBASE_CREDENTIALS_JSON,
+# então storage/app/firebase precisa ser gravável.
+RUN chmod +x /usr/local/bin/laravel-entrypoint \
+    && mkdir -p \
+        storage/app/firebase \
+        storage/app/public \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views \
+        storage/logs \
+        bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# 7. Entrypoint: Render/Koyeb injetam a porta via $PORT.
-#    NÃO rodamos config:cache aqui porque as envs (ex.: FIREBASE_CREDENTIALS_JSON)
-#    só existem em runtime — cache no build congelaria valores vazios.
-COPY --chmod=755 <<'ENTRYPOINT' /usr/local/bin/laravel-entrypoint
-#!/bin/sh
-set -e
-PORT="${PORT:-80}"
-sed -i "s/Listen 80/Listen ${PORT}/g" /etc/apache2/ports.conf
-sed -i "s/:80>/:${PORT}>/g" /etc/apache2/sites-enabled/*.conf
-php artisan migrate --force || true
-exec apache2-foreground
-ENTRYPOINT
-
+# NÃO rodamos config:cache no build porque as envs (ex.: FIREBASE_CREDENTIALS_JSON)
+# só existem em runtime — cache no build congelaria valores vazios.
 EXPOSE 80
 
 CMD ["laravel-entrypoint"]
