@@ -111,25 +111,61 @@ COPY --from=build /var/www/html /var/www/html
 # Assets do frontend compilados
 COPY --from=frontend /app/public/build /var/www/html/public/build
 
+# EXPLÍCITO de propósito: fixa o cwd do container na raiz da aplicação,
+# para qualquer `php artisan` executado via docker exec (debug) rodar no lugar
+# certo. Não dá para contar com o WORKDIR herdado da imagem base.
+WORKDIR /var/www/html
+
 COPY docker-entrypoint.sh /usr/local/bin/laravel-entrypoint
 
 # Permissões: Apache (www-data) precisa escrever em storage e bootstrap/cache.
 # O credentials.json do Firebase é gerado em runtime via FIREBASE_CREDENTIALS_JSON,
 # então storage/app/firebase precisa ser gravável.
+# O entrypoint repete isso a cada start (o Render pode remontar volumes).
 RUN chmod +x /usr/local/bin/laravel-entrypoint \
-    && mkdir -p \
+    && for dir in \
         storage/app/firebase \
+        storage/app/private \
         storage/app/public \
         storage/framework/cache/data \
         storage/framework/sessions \
+        storage/framework/testing \
         storage/framework/views \
         storage/logs \
         bootstrap/cache \
+       ; do install -d -o www-data -g www-data -m 0775 "$dir"; done \
+    && touch storage/logs/laravel.log \
+    && chown www-data:www-data storage/logs/laravel.log \
+    && chmod 664 storage/logs/laravel.log \
     && chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
+    && chmod -R u+rwX,g+rwX storage bootstrap/cache
+
+# php.ini de produção. O ponto crucial é log_errors + error_log=/dev/stderr:
+# o Render captura o stderr, então a exceção real do Laravel aparece no log do
+# deploy em vez de virar um 500 sem explicação. display_errors fica Off para
+# não vazar stack trace/segredos na resposta HTTP.
+RUN printf '%s\n' \
+        'memory_limit = 256M' \
+        'max_execution_time = 30' \
+        'post_max_size = 20M' \
+        'upload_max_filesize = 20M' \
+        'date.timezone = UTC' \
+        'expose_php = Off' \
+        'display_errors = Off' \
+        'log_errors = On' \
+        'error_log = /dev/stderr' \
+        'opcache.enable = 1' \
+        'opcache.validate_timestamps = 0' \
+        'opcache.max_accelerated_files = 20000' \
+        'opcache.memory_consumption = 128' \
+        'realpath_cache_size = 4096K' \
+        'realpath_cache_ttl = 600' \
+    > /usr/local/etc/php/conf.d/99-powertag.ini
 
 # NÃO rodamos config:cache no build porque as envs (ex.: FIREBASE_CREDENTIALS_JSON)
-# só existem em runtime — cache no build congelaria valores vazios.
+# só existem em runtime — cache no build congelaria valores vazios. O
+# .dockerignore também exclui bootstrap/cache/*.php, então a imagem nunca
+# embarca config cacheado. As migrações rodam no preDeployCommand do Render.
 EXPOSE 80
 
 CMD ["laravel-entrypoint"]
