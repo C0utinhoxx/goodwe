@@ -6,11 +6,8 @@
 #   1) Aponta o Apache para a porta do provedor
 #   2) Garante storage/ e bootstrap/cache/ graváveis pelo www-data
 #   3) Valida a APP_KEY e a DB_CONNECTION (falha cedo e com mensagem clara)
-#   4) Sobe o Apache
-#
-# NÃO executamos migrações aqui: elas rodam no preDeployCommand nativo do
-# Render (`php artisan migrate --force`), que roda uma única vez antes de
-# publicar o container em vez de uma vez por réplica a cada boot.
+#   4) Roda as migrações com retry (não há preDeployCommand no plano gratuito)
+#   5) Sobe o Apache
 ###############################################################################
 set -eu
 
@@ -106,9 +103,60 @@ if [ "${DB_CONNECTION}" = "sqlite" ]; then
 fi
 
 ###############################################################################
-# 4) Diagnóstico do boot e subida do Apache
+# 4) Migrações
+#
+#    No plano gratuito do Render não há preDeployCommand nem shell, então o
+#    migrate roda no boot do container.
+#
+#    Decisões deliberadas:
+#    * `--isolated` evita corrida entre réplicas caso a aplicação escale.
+#    * Retry com backoff: o banco pode levar alguns segundos para aceitar
+#      conexões logo após o container subir.
+#    * NÃO é fatal. Se esgotar as tentativas, registramos um ERROR alto e
+#      seguimos para o Apache. Um exit 1 aqui colocaria o Render em loop de
+#      restart, que é pior do que servir 500 com o erro visível no log.
+#      A diferença para o antigo `|| true` é justamente não ser silencioso.
+###############################################################################
+MIGRATE_ATTEMPTS="${MIGRATE_ATTEMPTS:-10}"
+
+migrated=0
+attempt=1
+while [ "$attempt" -le "$MIGRATE_ATTEMPTS" ]; do
+    entry_log "Executando migrações (tentativa ${attempt}/${MIGRATE_ATTEMPTS})."
+
+    if php artisan migrate --force --isolated --no-interaction; then
+        entry_log "Migrações concluídas."
+        migrated=1
+        break
+    fi
+
+    if [ "$attempt" -eq "$MIGRATE_ATTEMPTS" ]; then
+        break
+    fi
+
+    # Backoff: 3s, 6s, 9s... até o teto de 30s.
+    wait=$((attempt * 3))
+    [ "$wait" -gt 30 ] && wait=30
+
+    entry_log "Migração falhou; aguardando ${wait}s para o banco ficar disponível."
+    attempt=$((attempt + 1))
+    sleep "$wait"
+done
+
+if [ "$migrated" -eq 0 ]; then
+    entry_log "ERRO: migrações não concluídas após ${MIGRATE_ATTEMPTS} tentativas. O container subiu mesmo assim; rotas que usam a sessão vão retornar 500 até o banco estar acessível. Verifique DB_HOST/DB_PORT/DB_DATABASE/DB_USERNAME/DB_PASSWORD e se as tabelas (sessions, users, cache) existem."
+fi
+
+# Os comandos artisan rodaram como root e podem ter criado arquivos em
+# bootstrap/cache e storage. Sem isto, o worker do Apache (www-data) perde
+# o direito de escrita e o erro reaparece em runtime.
+chown -R www-data:www-data "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache"
+chmod -R u+rwX,g+rwX "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache"
+
+###############################################################################
+# 5) Diagnóstico do boot e subida do Apache
 ###############################################################################
 entry_log "Boot OK -> PHP $(php -r 'echo PHP_VERSION;') | APP_ENV=${APP_ENV:-<vazio>} | APP_DEBUG=${APP_DEBUG:-<vazio>} | SESSION_DRIVER=${SESSION_DRIVER:-<vazio>} | CACHE_STORE=${CACHE_STORE:-<vazio>} | DB_CONNECTION=${DB_CONNECTION:-<vazio>} | DB_HOST=${DB_HOST:-<vazio>}"
-entry_log "Migrações são responsabilidade do preDeployCommand; subindo o Apache na porta ${PORT}."
+entry_log "Subindo o Apache na porta ${PORT}."
 
 exec apache2-foreground
