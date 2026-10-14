@@ -109,7 +109,11 @@ fi
 #    migrate roda no boot do container.
 #
 #    Decisões deliberadas:
-#    * `--isolated` evita corrida entre réplicas caso a aplicação escale.
+#    * SEM `--isolated`: essa flag usa o cache store para travar o comando
+#      (CacheCommandMutex). Com CACHE_STORE=database ela escreve na tabela
+#      `cache_locks`, que é criada pela própria migração 0001_01_01_000001
+#      — em um banco novo o comando quebra com "Table 'cache_locks' doesn't
+#      exist" antes de qualquer migração rodar. Não reintroduzir.
 #    * Retry com backoff: o banco pode levar alguns segundos para aceitar
 #      conexões logo após o container subir.
 #    * NÃO é fatal. Se esgotar as tentativas, registramos um ERROR alto e
@@ -124,7 +128,7 @@ attempt=1
 while [ "$attempt" -le "$MIGRATE_ATTEMPTS" ]; do
     entry_log "Executando migrações (tentativa ${attempt}/${MIGRATE_ATTEMPTS})."
 
-    if php artisan migrate --force --isolated --no-interaction; then
+    if php artisan migrate --force --no-interaction; then
         entry_log "Migrações concluídas."
         migrated=1
         break
