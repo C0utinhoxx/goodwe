@@ -3,7 +3,9 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChargerController;
 use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\ChargingSessionController;
 use App\Http\Controllers\PointsController;
+use App\Http\Controllers\ReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register'])->name('api.register');
@@ -14,6 +16,11 @@ Route::get('/chargers', [ChargerController::class, 'index'])->name('api.chargers
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('api.logout');
     Route::get('/user', [AuthController::class, 'me'])->name('api.user');
+
+    Route::post('/chargers/{charger:code}/reserve', [ReservationController::class, 'store'])->name('api.reservations.store');
+    Route::post('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('api.reservations.cancel');
+    Route::get('/reservations/{reservation}', [ReservationController::class, 'status'])->name('api.reservations.status');
+    Route::post('/sessions/{session}/pay', [ChargingSessionController::class, 'pay'])->name('api.sessions.pay');
 
     Route::prefix('chargers')->name('api.chargers.')->group(function () {
         Route::post('/{charger}/schedule', [ChargerController::class, 'schedule'])->name('schedule');

@@ -38,6 +38,11 @@ class User extends Authenticatable
         'points' => 'decimal:2',
     ];
 
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(ChargingReservation::class);
+    }
+
     public function coupons(): HasMany
     {
         return $this->hasMany(Coupon::class);

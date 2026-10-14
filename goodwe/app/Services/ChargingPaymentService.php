@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Charger;
 use App\Models\ChargingSession;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +34,9 @@ class ChargingPaymentService
 
     private function pay(User $user, string $charger, array $data, string $amount, string $energy, int $minutes, string $plate): ChargingSession
     {
+        if (Charger::where('code', $charger)->exists()) {
+            throw ValidationException::withMessages(['charger' => 'Equipamentos cadastrados exigem confirmação física; o simulador não pode iniciar essa sessão.']);
+        }
         $occupied = false;
         try {
             return DB::transaction(function () use ($user, $charger, $data, $amount, $energy, $minutes, $plate, &$occupied) {

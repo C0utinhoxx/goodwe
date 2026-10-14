@@ -87,7 +87,60 @@ function setupPortal() {
         if (amount) { amount.value = button.dataset.setAmount; amount.focus(); }
     }));
     document.querySelector('[data-profile-theme]')?.addEventListener('click', () => document.getElementById('theme-toggle')?.click());
+    const localTime = new Intl.DateTimeFormat('pt-BR', {dateStyle:'short', timeStyle:'medium'});
+    document.querySelectorAll('time[data-local-time]').forEach(time => {
+        const date = new Date(time.dateTime);
+        if (!Number.isNaN(date.getTime())) time.textContent = localTime.format(date);
+    });
+    setupReservations();
+    setupSessionPayments();
     setupChat();
+}
+
+function setupReservations() {
+    document.querySelectorAll('[data-reservation-card]').forEach(card => {
+        if (card.dataset.reservationStatus !== 'active') return;
+        const countdown = card.querySelector('[data-reservation-countdown]');
+        if (!countdown) return;
+        const expires = Date.parse(card.dataset.expiresAt);
+        const serverTime = Date.parse(card.dataset.serverTime);
+        const began = performance.now();
+        let checking = false;
+        const tick = async () => {
+            const seconds = Math.max(0, Math.ceil((expires - serverTime - (performance.now() - began)) / 1000));
+            countdown.textContent = `${Math.floor(seconds / 60)}min ${String(seconds % 60).padStart(2, '0')}s`;
+            if (seconds > 0 || checking) return;
+            checking = true;
+            clearInterval(timer);
+            countdown.textContent = 'Prazo encerrado. Conferindo estado…';
+            card.querySelector('[data-reservation-cancel] button')?.setAttribute('disabled', '');
+            try {
+                const response = await fetch(card.dataset.statusUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                if (!response.ok) throw new Error('state');
+                const data = await response.json();
+                card.dataset.reservationStatus = data.reservation.status;
+                card.querySelector('[data-reservation-state]').textContent = ({ expired: 'Expirada por ausência', cancelled: 'Cancelada', started: 'Recarga iniciada', active: 'Reserva ativa' })[data.reservation.status] || 'Estado atualizado';
+                countdown.textContent = data.reservation.status === 'expired' ? `Ausência registrada · ${Number(data.reservation.penalty_applied_points).toLocaleString('pt-BR', {minimumFractionDigits:2})} pontos descontados` : 'Estado atualizado. Recarregue a página para consultar os detalhes.';
+            } catch { countdown.textContent = 'Prazo encerrado. Atualize a página para consultar o estado no servidor.'; }
+        };
+        const timer = setInterval(tick, 1000);
+        tick();
+    });
+}
+
+function setupSessionPayments() {
+    document.querySelectorAll('[data-session-payment]').forEach(form => {
+        const money = cents => (cents / 100).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+        const update = () => {
+            const original = Number(form.dataset.originalCents);
+            const percent = Number(form.querySelector('[data-payment-coupon] option:checked')?.dataset.percent || 0);
+            const discount = Math.min(original, Math.round(original * percent / 100));
+            form.querySelector('[data-session-discount]').textContent = `− ${money(discount)} (${percent}% OFF)`;
+            form.querySelector('[data-session-total]').textContent = money(original - discount);
+        };
+        form.querySelector('[data-payment-coupon]')?.addEventListener('change', update);
+        update();
+    });
 }
 
 function setupChat() {

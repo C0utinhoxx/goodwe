@@ -39,6 +39,13 @@ class WalletController extends Controller
                 'energy_kwh' => (float) $s->energy_kwh,
                 'amount_charged' => (float) $s->amount_charged,
                 'status' => $s->status,
+                'payment_status' => $s->payment_status,
+                'tariff_per_kwh' => $s->tariff_per_kwh,
+                'measured_energy_kwh' => $s->measured_energy_kwh,
+                'original_amount' => $s->original_amount,
+                'discount_amount' => $s->discount_amount,
+                'coupon_id' => $s->coupon_id,
+                'reservation_id' => $s->charging_reservation_id,
                 'created_at' => $s->created_at?->toIso8601String(),
             ]),
         ]);

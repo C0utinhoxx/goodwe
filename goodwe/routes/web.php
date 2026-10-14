@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\ChargingController;
+use App\Http\Controllers\ChargingSessionController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\MercadoPagoController;
 use App\Http\Controllers\PointsController;
+use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehicleController;
@@ -52,6 +54,12 @@ Route::get('/locale/{locale}', function (string $locale) {
 })->name('locale.set');
 
 Route::middleware('auth')->group(function () {
+
+    Route::post('/carregadores/{charger:code}/reservar', [ReservationController::class, 'store'])->name('reservations.store');
+    Route::post('/reservas/{reservation}/cancelar', [ReservationController::class, 'cancel'])->name('reservations.cancel');
+    Route::get('/reservas/{reservation}/estado', [ReservationController::class, 'status'])->name('reservations.status');
+    Route::get('/recargas/{session}', [ChargingSessionController::class, 'show'])->name('charging-sessions.show');
+    Route::post('/recargas/{session}/pagar', [ChargingSessionController::class, 'pay'])->name('charging-sessions.pay');
 
     Route::prefix('carregadores')->name('chargers.')->group(function () {
         Route::get('/', [ChargingController::class, 'index'])

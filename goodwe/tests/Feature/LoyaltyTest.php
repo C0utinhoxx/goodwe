@@ -162,7 +162,7 @@ class LoyaltyTest extends TestCase
         $user = User::factory()->create(['balance' => 100]);
         $coupon = Coupon::factory()->for($user)->create();
         $data = ['vehicle_plate' => 'ABC1D23', 'duration_minutes' => 30, 'coupon_id' => $coupon->id, 'idempotency_key' => (string) Str::uuid(), 'amount' => 0.01, 'discount_percent' => 100];
-        $this->actingAs($user)->get(route('chargers.index'))->assertSee($coupon->code)->assertSee('Aplicar cupom');
+        $this->actingAs($user)->get(route('chargers.index'))->assertDontSee('Aplicar cupom')->assertSee('A reserva é imediata', false);
         $this->post(route('chargers.schedule', 'CG-001'), $data)->assertSessionHas('success');
         $this->post(route('chargers.schedule', 'CG-001'), $data)->assertSessionHas('success');
         $this->assertDatabaseHas('charging_sessions', ['original_amount' => 19.50, 'discount_amount' => 1.95, 'amount_charged' => 17.55, 'coupon_id' => $coupon->id]);

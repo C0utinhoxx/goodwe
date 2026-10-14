@@ -46,7 +46,7 @@ class WalletController extends Controller
     {
         $user = auth()->user();
         $history = $user->transactions()->latest()->paginate(15, ['*'], 'transactions_page');
-        $sessions = $user->chargingSessions()->latest()->paginate(15, ['*'], 'sessions_page');
+        $sessions = $user->chargingSessions()->with(['establishment', 'coupon', 'reservation'])->latest()->paginate(15, ['*'], 'sessions_page');
 
         return view('user.carteira-historico', [
             'user' => $user,

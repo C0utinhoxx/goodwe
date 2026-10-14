@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Exceptions\InsufficientBalanceException;
+use App\Models\ChargingEvent;
 use App\Models\ChargingSession;
+use App\Models\Coupon;
 use App\Models\PointMovement;
 use App\Models\Transaction;
 use App\Models\User;
@@ -100,10 +102,7 @@ class WalletService
 
                 return $existing;
             }
-            $coupon = $couponId ? $locked->coupons()->whereKey($couponId)->lockForUpdate()->first() : null;
-            if ($couponId && (! $coupon || $coupon->status !== 'available')) {
-                throw ValidationException::withMessages(['coupon_id' => 'Cupom inválido, utilizado ou pertencente a outra conta.']);
-            }
+            $coupon = $this->paymentCoupon($locked, $couponId);
             $discount = $coupon ? min($original, DecimalAmount::percentage($original, $coupon->discount_percent)) : 0;
             $final = $original - $discount;
             if (! User::whereKey($locked->id)->where('balance', '>=', DecimalAmount::decimal($final))->decrement('balance', DecimalAmount::decimal($final))) {
@@ -115,6 +114,68 @@ class WalletService
 
             return $session;
         }, 5);
+    }
+
+    public function paySession(User $user, ChargingSession $session, ?int $couponId, string $key): ChargingSession
+    {
+        abort_unless($session->user_id === $user->id, 403);
+
+        return DB::transaction(function () use ($user, $session, $couponId, $key) {
+            $lockedUser = UserBalanceLock::acquire($user->id);
+            $locked = ChargingSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            if ($locked->payment_status === 'paid') {
+                if ($locked->coupon_id !== $couponId) {
+                    throw ValidationException::withMessages(['coupon_id' => 'Pagamento já confirmado com outra seleção de cupom.']);
+                }
+
+                return $locked;
+            }
+            if ($locked->charging_state !== 'ended' || $locked->payment_status !== 'pending' || ! $locked->ended_at || $locked->measured_energy_kwh === null || $locked->tariff_per_kwh === null || $locked->transaction_id) {
+                throw ValidationException::withMessages(['session' => 'O pagamento depende da confirmação de encerramento e consumo do equipamento.']);
+            }
+            if ($lockedUser->chargingSessions()->where('idempotency_key', $key)->whereKeyNot($locked->id)->exists()) {
+                throw ValidationException::withMessages(['idempotency_key' => 'Identificador já usado em outro pagamento.']);
+            }
+            $original = DecimalAmount::units(EnergyBilling::amount($locked->measured_energy_kwh, $locked->tariff_per_kwh));
+            $coupon = $this->paymentCoupon($lockedUser, $couponId);
+            $discount = $coupon ? min($original, DecimalAmount::percentage($original, $coupon->discount_percent)) : 0;
+            $final = $original - $discount;
+            if ($final > 0 && ! User::whereKey($user->id)->where('balance', '>=', DecimalAmount::decimal($final))->decrement('balance', DecimalAmount::decimal($final))) {
+                throw new InsufficientBalanceException('Saldo insuficiente para confirmar o pagamento. Adicione créditos à carteira.');
+            }
+            $transaction = Transaction::create([
+                'user_id' => $user->id,
+                'type' => Transaction::TYPE_CHARGE_PAYMENT,
+                'amount' => DecimalAmount::decimal($final),
+                'description' => 'Pagamento da sessão #'.$locked->id.' — '.$locked->charger_name,
+                'status' => Transaction::STATUS_APPROVED,
+            ]);
+            $locked->update([
+                'original_amount' => DecimalAmount::decimal($original),
+                'discount_amount' => DecimalAmount::decimal($discount),
+                'amount_charged' => DecimalAmount::decimal($final),
+                'coupon_id' => $coupon?->id,
+                'transaction_id' => $transaction->id,
+                'idempotency_key' => $key,
+                'payment_status' => 'paid',
+                'status' => ChargingSession::STATUS_COMPLETED,
+                'paid_at' => now(),
+            ]);
+            $coupon?->update(['status' => 'used', 'used_at' => now()]);
+            ChargingEvent::create(['charger_id' => $locked->charger_id, 'charging_session_id' => $locked->id, 'charging_reservation_id' => $locked->charging_reservation_id, 'type' => 'paid', 'event_key' => 'session:'.$locked->id.':paid', 'metadata' => ['transaction_id' => $transaction->id, 'coupon_id' => $coupon?->id, 'amount' => DecimalAmount::decimal($final)], 'occurred_at' => now()]);
+
+            return $locked;
+        }, 5);
+    }
+
+    private function paymentCoupon(User $user, ?int $couponId): ?Coupon
+    {
+        $coupon = $couponId ? $user->coupons()->whereKey($couponId)->lockForUpdate()->first() : null;
+        if ($couponId && (! $coupon || $coupon->status !== 'available')) {
+            throw ValidationException::withMessages(['coupon_id' => 'Cupom inválido, utilizado ou pertencente a outra conta.']);
+        }
+
+        return $coupon;
     }
 
     public function getHistory(User $user): Collection

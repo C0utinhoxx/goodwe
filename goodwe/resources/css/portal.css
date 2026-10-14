@@ -76,3 +76,5 @@
 @media(max-width:650px) { .pt-loyalty-grid { grid-template-columns:1fr; } .pt-points-hero { flex-direction:column; align-items:stretch; gap:20px; } .pt-payment-summary { padding:12px; } .pt-payment-summary > div { font-size:13px; } }
 
 .pt-status.success .pt-dot,.pt-filter-foot .pt-dot{background:var(--pt-success)}
+
+.pt-reservations-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.pt-reservation{padding:20px;border:1px solid var(--pt-border);border-radius:14px;min-width:0}.pt-reservation .pt-card-heading{flex-wrap:wrap;gap:8px}.pt-reservation-countdown{margin:14px 0;color:var(--pt-accent);font-size:15px}.pt-status.reserved{background:#fff5de;color:#8d650f}.pt-status.in-use{background:#eaf2ff;color:#235dac}.dark .pt-status.reserved{background:#3d321b;color:#e9c873}.dark .pt-status.in-use{background:#192e48;color:#9ec9ff}@media(max-width:650px){.pt-reservations-grid{grid-template-columns:1fr}}

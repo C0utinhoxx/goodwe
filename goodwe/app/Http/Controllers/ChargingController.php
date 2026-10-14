@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\InsufficientBalanceException;
 use App\Http\Requests\ScheduleChargingRequest;
+use App\Models\Charger;
 use App\Services\ChargingPaymentService;
 use App\Services\ChargingSimulator;
+use App\Services\ReservationService;
 use Illuminate\View\View;
 
 class ChargingController extends Controller
@@ -14,17 +16,23 @@ class ChargingController extends Controller
         private ChargingPaymentService $payments,
     ) {}
 
-    public function index(): View
+    public function index(ReservationService $reservations): View
     {
+        $reservations->expireDue();
+        $user = auth()->user();
+
         return view('chargers.index', [
-            'chargers' => ChargingSimulator::all(),
-            'vehicles' => auth()->user()->vehicles()->latest()->get(),
-            'coupons' => auth()->user()->coupons()->where('status', 'available')->latest()->get(),
+            'chargers' => Charger::with(['establishment', 'activeReservation'])->orderBy('name')->get(),
+            'reservations' => $user->reservations()->with(['charger', 'establishment'])->latest()->paginate(10, ['*'], 'reservations_page'),
+            'activeSessions' => $user->chargingSessions()->with('establishment')->whereNotNull('charging_state')->where('payment_status', '!=', 'paid')->latest()->get(),
         ]);
     }
 
     public function schedule(ScheduleChargingRequest $request, string $code): mixed
     {
+        if (Charger::where('code', $code)->exists()) {
+            abort(409, 'Carregadores cadastrados utilizam reserva imediata; o início é confirmado pelo equipamento.');
+        }
         try {
             $session = $this->payments->schedule($request->user(), $code, $request->validated());
         } catch (InsufficientBalanceException $e) {
@@ -37,6 +45,9 @@ class ChargingController extends Controller
 
     public function release(string $code): mixed
     {
+        if (Charger::where('code', $code)->exists()) {
+            abort(409, 'O estado físico só pode ser atualizado pela integração do equipamento.');
+        }
         ChargingSimulator::release($code);
 
         return back()->with('success', __('chargers.released'));

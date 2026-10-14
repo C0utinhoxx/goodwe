@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Establishment extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'name',
@@ -16,11 +19,11 @@ class Establishment extends Model
         'operating_hours',
         'phone',
         'cost_per_kwh',
-        'image',
+        'image', 'reservation_tolerance_minutes', 'no_show_penalty_points',
     ];
 
     protected $casts = [
-        'cost_per_kwh' => 'decimal:4',
+        'cost_per_kwh' => 'decimal:4', 'reservation_tolerance_minutes' => 'integer', 'no_show_penalty_points' => 'decimal:2',
     ];
 
     public const TYPE_RESIDENCIAL = 'residencial';
@@ -30,6 +33,11 @@ class Establishment extends Model
     public const TYPE_SHOPPING = 'shopping';
 
     public const TYPE_OUTRO = 'outro';
+
+    public function chargers(): HasMany
+    {
+        return $this->hasMany(Charger::class);
+    }
 
     public function user(): BelongsTo
     {

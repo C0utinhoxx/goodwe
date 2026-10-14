@@ -6,6 +6,7 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ScheduleChargingRequest;
 use App\Http\Requests\StartChargingRequest;
+use App\Models\Charger;
 use App\Models\ChargingPoint;
 use App\Models\ChargingSession;
 use App\Services\ChargingPaymentService;
@@ -28,11 +29,15 @@ class ChargerController extends Controller
 
         return response()->json([
             'chargers' => $chargers,
+            'registered_chargers' => Charger::with('establishment')->orderBy('name')->get()->map(fn (Charger $c) => ['id' => $c->code, 'name' => $c->name, 'establishment' => $c->establishment->name, 'location' => $c->location, 'power_kw' => (float) $c->power_kw, 'status' => $c->status(), 'tariff_per_kwh' => $c->currentTariff(), 'can_reserve' => $c->canReserve(), 'source' => 'registered']),
         ]);
     }
 
     public function schedule(ScheduleChargingRequest $request, string $charger): JsonResponse
     {
+        if (Charger::where('code', $charger)->exists()) {
+            return response()->json(['message' => 'A autorização presencial e a confirmação IoT deste equipamento ainda dependem da integração. Nenhuma recarga foi iniciada.', 'integration_pending' => true], 503);
+        }
         try {
             $session = $this->payments->schedule($request->user(), $charger, $request->validated());
         } catch (InsufficientBalanceException $e) {
@@ -44,6 +49,9 @@ class ChargerController extends Controller
 
     public function start(StartChargingRequest $request, string $charger): JsonResponse
     {
+        if (Charger::where('code', $charger)->exists()) {
+            return response()->json(['message' => 'A autorização presencial e a confirmação IoT deste equipamento ainda dependem da integração. Nenhuma recarga foi iniciada.', 'integration_pending' => true], 503);
+        }
         try {
             $session = $this->payments->start($request->user(), $charger, $request->validated());
         } catch (InsufficientBalanceException $e) {
@@ -60,6 +68,9 @@ class ChargerController extends Controller
 
     public function release(Request $request, string $charger): JsonResponse
     {
+        if (Charger::where('code', $charger)->exists()) {
+            return response()->json(['message' => 'A parada e a disponibilidade física dependem de confirmação pelo IoT.', 'integration_pending' => true], 503);
+        }
         $released = ChargingSimulator::release($charger);
 
         if (! $released) {
@@ -78,6 +89,7 @@ class ChargerController extends Controller
     {
         return [
             'id' => $charger->id,
+            'source' => 'simulation',
             'name' => $charger->name,
             'location' => $charger->location,
             'power_kw' => $charger->powerKw,
