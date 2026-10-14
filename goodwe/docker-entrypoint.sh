@@ -5,7 +5,7 @@
 # Escopo: SOMENTE preparar o container para o Apache servir a aplicação.
 #   1) Aponta o Apache para a porta do provedor
 #   2) Garante storage/ e bootstrap/cache/ graváveis pelo www-data
-#   3) Valida a APP_KEY (falha cedo e com mensagem clara, em vez de 500)
+#   3) Valida a APP_KEY e a DB_CONNECTION (falha cedo e com mensagem clara)
 #   4) Sobe o Apache
 #
 # NÃO executamos migrações aqui: elas rodam no preDeployCommand nativo do
@@ -86,6 +86,23 @@ if ! php -r '
     exit(is_string($raw) && strlen($raw) === 32 ? 0 : 1);
 '; then
     die "APP_KEY inválida: esperado 'base64:' + 32 bytes. Gere com 'php artisan key:generate --show'."
+fi
+
+###############################################################################
+# 3.1) Validação da DB_CONNECTION
+#
+#    config/database.php usa env('DB_CONNECTION', 'sqlite'). Sem a variável,
+#    o Laravel cai em sqlite e tenta abrir database/database.sqlite — arquivo
+#    que não existe na imagem (é ignorado pelo database/.gitignore). O
+#    resultado é "Database file at path ... does not exist" em TODA rota web,
+#    enquanto /up segue em 200 — um 500 confuso e difícil de diagnosticar.
+###############################################################################
+if [ -z "${DB_CONNECTION:-}" ]; then
+    die "DB_CONNECTION não definida. Sem ela o Laravel assume sqlite e tenta abrir /var/www/html/database/database.sqlite, que não existe na imagem. No Render: Environment > Add 'DB_CONNECTION=mysql'."
+fi
+
+if [ "${DB_CONNECTION}" = "sqlite" ]; then
+    die "DB_CONNECTION=sqlite não é suportado nesta imagem: não há database/database.sqlite. Use 'DB_CONNECTION=mysql'."
 fi
 
 ###############################################################################
