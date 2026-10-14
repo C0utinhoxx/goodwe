@@ -3,53 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\InsufficientBalanceException;
+use App\Http\Requests\ScheduleChargingRequest;
+use App\Services\ChargingPaymentService;
 use App\Services\ChargingSimulator;
-use App\Services\WalletService;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ChargingController extends Controller
 {
     public function __construct(
-        private WalletService $walletService,
+        private ChargingPaymentService $payments,
     ) {}
 
     public function index(): View
     {
         return view('chargers.index', [
             'chargers' => ChargingSimulator::all(),
+            'vehicles' => auth()->user()->vehicles()->latest()->get(),
+            'coupons' => auth()->user()->coupons()->where('status', 'available')->latest()->get(),
         ]);
     }
 
-    public function schedule(Request $request, string $code): mixed
+    public function schedule(ScheduleChargingRequest $request, string $code): mixed
     {
-        $validated = $request->validate([
-            'vehicle_plate' => ['required', 'string', 'max:8'],
-            'duration_minutes' => ['required', 'integer', 'in:15,30,45,60,120'],
-        ]);
-
-        $scheduled = ChargingSimulator::occupy(
-            $code,
-            $validated['vehicle_plate'],
-            $validated['duration_minutes'],
-        );
-
-        if (! $scheduled) {
-            return back()->with('error', __('chargers.not_available'));
-        }
-
-        $user = auth()->user();
-        $amount = $validated['duration_minutes'] * 0.65;
-        $energyKwh = $validated['duration_minutes'] * 0.37;
-
         try {
-            $this->walletService->payCharging($user, $amount, $code, $energyKwh);
+            $session = $this->payments->schedule($request->user(), $code, $request->validated());
         } catch (InsufficientBalanceException $e) {
-            return back()->with('error', __('wallet.insufficient_balance'));
+            return back()->with('error', $e->getMessage());
         }
 
         return redirect()->route('chargers.index')
-            ->with('success', __('chargers.scheduled'));
+            ->with('success', 'Pagamento confirmado: R$ '.number_format($session->amount_charged, 2, ',', '.').($session->coupon_id ? ' com desconto do cupom.' : '.').' Recarga agendada no simulador.');
     }
 
     public function release(string $code): mixed

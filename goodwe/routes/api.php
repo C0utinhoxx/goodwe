@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChargerController;
 use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\PointsController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register'])->name('api.register');
@@ -24,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [WalletController::class, 'index'])->name('index');
         Route::get('/sessions', [WalletController::class, 'sessions'])->name('sessions');
         Route::post('/deposit', [WalletController::class, 'deposit'])->name('deposit');
-        Route::post('/redeem-points', [WalletController::class, 'redeemPoints'])->name('redeem-points');
+        Route::get('/points', [PointsController::class, 'index'])->name('points');
+        Route::post('/redeem-points', [PointsController::class, 'redeem'])->name('redeem-points');
     });
 });

@@ -4,8 +4,10 @@ use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\MercadoPagoController;
+use App\Http\Controllers\PointsController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
 
@@ -75,6 +77,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/historico', [WalletController::class, 'history'])
             ->name('history');
     });
+
+    Route::post('/meus-pontos/resgatar', [PointsController::class, 'redeem'])->name('points.redeem');
+    Route::get('/meus-pontos', [PointsController::class, 'index'])->name('points.index');
+    Route::patch('/meu-perfil', [UserController::class, 'updateProfile'])->name('user.profile.update');
+    Route::post('/meus-veiculos', [VehicleController::class, 'store'])->name('vehicles.store');
+    Route::delete('/meus-veiculos/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+    Route::get('/chatbot/historico', [UserChatbotController::class, 'history'])->name('user.chatbot.history');
 
     Route::get('/meu-perfil', [UserController::class, 'profile'])
         ->name('user.profile');

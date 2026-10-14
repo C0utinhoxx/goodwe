@@ -79,7 +79,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'phone' => $user->phone,
             'balance' => (float) $user->balance,
-            'points' => (int) $user->points,
+            'points' => (float) $user->points,
             'is_admin' => (bool) $user->is_admin,
         ];
     }

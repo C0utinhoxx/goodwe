@@ -35,8 +35,23 @@ class User extends Authenticatable
         'is_admin' => 'boolean',
         'password' => 'hashed',
         'balance' => 'decimal:2',
-        'points' => 'integer',
+        'points' => 'decimal:2',
     ];
+
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(Coupon::class);
+    }
+
+    public function pointMovements(): HasMany
+    {
+        return $this->hasMany(PointMovement::class);
+    }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class);
+    }
 
     public function transactions(): HasMany
     {

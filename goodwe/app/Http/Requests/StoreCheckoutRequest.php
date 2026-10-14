@@ -23,7 +23,7 @@ class StoreCheckoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:1', 'max:10000'],
+            'amount' => ['required', 'numeric', 'decimal:0,2', 'min:1', 'max:10000'],
         ];
     }
 }

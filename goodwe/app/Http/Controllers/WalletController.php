@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Exceptions\InsufficientPointsException;
+use App\Http\Requests\StoreCheckoutRequest;
 use App\Services\WalletService;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class WalletController extends Controller
@@ -16,7 +15,7 @@ class WalletController extends Controller
     public function index(): View
     {
         $user = auth()->user();
-        $history = $this->walletService->getHistory($user);
+        $history = $user->transactions()->latest()->take(7)->get();
 
         return view('user.carteira', [
             'user' => $user,
@@ -31,11 +30,9 @@ class WalletController extends Controller
         ]);
     }
 
-    public function storeDeposit(Request $request)
+    public function storeDeposit(StoreCheckoutRequest $request)
     {
-        $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:1', 'max:10000'],
-        ]);
+        $validated = $request->validated();
 
         $amount = round((float) $validated['amount'], 2);
 
@@ -48,35 +45,13 @@ class WalletController extends Controller
     public function history(): View
     {
         $user = auth()->user();
-        $history = $this->walletService->getHistory($user);
-        $sessions = $this->walletService->getRecentSessions($user);
+        $history = $user->transactions()->latest()->paginate(15, ['*'], 'transactions_page');
+        $sessions = $user->chargingSessions()->latest()->paginate(15, ['*'], 'sessions_page');
 
         return view('user.carteira-historico', [
             'user' => $user,
             'history' => $history,
             'sessions' => $sessions,
         ]);
-    }
-
-    public function redeemPoints(Request $request)
-    {
-        $validated = $request->validate([
-            'points' => ['required', 'integer', 'min:100'],
-        ]);
-
-        $user = auth()->user();
-
-        if ($user->points < $validated['points']) {
-            return back()->with('error', __('wallet.insufficient_points'));
-        }
-
-        try {
-            $this->walletService->redeemPoints($user, $validated['points']);
-
-            return redirect()->route('wallet.index')
-                ->with('success', __('wallet.redeem_success', ['points' => $validated['points']]));
-        } catch (InsufficientPointsException $e) {
-            return back()->with('error', $e->getMessage());
-        }
     }
 }

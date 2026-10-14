@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ChargingSimulator;
 use App\Services\WalletService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -17,6 +18,16 @@ class UserChatbotController extends Controller
     {
         return view('user.chatbot', [
             'history' => session('user_chat_history', []),
+        ]);
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        return response()->json([
+            'history' => collect($request->session()->get('user_chat_history', []))
+                ->filter(fn ($message) => in_array($message['role'] ?? '', ['user', 'assistant'], true))
+                ->map(fn ($message) => ['role' => $message['role'], 'content' => $message['content'] ?? ''])
+                ->take(-40)->values(),
         ]);
     }
 
@@ -39,7 +50,7 @@ class UserChatbotController extends Controller
         $userEmail = $user->email ?? 'Não informado';
         $userPhone = $user->phone ?? 'Não informado';
         $userBalance = (float) ($user->balance ?? 0);
-        $userPoints = (int) ($user->points ?? 0);
+        $userPoints = (float) ($user->points ?? 0);
 
         /*
         |--------------------------------------------------------------------------
@@ -176,7 +187,7 @@ class UserChatbotController extends Controller
         */
 
         $context = "
-Você é o Assistente GoodWe, o assistente virtual da plataforma GoodWe.
+Você é o Assistente PowerTag, o assistente virtual da plataforma PowerTag do Challenge GoodWe.
 
 {$languageInstruction}
 

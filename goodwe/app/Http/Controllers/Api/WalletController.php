@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Exceptions\InsufficientPointsException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreCheckoutRequest;
 use App\Models\Transaction;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +22,7 @@ class WalletController extends Controller
 
         return response()->json([
             'balance' => (float) $user->balance,
-            'points' => (int) $user->points,
+            'points' => (float) $user->points,
             'history' => $history->map(fn (Transaction $t) => $this->transformTransaction($t)),
         ]);
     }
@@ -44,11 +44,9 @@ class WalletController extends Controller
         ]);
     }
 
-    public function deposit(Request $request): JsonResponse
+    public function deposit(StoreCheckoutRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:1', 'max:10000'],
-        ]);
+        $validated = $request->validated();
 
         $amount = round((float) $validated['amount'], 2);
         $user = $request->user();
@@ -58,37 +56,8 @@ class WalletController extends Controller
         return response()->json([
             'message' => __('wallet.deposit_success', ['amount' => number_format($amount, 2, ',', '.')]),
             'balance' => (float) $user->refresh()->balance,
-            'points' => (int) $user->points,
+            'points' => (float) $user->points,
         ]);
-    }
-
-    public function redeemPoints(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'points' => ['required', 'integer', 'min:100'],
-        ]);
-
-        $user = $request->user();
-
-        if ($user->points < $validated['points']) {
-            return response()->json([
-                'message' => __('wallet.insufficient_points'),
-            ], 422);
-        }
-
-        try {
-            $this->walletService->redeemPoints($user, $validated['points']);
-
-            return response()->json([
-                'message' => __('wallet.redeem_success', ['points' => $validated['points']]),
-                'balance' => (float) $user->refresh()->balance,
-                'points' => (int) $user->points,
-            ]);
-        } catch (InsufficientPointsException $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 422);
-        }
     }
 
     private function transformTransaction(Transaction $transaction): array

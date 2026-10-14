@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\PasswordRecoveryRequest;
 use App\Http\Requests\PasswordResetRequest;
+use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Requests\UserRequest;
+use App\Models\ChargingSession;
 use App\Models\User;
+use App\Services\ChargingSimulator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -116,12 +119,33 @@ class UserController extends Controller
 
     public function profile(): View
     {
-        return view('user.profile');
+        return view('user.profile', ['vehicles' => auth()->user()->vehicles()->latest()->get()]);
     }
 
     public function home(): View
     {
-        return view('user.home-usuario');
+        $user = auth()->user();
+        $chargers = ChargingSimulator::all();
+
+        return view('user.home-usuario', [
+            'sessions' => $user->chargingSessions()->latest()->take(5)->get(),
+            'pendingSession' => $user->chargingSessions()->where('status', ChargingSession::STATUS_PENDING)->latest()->first(),
+            'recentTransactions' => $user->transactions()->latest()->take(5)->get(),
+            'totalSessions' => $user->chargingSessions()->where('status', ChargingSession::STATUS_COMPLETED)->count(),
+            'availableChargers' => collect($chargers)->filter(fn ($charger) => $charger->isAvailable())->count(),
+            'totalChargers' => count($chargers),
+        ]);
+    }
+
+    public function updateProfile(UpdateProfileRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        if ($request->user()->email !== $data['email']) {
+            $request->user()->email_verified_at = null;
+        }
+        $request->user()->fill($data)->save();
+
+        return back()->with('success', 'Dados atualizados com sucesso.');
     }
 
     public function logout(): RedirectResponse

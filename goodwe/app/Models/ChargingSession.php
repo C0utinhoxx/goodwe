@@ -14,12 +14,12 @@ class ChargingSession extends Model
         'energy_kwh',
         'amount_charged',
         'payment_method',
-        'status',
+        'status', 'original_amount', 'discount_amount', 'coupon_id', 'transaction_id', 'idempotency_key',
     ];
 
     protected $casts = [
         'energy_kwh' => 'decimal:2',
-        'amount_charged' => 'decimal:2',
+        'amount_charged' => 'decimal:2', 'original_amount' => 'decimal:2', 'discount_amount' => 'decimal:2',
     ];
 
     public const PAYMENT_WALLET = 'wallet';
@@ -33,6 +33,16 @@ class ChargingSession extends Model
     public const STATUS_COMPLETED = 'completed';
 
     public const STATUS_CANCELLED = 'cancelled';
+
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
+    public function transaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class);
+    }
 
     public function user(): BelongsTo
     {

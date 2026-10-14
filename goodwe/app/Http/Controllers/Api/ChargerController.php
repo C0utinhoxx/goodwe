@@ -4,16 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\InsufficientBalanceException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ScheduleChargingRequest;
+use App\Http\Requests\StartChargingRequest;
 use App\Models\ChargingPoint;
+use App\Models\ChargingSession;
+use App\Services\ChargingPaymentService;
 use App\Services\ChargingSimulator;
-use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ChargerController extends Controller
 {
     public function __construct(
-        private WalletService $walletService,
+        private ChargingPaymentService $payments,
     ) {}
 
     public function index(): JsonResponse
@@ -28,109 +31,31 @@ class ChargerController extends Controller
         ]);
     }
 
-    public function schedule(Request $request, string $charger): JsonResponse
+    public function schedule(ScheduleChargingRequest $request, string $charger): JsonResponse
     {
-        $validated = $request->validate([
-            'vehicle_plate' => ['required', 'string', 'max:8'],
-            'duration_minutes' => ['required', 'integer', 'in:15,30,45,60,120'],
-        ]);
-
-        $scheduled = ChargingSimulator::occupy(
-            $charger,
-            $validated['vehicle_plate'],
-            $validated['duration_minutes'],
-        );
-
-        if (! $scheduled) {
-            return response()->json([
-                'message' => __('chargers.not_available'),
-            ], 422);
-        }
-
-        $user = $request->user();
-        $amount = $validated['duration_minutes'] * 0.65;
-        $energyKwh = $validated['duration_minutes'] * 0.37;
-
         try {
-            $session = $this->walletService->payCharging($user, $amount, $charger, $energyKwh);
+            $session = $this->payments->schedule($request->user(), $charger, $request->validated());
         } catch (InsufficientBalanceException $e) {
-            ChargingSimulator::release($charger);
-
-            return response()->json([
-                'message' => __('wallet.insufficient_balance'),
-            ], 422);
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json([
-            'message' => __('chargers.scheduled'),
-            'charger' => $this->transform(ChargingSimulator::find($charger)),
-            'session' => [
-                'id' => $session->id,
-                'charger_name' => $session->charger_name,
-                'energy_kwh' => (float) $session->energy_kwh,
-                'amount_charged' => (float) $session->amount_charged,
-                'status' => $session->status,
-            ],
-            'user' => [
-                'balance' => (float) $user->refresh()->balance,
-                'points' => (int) $user->points,
-            ],
-        ], 201);
+        return $this->paymentResponse($request, $charger, $session);
     }
 
-    public function start(Request $request, string $charger): JsonResponse
+    public function start(StartChargingRequest $request, string $charger): JsonResponse
     {
-        $validated = $request->validate([
-            'energy_kwh' => ['required', 'numeric', 'min:0.01', 'max:1000'],
-            'amount' => ['required', 'numeric', 'min:0.01', 'max:100000'],
-            'charge_type' => ['required', 'string', 'in:full,partial'],
-            'target_percent' => ['nullable', 'numeric', 'min:1', 'max:100'],
-        ]);
-
-        $chargingPoint = ChargingSimulator::find($charger);
-
-        if ($chargingPoint === null || ! $chargingPoint->isAvailable()) {
-            return response()->json([
-                'message' => __('chargers.not_available'),
-            ], 422);
-        }
-
-        $user = $request->user();
-
-        $estimatedMinutes = max(5, (int) ceil(($validated['energy_kwh'] / max(1, $chargingPoint->powerKw)) * 60));
-        $vehiclePlate = 'APP-'.str_pad((string) $user->id, 4, '0', STR_PAD_LEFT);
-        ChargingSimulator::occupy($charger, $vehiclePlate, $estimatedMinutes);
-
         try {
-            $session = $this->walletService->payCharging(
-                $user,
-                round($validated['amount'], 2),
-                $chargingPoint->name,
-                round($validated['energy_kwh'], 2),
-            );
+            $session = $this->payments->start($request->user(), $charger, $request->validated());
         } catch (InsufficientBalanceException $e) {
-            ChargingSimulator::release($charger);
-
-            return response()->json([
-                'message' => __('wallet.insufficient_balance'),
-            ], 422);
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json([
-            'message' => __('chargers.scheduled'),
-            'charger' => $this->transform(ChargingSimulator::find($charger)),
-            'session' => [
-                'id' => $session->id,
-                'charger_name' => $session->charger_name,
-                'energy_kwh' => (float) $session->energy_kwh,
-                'amount_charged' => (float) $session->amount_charged,
-                'status' => $session->status,
-            ],
-            'user' => [
-                'balance' => (float) $user->refresh()->balance,
-                'points' => (int) $user->points,
-            ],
-        ], 201);
+        return $this->paymentResponse($request, $charger, $session);
+    }
+
+    private function paymentResponse(Request $request, string $charger, ChargingSession $session): JsonResponse
+    {
+        return response()->json(['message' => __('chargers.scheduled'), 'charger' => $this->transform(ChargingSimulator::find($charger)), 'session' => ['id' => $session->id, 'charger_name' => $session->charger_name, 'energy_kwh' => (float) $session->energy_kwh, 'original_amount' => (float) $session->original_amount, 'discount_amount' => (float) $session->discount_amount, 'amount_charged' => (float) $session->amount_charged, 'coupon_id' => $session->coupon_id, 'transaction_id' => $session->transaction_id, 'status' => $session->status], 'user' => ['balance' => (float) $request->user()->refresh()->balance, 'points' => (float) $request->user()->points]], 201);
     }
 
     public function release(Request $request, string $charger): JsonResponse
