@@ -6,6 +6,7 @@
 #   1) Aponta o Apache para a porta do provedor
 #   2) Garante storage/ e bootstrap/cache/ graváveis pelo www-data
 #   3) Valida a APP_KEY e a DB_CONNECTION (falha cedo e com mensagem clara)
+#   3.1) Limpa o cache de configuração para ler as envs de runtime
 #   4) Roda as migrações com retry (não há preDeployCommand no plano gratuito)
 #   5) Sobe o Apache
 ###############################################################################
@@ -100,6 +101,27 @@ fi
 
 if [ "${DB_CONNECTION}" = "sqlite" ]; then
     die "DB_CONNECTION=sqlite não é suportado nesta imagem: não há database/database.sqlite. Use 'DB_CONNECTION=mysql'."
+fi
+
+###############################################################################
+# 3.2) Limpeza do cache de configuração
+#
+#    Rede de segurança: se algum dia uma imagem embarcar com
+#    bootstrap/cache/config.php, esse arquivo congela os valores de env
+#    lidos no build (ex.: FIREBASE_CREDENTIALS_JSON) e o Laravel ignoraria
+#    as variáveis injetadas em runtime.
+#
+#    Hoje isso não ocorre — o Dockerfile não roda `config:cache` e o
+#    .dockerignore exclui `bootstrap/cache/*.php` — então o comando é um
+#    no-op. Mantemos porque é barato e protege contra regressões futuras.
+#
+#    Fica ANTES das migrações: um config cache obsoleto faria o migrate
+#    rodar contra o banco errado. Não é fatal — não conseguir apagar um
+#    cache inexistente jamais deve impedir o container de subir.
+###############################################################################
+entry_log "Limpando cache de configuração."
+if ! php artisan config:clear --no-interaction; then
+    entry_log "AVISO: config:clear retornou erro; seguindo com a configuração atual."
 fi
 
 ###############################################################################
