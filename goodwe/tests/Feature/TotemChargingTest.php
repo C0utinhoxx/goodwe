@@ -37,7 +37,24 @@ class TotemChargingTest extends TestCase
         // O controle do totem é acessado a partir da seção de recarga
         $response->assertOk();
         $response->assertSee(__('totens.open_control'));
-        $response->assertSee(route('totens.carregar', 'CG-001'), false);
+        $response->assertSee(route('totens.carregar', 'totem_01'), false);
+        $response->assertSee(route('totens.carregar', 'totem_02'), false);
+    }
+
+    public function test_chargers_section_never_links_using_the_simulator_code(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('chargers.index'));
+
+        // O id do simulador (CG-00X) não existe na coleção `totens` do Firestore,
+        // então não pode virar link de controle remoto.
+        $response->assertSee(__('chargers.id_label').': totem_01', false);
+        $response->assertSee(__('chargers.id_label').': totem_02', false);
+
+        foreach (['CG-001', 'CG-002', 'CG-003', 'CG-004'] as $code) {
+            $response->assertDontSee('/carregar/'.$code, false);
+        }
     }
 
     public function test_show_displays_dynamic_user_data_from_firestore(): void

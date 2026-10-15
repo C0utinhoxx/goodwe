@@ -88,6 +88,7 @@ class ChargingSimulator
                 connector: 'Type 2',
                 lat: -23.5505,
                 lng: -46.6333,
+                totemId: 'totem_01',
             ),
             new ChargingPoint(
                 id: 'CG-002',
@@ -99,6 +100,7 @@ class ChargingSimulator
                 vehiclePlate: 'ABC-1D23',
                 lat: -23.5620,
                 lng: -46.6540,
+                totemId: 'totem_02',
             ),
             new ChargingPoint(
                 id: 'CG-003',

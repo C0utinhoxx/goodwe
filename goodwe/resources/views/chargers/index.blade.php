@@ -51,7 +51,7 @@
                         <div>
                             <h2 class="font-medium text-gray-900 dark:text-white">{{ $charger->name }}</h2>
                             <p class="text-xs text-gray-500 dark:text-[#a0a0a0]">{{ $charger->location }}</p>
-                            <p class="mt-0.5 text-[11px] font-mono text-gray-400 dark:text-[#8a8f98]">{{ __('chargers.id_label') }}: {{ $charger->id }}</p>
+                            <p class="mt-0.5 text-[11px] font-mono text-gray-400 dark:text-[#8a8f98]">{{ __('chargers.id_label') }}: {{ $charger->totemId ?? $charger->id }}</p>
                         </div>
                     </div>
 
@@ -87,16 +87,18 @@
                     <span class="text-sm font-semibold text-gray-900 dark:text-white">R$ {{ $price }} <span class="text-xs font-normal text-gray-400">/h</span></span>
                 </div>
 
-                {{-- Controle remoto do totem deste ponto de recarga --}}
-                <a
-                    href="{{ route('totens.carregar', $charger->id) }}"
-                    class="relative mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#e53935]/30 px-4 py-2.5 text-sm font-medium text-[#e53935] transition-all hover:border-[#e53935]/50 hover:bg-[#e53935]/10 active:scale-[0.98]"
-                >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                    </svg>
-                    {{ __('totens.open_control') }}
-                </a>
+                {{-- Controle remoto do totem vinculado a este ponto de recarga --}}
+                @if ($charger->hasTotem())
+                    <a
+                        href="{{ route('totens.carregar', $charger->totemId) }}"
+                        class="relative mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#e53935]/30 px-4 py-2.5 text-sm font-medium text-[#e53935] transition-all hover:border-[#e53935]/50 hover:bg-[#e53935]/10 active:scale-[0.98]"
+                    >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                        </svg>
+                        {{ __('totens.open_control') }}
+                    </a>
+                @endif
 
                 @if ($available)
                     <form method="POST" action="{{ route('chargers.schedule', $charger->id) }}" class="relative mt-4 flex flex-col gap-2 sm:flex-row">
