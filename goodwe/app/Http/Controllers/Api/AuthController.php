@@ -9,18 +9,20 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
     public function register(UserRequest $request): JsonResponse
     {
-        $request->validated();
+        $data = $request->validated();
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'password' => bcrypt($request->password),
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'],
+            'password' => $data['password'],
+            'is_admin' => false,
         ]);
 
         $token = $user->createToken('nfc-charger-app')->plainTextToken;
@@ -34,15 +36,15 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
-        $credentials = $request->only('email', 'password');
+        $credentials = [...$request->safe()->only(['email', 'password']), 'is_admin' => false];
 
-        if (! Auth::attempt($credentials)) {
+        if (! Auth::guard('web')->validate($credentials)) {
             return response()->json([
                 'message' => __('auth.failed'),
             ], 401);
         }
 
-        $user = User::where('email', $credentials['email'])->firstOrFail();
+        $user = User::where('email', $credentials['email'])->where('is_admin', false)->firstOrFail();
 
         $user->tokens()->where('name', 'nfc-charger-app')->delete();
 
@@ -57,7 +59,16 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $token = $request->user()->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        } else {
+            Auth::guard('web')->logout();
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+        }
 
         return response()->json([
             'message' => __('auth.logged_out'),

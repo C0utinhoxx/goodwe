@@ -8,6 +8,7 @@ import {
 } from 'lucide';
 import Chart from 'chart.js/auto';
 import './portal';
+import './manager';
 
 createIcons({ icons: {
     House, Zap, Wallet, History, CircleHelp, User, LogOut, Bell, Search, MapPin,

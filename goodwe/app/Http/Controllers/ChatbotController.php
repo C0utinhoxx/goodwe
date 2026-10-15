@@ -3,9 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChargingSession;
-use App\Models\Transaction;
-use App\Models\User;
-use App\Services\ChargingSimulator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -14,7 +11,7 @@ class ChatbotController extends Controller
     public function page(Request $request)
     {
         return view('manager.chatbot', [
-            'history' => session('manager_chat_history', []),
+            'history' => session('manager_chat_history.scoped_v1.'.$request->user()->establishment->id, []),
         ]);
     }
 
@@ -46,11 +43,10 @@ class ChatbotController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        $currentTariff = $establishment->currentTariff();
         $managerName = $user->name ?? 'Não informado';
         $managerEmail = $user->email ?? 'Não informado';
         $managerPhone = $user->phone ?? 'Não informado';
-        $managerBalance = (float) ($user->balance ?? 0);
-        $managerPoints = (int) ($user->points ?? 0);
         $managerType = $user->isGestor()
             ? 'Gestor'
             : 'Usuário';
@@ -154,213 +150,12 @@ class ChatbotController extends Controller
             }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Usuários cadastrados
-        |--------------------------------------------------------------------------
-        */
-
-        $users = User::query()
-            ->withCount([
-                'chargingSessions',
-                'transactions',
-            ])
-            ->orderBy('name')
-            ->get();
-
-        $totalUsers = $users->count();
-        $totalManagers = $users
-            ->where('is_admin', true)
-            ->count();
-        $totalRegularUsers = $totalUsers - $totalManagers;
-
-        $usersText = '';
-
-        if ($users->isEmpty()) {
-            $usersText = 'Nenhum usuário cadastrado.';
-        } else {
-            foreach ($users as $registeredUser) {
-                $accountType = $registeredUser->isGestor()
-                    ? 'Gestor'
-                    : 'Usuário';
-
-                $phone = $registeredUser->phone
-                    ?? 'Não informado';
-
-                $balance = number_format(
-                    (float) $registeredUser->balance,
-                    2,
-                    ',',
-                    '.'
-                );
-
-                $usersText .=
-                    "- ID: {$registeredUser->id}\n".
-                    "  Nome: {$registeredUser->name}\n".
-                    "  E-mail: {$registeredUser->email}\n".
-                    "  Telefone: {$phone}\n".
-                    "  Tipo de conta: {$accountType}\n".
-                    "  Saldo: R$ {$balance}\n".
-                    "  Pontos: {$registeredUser->points}\n".
-                    "  Total de recargas: {$registeredUser->charging_sessions_count}\n".
-                    "  Total de transações: {$registeredUser->transactions_count}\n";
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Transações recentes dos usuários
-        |--------------------------------------------------------------------------
-        */
-
-        $recentTransactions = Transaction::query()
-            ->with('user:id,name,email')
-            ->latest()
-            ->take(20)
-            ->get();
-
-        if ($recentTransactions->isEmpty()) {
-            $transactionsText =
-                'Nenhuma transação registrada.';
-        } else {
-            $transactionsText = '';
-
-            foreach ($recentTransactions as $transaction) {
-                $transactionUserName =
-                    $transaction->user?->name
-                    ?? 'Usuário não identificado';
-
-                $transactionUserEmail =
-                    $transaction->user?->email
-                    ?? 'E-mail não disponível';
-
-                $date = $transaction->created_at
-                    ? $transaction->created_at->format(
-                        'd/m/Y H:i'
-                    )
-                    : 'Data não disponível';
-
-                $amount = number_format(
-                    (float) $transaction->amount,
-                    2,
-                    ',',
-                    '.'
-                );
-
-                $reference =
-                    $transaction->reference
-                    ?? 'Não informada';
-
-                $transactionsText .=
-                    "- Data: {$date}\n".
-                    "  Usuário: {$transactionUserName}\n".
-                    "  E-mail: {$transactionUserEmail}\n".
-                    "  Tipo: {$transaction->type}\n".
-                    "  Valor: R$ {$amount}\n".
-                    "  Descrição: {$transaction->description}\n".
-                    "  Referência: {$reference}\n";
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Recargas recentes de todos os usuários
-        |--------------------------------------------------------------------------
-        */
-
-        $allRecentSessions = ChargingSession::query()
-            ->with('user:id,name,email')
-            ->latest()
-            ->take(20)
-            ->get();
-
-        if ($allRecentSessions->isEmpty()) {
-            $allRecentSessionsText =
-                'Nenhuma recarga registrada.';
-        } else {
-            $allRecentSessionsText = '';
-
-            foreach ($allRecentSessions as $session) {
-                $sessionUserName =
-                    $session->user?->name
-                    ?? 'Usuário não identificado';
-
-                $sessionUserEmail =
-                    $session->user?->email
-                    ?? 'E-mail não disponível';
-
-                $date = $session->created_at
-                    ? $session->created_at->format(
-                        'd/m/Y H:i'
-                    )
-                    : 'Data não disponível';
-
-                $allRecentSessionsText .=
-                    "- Data: {$date}\n".
-                    "  Usuário: {$sessionUserName}\n".
-                    "  E-mail: {$sessionUserEmail}\n".
-                    "  Carregador: {$session->charger_name}\n".
-                    "  Energia: {$session->energy_kwh} kWh\n".
-                    "  Valor: R$ {$session->amount_charged}\n".
-                    "  Pagamento: {$session->payment_method}\n".
-                    "  Status: {$session->status}\n";
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Carregadores
-        |--------------------------------------------------------------------------
-        */
-
-        $chargers = ChargingSimulator::all();
-
-        $totalChargers = count($chargers);
-        $availableChargers = 0;
-        $occupiedChargers = 0;
-        $chargersText = '';
-
-        foreach ($chargers as $charger) {
-            $status = $charger->status();
-
-            if (
-                $status ===
-                $charger::STATUS_AVAILABLE
-            ) {
-                $availableChargers++;
-            } else {
-                $occupiedChargers++;
-            }
-
-            $chargersText .=
-                "- Código: {$charger->id}\n".
-                "  Nome: {$charger->name}\n".
-                "  Localização: {$charger->location}\n".
-                "  Potência: {$charger->powerKw} kW\n".
-                "  Conector: {$charger->connector}\n".
-                "  Status: {$status}\n";
-
-            if (
-                $status ===
-                $charger::STATUS_OCCUPIED
-            ) {
-                $vehiclePlate =
-                    $charger->vehiclePlate
-                    ?? 'Não informada';
-
-                $availableIn =
-                    $charger->availableInMinutes();
-
-                $minutesText =
-                    $availableIn !== null
-                    ? "{$availableIn} minutos"
-                    : 'Não disponível';
-
-                $chargersText .=
-                    "  Placa: {$vehiclePlate}\n".
-                    "  Disponível em: {$minutesText}\n";
-            }
-        }
+        $chargers = $establishment->chargers()->orderBy('name')->get();
+        $totalChargers = $chargers->count();
+        $availableChargers = $chargers->filter(fn ($charger) => $charger->isAvailable())->count();
+        $occupiedChargers = $chargers->filter(fn ($charger) => $charger->status() === 'in_use')->count();
+        $chargersText = $chargers->map(fn ($charger) => "- Código: {$charger->code}\n  Nome: {$charger->name}\n  Localização: {$charger->location}\n  Potência: {$charger->power_kw} kW\n  Conector: {$charger->connector}\n  Status: {$charger->status()}"
+        )->implode("\n");
 
         /*
         |--------------------------------------------------------------------------
@@ -389,7 +184,7 @@ Você é o Assistente GoodWe, o assistente operacional da plataforma GoodWe.
 
 Responda de forma simples, objetiva e profissional.
 
-Você auxilia o gestor a consultar informações do próprio perfil, do estabelecimento, dos usuários cadastrados, das transações, das recargas e dos carregadores.
+Você auxilia o gestor a consultar informações do próprio perfil, do estabelecimento, das recargas e dos carregadores vinculados exclusivamente a esse estabelecimento.
 
 ==================================================
 PERFIL DO GESTOR AUTENTICADO
@@ -398,14 +193,6 @@ PERFIL DO GESTOR AUTENTICADO
 Nome: {$managerName}
 E-mail: {$managerEmail}
 Telefone: {$managerPhone}
-Saldo da carteira: R$ ".
-            number_format(
-                $managerBalance,
-                2,
-                ',',
-                '.'
-            )."
-Pontos: {$managerPoints}
 Tipo de conta: {$managerType}
 
 ==================================================
@@ -417,7 +204,8 @@ Endereço: {$establishment->address}
 Tipo: {$establishment->type}
 Horário de funcionamento: {$establishment->operating_hours}
 Telefone: ".($establishment->phone ?? 'Não informado')."
-Custo por kWh: R$ {$establishment->cost_per_kwh}
+Tarifa-base por kWh: R$ {$establishment->cost_per_kwh}
+Tarifa vigente por kWh: R$ {$currentTariff}
 
 ==================================================
 RESUMO DAS RECARGAS
@@ -467,29 +255,7 @@ Energia média por sessão concluída: '.
 {$recentSessionsText}
 
 ==================================================
-USUÁRIOS CADASTRADOS
-==================================================
-
-Total de contas cadastradas: {$totalUsers}
-Usuários comuns: {$totalRegularUsers}
-Gestores: {$totalManagers}
-
-{$usersText}
-
-==================================================
-TRANSAÇÕES RECENTES DOS USUÁRIOS
-==================================================
-
-{$transactionsText}
-
-==================================================
-RECARGAS RECENTES DE TODOS OS USUÁRIOS
-==================================================
-
-{$allRecentSessionsText}
-
-==================================================
-CARREGADORES DA SIMULAÇÃO
+CARREGADORES DO ESTABELECIMENTO
 ==================================================
 
 Total de carregadores: {$totalChargers}
@@ -507,18 +273,16 @@ REGRAS
 - Não altere os valores fornecidos pelo sistema.
 - Se uma informação não estiver disponível, informe isso claramente.
 - Quando o gestor perguntar 'meu', 'minha', 'eu' ou 'me', considere que ele está falando do perfil do gestor autenticado.
-- Você pode informar nome, e-mail, telefone, saldo, pontos e tipo de conta do gestor autenticado.
-- Você pode consultar os usuários cadastrados apresentados neste contexto.
-- Você pode informar nome, e-mail, telefone, saldo, pontos, tipo de conta, quantidade de recargas e quantidade de transações dos usuários apresentados no contexto.
-- Você pode utilizar as transações recentes e as recargas recentes apresentadas no contexto para responder perguntas do gestor.
-- Ao procurar um usuário pelo nome, compare com os nomes apresentados no contexto.
-- Se houver mais de um usuário compatível com o nome informado, peça ao gestor para especificar qual deles.
+- Você pode informar nome, e-mail, telefone e tipo de conta do gestor autenticado.
+- As sessões fornecidas pertencem somente ao estabelecimento do gestor autenticado.
+- Não forneça carteiras, pontos, depósitos ou informações de outros estabelecimentos.
+- Se perguntarem por dados fora deste contexto, explique que não estão disponíveis neste ambiente.
 - Nunca forneça senha, hash de senha, token, chave de API, código de recuperação, segredo de autenticação ou qualquer outra credencial.
 - Nunca diga que não sabe o nome do gestor quando o nome estiver disponível no contexto.
 - Nunca invente ou forneça senha, token, chave de API ou qualquer credencial de autenticação.
 - Diferencie os dados do perfil pessoal dos dados do estabelecimento.
 - Diferencie dados históricos das sessões dos dados atuais dos carregadores.
-- Os carregadores pertencem à simulação atual do sistema.
+- Os carregadores são os equipamentos cadastrados para este estabelecimento; o status corresponde ao registro no backend.
 - As sessões são registros armazenados no banco de dados.
 - Receita e energia total consideram somente sessões concluídas.
 - Considere o histórico para entender perguntas de continuação.
@@ -537,7 +301,7 @@ REGRAS
         */
 
         $history = session(
-            'manager_chat_history',
+            'manager_chat_history.scoped_v1.'.$request->user()->establishment->id,
             []
         );
 
@@ -645,7 +409,7 @@ REGRAS
         ];
 
         session([
-            'manager_chat_history' => $history,
+            'manager_chat_history.scoped_v1.'.$request->user()->establishment->id => $history,
         ]);
 
         return response()->json([
@@ -662,7 +426,7 @@ REGRAS
     public function clear(Request $request)
     {
         $request->session()->forget(
-            'manager_chat_history'
+            'manager_chat_history.scoped_v1.'.$request->user()->establishment->id
         );
 
         return response()->json([

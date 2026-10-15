@@ -10,8 +10,8 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-2">
-                <form method="GET" action="{{ route('manager.dashboard') }}" class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+                <form method="GET" action="{{ route('manager.dashboard') }}" class="flex flex-wrap items-center gap-2">
                     <label for="period" class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_label') }}</label>
                     <select name="period" id="period" onchange="this.form.submit()" class="rounded-md border border-gray-300 dark:border-[#343843] bg-gray-50 dark:bg-[#181b22] px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935]">
                         <option value="7" @selected($period === 7)>{{ __('manager.period_7') }}</option>
@@ -29,6 +29,13 @@
         </div>
     </x-slot>
 
+    <x-manager-pricing-summary :establishment="$establishment" :detector-configured="$detectorConfigured" />
+    <section class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        @foreach(['total'=>'Total de carregadores','available'=>'Disponíveis','reserved'=>'Reservados','in_use'=>'Em uso','unavailable'=>'Indisponíveis'] as $status=>$label)
+            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-[#343843] dark:bg-[#1a1a1a]"><p class="text-xs text-gray-500 dark:text-gray-400">{{ $label }}</p><p class="mt-2 text-2xl font-semibold">{{ $chargerCounts[$status] }}</p></div>
+        @endforeach
+    </section>
+    <p class="text-xs text-gray-500 dark:text-gray-400">Receita considera pagamentos de recarga com transação aprovada. Valores pendentes não compõem a receita. Energia considera o consumo registrado, inclusive de sessões ainda não pagas. O custo médio considera somente sessões pagas.</p>
     <section class="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div class="relative min-h-[130px] overflow-hidden rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
             <div class="flex items-center gap-4">
@@ -112,15 +119,14 @@
     <section class="mt-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ __('manager.live_network') }}</h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.live_network_subtitle') }}</p>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ __('auth.manager_chargers') }}</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('auth.manager_chargers_subtitle') }}</p>
             </div>
             <span class="inline-flex items-center gap-1.5 rounded-full border border-[#e53935]/30 bg-[#e53935]/5 px-3 py-1.5">
                 <span class="relative flex h-2.5 w-2.5">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e53935] opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#e53935]"></span>
                 </span>
-                <span class="text-xs text-[#e53935] font-medium">{{ __('chargers.live_status') }}</span>
+                <span class="text-xs text-[#e53935] font-medium">{{ __('auth.recorded_status') }}</span>
             </span>
         </div>
 
@@ -134,7 +140,7 @@
                         </div>
                         <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {{ $charger['is_available'] ? 'bg-emerald-500/10 text-emerald-500' : 'bg-gray-200 dark:bg-[#343843] text-gray-400 dark:text-[#a0a0a0]' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ $charger['is_available'] ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-[#a0a0a0]' }}"></span>
-                            {{ $charger['is_available'] ? __('manager.charger_available') : __('manager.charger_occupied') }}
+                            {{ __('auth.charger_status_' . $charger['status']) }}
                         </span>
                     </div>
                     <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-[#a0a0a0]">
@@ -142,12 +148,6 @@
                         <span class="rounded-md bg-gray-100 dark:bg-[#181b22] px-2 py-1">{{ $charger['connector'] }}</span>
                         <span class="rounded-md bg-gray-100 dark:bg-[#181b22] px-2 py-1 font-mono">{{ $charger['id'] }}</span>
                     </div>
-                    @if(! $charger['is_available'])
-                        <p class="mt-3 text-xs text-gray-500 dark:text-[#a0a0a0]">
-                            {{ __('chargers.occupied_by') }} <span class="font-medium text-gray-900 dark:text-white">{{ $charger['vehicle_plate'] }}</span>
-                            &bull; {{ __('manager.releases_in', ['minutes' => $charger['available_in_minutes']]) }}
-                        </p>
-                    @endif
                 </div>
             @empty
                 <p class="col-span-full py-6 text-center text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.no_chargers') }}</p>
@@ -261,7 +261,7 @@
                     <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->phone ?? '-' }}</p>
                 </div>
                 <div>
-                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.info_cost') }}</p>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">Tarifa-base</p>
                     <p class="mt-1 font-medium text-gray-900 dark:text-white">R$ {{ number_format($establishment->cost_per_kwh, 4, ',', '.') }}/kWh</p>
                 </div>
             </div>

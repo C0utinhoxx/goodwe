@@ -28,7 +28,7 @@ class MeteredChargingService
             if (DecimalAmount::units($payer->balance) <= 0) {
                 throw new InsufficientBalanceException('Adicione créditos à carteira antes de iniciar a recarga.');
             }
-            if ($locked->physical_status !== 'available' || $locked->active_session_id) {
+            if (($locked->activation_status !== null && $locked->activation_status !== 'active') || $locked->physical_status !== 'available' || $locked->active_session_id) {
                 throw ValidationException::withMessages(['charger' => 'Este equipamento não pode receber uma nova autorização.']);
             }
             $reservation = $reservationId ? ChargingReservation::whereKey($reservationId)->lockForUpdate()->first() : null;
@@ -38,7 +38,7 @@ class MeteredChargingService
             if (! $reservation && $locked->active_reservation_id) {
                 throw ValidationException::withMessages(['reservation' => 'Este equipamento já está reservado.']);
             }
-            EnergyBilling::amount('0', $reservation?->tariff_per_kwh ?? $locked->tariff_override ?? $establishment->cost_per_kwh);
+            EnergyBilling::amount('0', $reservation?->tariff_per_kwh ?? $establishment->currentTariff());
         }, 5);
     }
 
@@ -64,7 +64,7 @@ class MeteredChargingService
             if (DecimalAmount::units($lockedUser->balance) <= 0) {
                 throw new InsufficientBalanceException('Adicione créditos à carteira antes de iniciar a recarga.');
             }
-            if ($lockedCharger->active_session_id || ! in_array($lockedCharger->physical_status, ['available', 'in_use'], true)) {
+            if (($lockedCharger->activation_status !== null && $lockedCharger->activation_status !== 'active') || $lockedCharger->active_session_id || ! in_array($lockedCharger->physical_status, ['available', 'in_use'], true)) {
                 throw ValidationException::withMessages(['charger' => 'Carregador não autorizado para uma nova sessão.']);
             }
             $reservation = $reservationId ? ChargingReservation::whereKey($reservationId)->lockForUpdate()->first() : null;
@@ -74,7 +74,7 @@ class MeteredChargingService
             if (! $reservation && $lockedCharger->active_reservation_id) {
                 throw ValidationException::withMessages(['reservation' => 'Carregador reservado por outra operação.']);
             }
-            $tariff = $reservation?->tariff_per_kwh ?? $lockedCharger->tariff_override ?? $establishment->cost_per_kwh;
+            $tariff = $reservation?->tariff_per_kwh ?? $establishment->currentTariff();
             EnergyBilling::amount('0', $tariff);
             $session = ChargingSession::create([
                 'user_id' => $user->id,

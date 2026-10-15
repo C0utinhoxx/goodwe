@@ -29,13 +29,14 @@ class UserController extends Controller
 
     public function store(UserRequest $request): RedirectResponse
     {
-        $request->validated();
+        $data = $request->validated();
 
         User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'password' => bcrypt($request->password),
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'],
+            'password' => $data['password'],
+            'is_admin' => false,
         ]);
 
         return redirect()->route('user.login')->with('success', __('auth.registered'));
@@ -43,17 +44,17 @@ class UserController extends Controller
 
     public function logar(LoginRequest $request): RedirectResponse
     {
-        $credentials = $request->only('email', 'password');
+        $credentials = [...$request->safe()->only(['email', 'password']), 'is_admin' => false];
 
-        if (Auth::attempt($credentials)) {
+        if (Auth::attempt($credentials, $request->boolean('lembrar'))) {
             request()->session()->regenerate();
 
             return redirect()->route('user.home')->with('success', __('auth.logged_in'));
         }
 
         return back()->withErrors([
-            'email' => __('auth.failed'),
-        ]);
+            'email' => __('auth.driver_failed'),
+        ])->onlyInput('email');
     }
 
     public function showPasswordRecovery(): View
@@ -115,7 +116,7 @@ class UserController extends Controller
             'password_recovery_email',
         ]);
 
-        return redirect()->route('user.login')->with('success', __('auth.password_updated'));
+        return redirect()->route($user->isGestor() ? 'manager.login' : 'user.login')->with('success', __('auth.password_updated'));
     }
 
     public function profile(): View
@@ -153,11 +154,12 @@ class UserController extends Controller
 
     public function logout(): RedirectResponse
     {
+        $loginRoute = auth()->user()?->isGestor() ? 'manager.login' : 'user.login';
         Auth::logout();
 
         request()->session()->invalidate();
         request()->session()->regenerateToken();
 
-        return redirect()->route('user.login');
+        return redirect()->route($loginRoute);
     }
 }

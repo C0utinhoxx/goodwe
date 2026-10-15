@@ -12,3 +12,52 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+.partner-brands {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid #e3e3e0;
+    border-radius: 14px;
+    background: #fff;
+    vertical-align: middle;
+}
+.partner-brands-powertag {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+}
+.partner-brands-goodwe {
+    width: 100px;
+    height: auto;
+    object-fit: contain;
+}
+.partner-brands-divider {
+    width: 1px;
+    height: 32px;
+    flex-shrink: 0;
+    background: #e3e3e0;
+}
+.partner-brands-compact {
+    gap: 10px;
+    padding: 4px 10px;
+}
+.partner-brands-compact .partner-brands-powertag {
+    width: 80px;
+    height: 80px;
+}
+.partner-brands-compact .partner-brands-goodwe {
+    width: 80px;
+}
+.pt-brand.pt-brand-partners {
+    padding-right: 0;
+    padding-left: 0;
+}
+
+.partner-brands-dark { display: none; }
+html.dark .partner-brands { background: #17191f; border-color: #343843; }
+html.dark .partner-brands-divider { background: #ffffff30; }
+html.dark .partner-brands-light { display: none; }
+html.dark .partner-brands-dark { display: block; }

@@ -3,6 +3,10 @@
 use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChargingSessionController;
 use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\DemandPricingController;
+use App\Http\Controllers\EstablishmentController;
+use App\Http\Controllers\ManagerAuthController;
+use App\Http\Controllers\ManagerChargerController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\MercadoPagoController;
 use App\Http\Controllers\PointsController;
@@ -15,33 +19,33 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return auth()->check()
-        ? redirect()->route('user.home')
+        ? redirect()->route(auth()->user()->portalRoute())
         : redirect()->route('user.login');
 });
 
 Route::get('/login-user', [UserController::class, 'login'])
-    ->name('user.login');
+    ->middleware('guest')->name('user.login');
 
 Route::post('/login', [UserController::class, 'logar'])
-    ->name('login-user');
+    ->middleware(['guest', 'throttle:5,1'])->name('login-user');
 
 Route::get('/recover-password', [UserController::class, 'showPasswordRecovery'])
-    ->name('user.password.recovery');
+    ->middleware('guest')->name('user.password.recovery');
 
 Route::post('/recover-password/verify', [UserController::class, 'verifyPasswordRecovery'])
-    ->name('user.password.verify');
+    ->middleware(['guest', 'throttle:5,1'])->name('user.password.verify');
 
 Route::post('/recover-password/update', [UserController::class, 'updatePassword'])
-    ->name('user.password.update');
+    ->middleware(['guest', 'throttle:5,1'])->name('user.password.update');
 
 Route::get('/create-user', [UserController::class, 'create'])
-    ->name('user.cadastro');
+    ->middleware('guest')->name('user.cadastro');
 
 Route::post('/store-user', [UserController::class, 'store'])
-    ->name('user-store');
+    ->middleware(['guest', 'throttle:10,1'])->name('user-store');
 
 Route::post('/logout', [UserController::class, 'logout'])
-    ->name('logout');
+    ->middleware('auth')->name('logout');
 
 Route::get('/locale/{locale}', function (string $locale) {
     if (! in_array($locale, ['pt', 'en', 'es'])) {
@@ -53,7 +57,35 @@ Route::get('/locale/{locale}', function (string $locale) {
     return redirect()->back();
 })->name('locale.set');
 
-Route::middleware('auth')->group(function () {
+Route::prefix('gestor')->name('manager.')->middleware('guest')->group(function () {
+    Route::get('/login', [ManagerAuthController::class, 'login'])->name('login');
+    Route::post('/login', [ManagerAuthController::class, 'authenticate'])->middleware('throttle:5,1')->name('login.store');
+    Route::get('/cadastro', [ManagerAuthController::class, 'create'])->name('register');
+    Route::post('/cadastro', [ManagerAuthController::class, 'store'])->middleware('throttle:10,1')->name('register.store');
+});
+
+Route::middleware(['auth', 'gestor'])->prefix('gestor')->name('manager.')->group(function () {
+    Route::get('/estabelecimento/cadastro', [EstablishmentController::class, 'create'])->name('establishment.setup');
+    Route::post('/estabelecimento/cadastro', [EstablishmentController::class, 'store'])->name('establishment.store');
+    Route::middleware('establishment')->group(function () {
+        Route::get('/estabelecimento', [EstablishmentController::class, 'edit'])->name('establishment.edit');
+        Route::patch('/estabelecimento', [EstablishmentController::class, 'update'])->name('establishment.update');
+        Route::get('/carregadores', [ManagerChargerController::class, 'index'])->name('chargers.index');
+        Route::get('/carregadores/novo', [ManagerChargerController::class, 'create'])->name('chargers.create');
+        Route::post('/carregadores', [ManagerChargerController::class, 'store'])->name('chargers.store');
+        Route::get('/carregadores/{charger}/editar', [ManagerChargerController::class, 'edit'])->name('chargers.edit');
+        Route::patch('/carregadores/{charger}', [ManagerChargerController::class, 'update'])->name('chargers.update');
+        Route::get('/demanda', [DemandPricingController::class, 'index'])->name('demand.index');
+        Route::post('/demanda/{peak}/decisao', [DemandPricingController::class, 'decide'])->name('demand.decide');
+        Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
+        Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])->name('dashboard.export');
+        Route::get('/assistente', [ChatbotController::class, 'page'])->name('chatbot.page');
+        Route::post('/chatbot', [ChatbotController::class, 'chat'])->name('chatbot');
+        Route::delete('/chatbot', [ChatbotController::class, 'clear'])->name('chatbot.clear');
+    });
+});
+
+Route::middleware(['auth', 'portal.user'])->group(function () {
 
     Route::post('/carregadores/{charger:code}/reservar', [ReservationController::class, 'store'])->name('reservations.store');
     Route::post('/reservas/{reservation}/cancelar', [ReservationController::class, 'cancel'])->name('reservations.cancel');
@@ -99,11 +131,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/inicio', [UserController::class, 'home'])
         ->name('user.home');
 
-    Route::middleware('gestor')->prefix('gestor')->name('manager.')->group(function () {
-        Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
-        Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])->name('dashboard.export');
-    });
-
     /*
     |--------------------------------------------------------------------------
     | Assistente IA do usuário
@@ -118,26 +145,6 @@ Route::middleware('auth')->group(function () {
 
     Route::delete('/chatbot', [UserChatbotController::class, 'clear'])
         ->name('user.chatbot.clear');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Área do gestor
-    |--------------------------------------------------------------------------
-    */
-
-    Route::middleware('gestor')
-        ->prefix('gestor')
-        ->name('manager.')
-        ->group(function () {
-            Route::get('/assistente', [ChatbotController::class, 'page'])
-                ->name('chatbot.page');
-
-            Route::post('/chatbot', [ChatbotController::class, 'chat'])
-                ->name('chatbot');
-
-            Route::delete('/chatbot', [ChatbotController::class, 'clear'])
-                ->name('chatbot.clear');
-        });
 
     Route::post('/checkout', [MercadoPagoController::class, 'checkout'])
         ->name('checkout');

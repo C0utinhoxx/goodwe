@@ -36,9 +36,8 @@
     <div class="pt-shell" data-portal-shell>
         <div class="pt-mobile-overlay" data-mobile-close hidden></div>
         <aside class="pt-sidebar" id="portal-sidebar" aria-label="Navegação principal">
-            <a href="{{ route('user.home') }}" class="pt-brand">
-                <img src="{{ asset('imagens/goodwe-logo.png') }}" alt="GoodWe" class="pt-brand-logo">
-                <span><strong>Power<span>Tag</span></strong><small>GOODWE CHALLENGE</small></span>
+            <a href="{{ route('user.home') }}" class="pt-brand pt-brand-partners">
+                <x-partner-brands compact />
             </a>
             <div class="pt-nav-section-label">MENU PRINCIPAL</div>
             <nav class="pt-nav">

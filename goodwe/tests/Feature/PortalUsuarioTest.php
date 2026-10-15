@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Establishment;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\ChargingSimulator;
@@ -192,11 +193,13 @@ class PortalUsuarioTest extends TestCase
 
     public function test_manager_pages_keep_the_original_layout_and_user_portal_still_has_five_links(): void
     {
-        $user = User::factory()->create(['is_admin' => true]);
-        $this->actingAs($user)->get(route('manager.dashboard'))->assertOk()->assertDontSee('data-chat-widget', false)->assertDontSee('pt-shell');
+        $manager = Establishment::factory()->create()->user;
+        $this->actingAs($manager)->get(route('manager.dashboard'))->assertOk()->assertDontSee('data-chat-widget', false)->assertDontSee('pt-shell')->assertDontSee(route('wallet.index'))->assertDontSee(route('user.profile'));
         $this->get(route('manager.chatbot.page'))->assertOk()->assertDontSee('data-chat-widget', false);
+        $this->get(route('user.home'))->assertForbidden();
+        $this->actingAs(User::factory()->create());
         $response = $this->get(route('user.home'))->assertOk();
         $this->assertSame(5, preg_match_all('/<a[^>]+class="pt-nav-link /', $response->getContent()));
-        $this->get(route('user.profile'))->assertSee('Acessar painel do gestor');
+        $this->get(route('user.profile'))->assertDontSee('Acessar painel do gestor');
     }
 }

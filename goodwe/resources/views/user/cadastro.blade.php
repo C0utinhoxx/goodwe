@@ -1,9 +1,10 @@
+@php($managerAccess = $managerAccess ?? false)
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ __('auth.register_title') }}</title>
+    <title>{{ __($managerAccess ? 'auth.manager_register_title' : 'auth.register_title') }}</title>
     <link rel="icon" href="{{ asset('imagens/logo.png') }}" type="image/x-icon">
     <script>
         (function() {
@@ -47,7 +48,7 @@
         </div>
 
         {{-- Lado Formulario --}}
-        <div class="w-full lg:w-[calc(40%+28px)] lg:-ml-7 bg-[#FDFDFC] dark:bg-[#0f1117] flex items-center justify-center relative lg:rounded-l-[28px] z-20">
+        <div class="w-full lg:w-[calc(40%+28px)] lg:-ml-7 bg-[#FDFDFC] dark:bg-[#0f1117] flex flex-col items-center justify-center relative lg:rounded-l-[28px] z-20 pt-24 pb-10">
             {{-- Seletor de Idioma --}}
             <div class="absolute top-6 right-8 z-10">
                 <x-lang-switcher variant="boxed" />
@@ -59,14 +60,19 @@
             </div>
 
             <div class="w-[85%] max-w-[460px]">
-                <h2 class="text-3xl mb-3 text-gray-900 dark:text-white">{{ __('auth.create_account') }}</h2>
+                <h2 class="text-3xl mb-3 text-gray-900 dark:text-white">{{ __($managerAccess ? 'auth.manager_register_title' : 'auth.create_account') }}</h2>
                 <div class="w-[45px] h-[3px] bg-[#e53935] mb-5"></div>
                 <h3 class="text-lg mb-2 font-normal text-gray-900 dark:text-white">{{ __('auth.platform_name') }}</h3>
-                <p class="text-gray-500 dark:text-[#a0a0a0] mb-8">{{ __('auth.register_subtitle') }}</p>
+                <p class="text-gray-500 dark:text-[#a0a0a0] mb-8">{{ __($managerAccess ? 'auth.manager_register_subtitle' : 'auth.register_subtitle') }}</p>
+
+                <nav aria-label="{{ __('auth.access_choice') }}" class="mb-6 grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1 dark:bg-[#181b22]">
+                    <a href="{{ route('user.login') }}" @if(! $managerAccess) aria-current="page" @endif class="rounded-md px-3 py-2 text-center text-sm font-semibold {{ ! $managerAccess ? 'bg-[#c62828] text-white' : 'text-gray-600 dark:text-gray-300' }}">{{ __('auth.driver_access') }}</a>
+                    <a href="{{ route('manager.login') }}" @if($managerAccess) aria-current="page" @endif class="rounded-md px-3 py-2 text-center text-sm font-semibold {{ $managerAccess ? 'bg-[#c62828] text-white' : 'text-gray-600 dark:text-gray-300' }}">{{ __('auth.manager_access') }}</a>
+                </nav>
 
                 <x-flash-messages />
 
-                <form action="{{ route('user-store') }}" method="POST" class="flex flex-col">
+                <form action="{{ route($managerAccess ? 'manager.register.store' : 'user-store') }}" method="POST" class="flex flex-col">
                     @csrf
 
                     <label for="name" class="text-sm mb-2 text-gray-900 dark:text-white">{{ __('auth.name') }}</label>
@@ -86,6 +92,7 @@
                     <input
                         type="email"
                         name="email"
+                        required autocomplete="email"
                         id="email"
                         class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('email') border-[#e53935] @enderror"
                         placeholder="{{ __('auth.email_placeholder') }}"
@@ -113,6 +120,7 @@
                     <input
                         type="password"
                         name="password"
+                        required autocomplete="new-password"
                         id="password"
                         class="w-full p-3.5 mb-6 border border-gray-300 dark:border-[#343843] rounded-md bg-gray-50 dark:bg-[#181b22] text-gray-900 dark:text-white focus:outline-none focus:border-[#e53935] @error('password') border-[#e53935] @enderror"
                         placeholder="{{ __('auth.password_placeholder') }}"
@@ -140,11 +148,11 @@
 
                 <p class="text-center mt-6 text-sm text-gray-500 dark:text-[#a0a0a0]">
                     {{ __('auth.has_account') }}
-                    <a href="{{ route('user.login') }}" class="text-[#e53935] no-underline font-bold">{{ __('auth.login_link') }}</a>
+                    <a href="{{ route($managerAccess ? 'manager.login' : 'user.login') }}" class="text-[#e53935] no-underline font-bold">{{ __('auth.login_link') }}</a>
                 </p>
             </div>
 
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[85%] text-center">
+            <div class="mt-10 w-[85%] text-center">
                 <p class="text-sm text-gray-400 dark:text-[#b0b4bc] mb-2">{{ __('app.footer_tagline') }}</p>
                 <span class="text-xs text-gray-400 dark:text-[#8a8f98]">{{ __('app.footer_copyright') }}</span>
             </div>

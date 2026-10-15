@@ -11,9 +11,9 @@ class Charger extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['establishment_id', 'code', 'name', 'location', 'power_kw', 'connector', 'physical_status', 'physical_status_updated_at', 'tariff_override', 'lat', 'lng', 'active_reservation_id', 'active_session_id'];
+    protected $fillable = ['establishment_id', 'code', 'name', 'location', 'power_kw', 'connector', 'physical_status', 'physical_status_updated_at', 'tariff_override', 'lat', 'lng', 'active_reservation_id', 'active_session_id', 'activation_status'];
 
-    protected $attributes = ['physical_status' => 'unavailable'];
+    protected $attributes = ['physical_status' => 'unavailable', 'activation_status' => 'pending'];
 
     protected $casts = ['power_kw' => 'decimal:2', 'tariff_override' => 'decimal:4', 'physical_status_updated_at' => 'datetime', 'lat' => 'float', 'lng' => 'float'];
 
@@ -44,6 +44,9 @@ class Charger extends Model
 
     public function status(): string
     {
+        if ($this->activation_status !== null && $this->activation_status !== 'active') {
+            return 'unavailable';
+        }
         if (! in_array($this->physical_status, ['available', 'in_use'], true)) {
             return 'unavailable';
         }
@@ -61,7 +64,7 @@ class Charger extends Model
 
     public function currentTariff(): ?string
     {
-        return $this->tariff_override ?? $this->establishment?->cost_per_kwh;
+        return $this->establishment?->currentTariff();
     }
 
     public function canReserve(): bool

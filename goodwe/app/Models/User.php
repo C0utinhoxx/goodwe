@@ -73,6 +73,15 @@ class User extends Authenticatable
         return $this->hasOne(Establishment::class);
     }
 
+    public function portalRoute(): string
+    {
+        if (! $this->isGestor()) {
+            return 'user.home';
+        }
+
+        return $this->establishment()->exists() ? 'manager.dashboard' : 'manager.establishment.setup';
+    }
+
     public function isGestor(): bool
     {
         return $this->is_admin === true;
