@@ -28,6 +28,18 @@ class TotemChargingTest extends TestCase
             ->assertRedirect(route('user.login'));
     }
 
+    public function test_chargers_section_links_to_totem_control(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('chargers.index'));
+
+        // O controle do totem é acessado a partir da seção de recarga
+        $response->assertOk();
+        $response->assertSee(__('totens.open_control'));
+        $response->assertSee(route('totens.carregar', 'CG-001'), false);
+    }
+
     public function test_show_displays_dynamic_user_data_from_firestore(): void
     {
         $user = User::factory()->create([
@@ -54,11 +66,14 @@ class TotemChargingTest extends TestCase
         $response->assertOk();
         $response->assertSee('Maria Silva');
         $response->assertSee($tagUid, false);
-        $response->assertSee('ID '.$user->id, false);
-        $response->assertSee('42,50', false);   // saldo real do Firestore
-        $response->assertSee('4,99', false);    // tarifa do totem
-        $response->assertSee('Carregando');     // status lido do canal do ESP
-        $response->assertSee('Parar Carga');    // botão secundário
+        $response->assertSee(__('totens.user_id').': '.$user->id, false);
+        $response->assertSee('42,50', false);                          // saldo real do Firestore
+        $response->assertSee('4,99', false);                           // tarifa do totem
+        $response->assertSee(__('totens.status_charging'));            // status lido do canal do ESP
+        $response->assertSee(__('totens.stop_button'));                // botão secundário
+        $response->assertSee(route('chargers.index'), false);          // volta para a seção de recarga
+        $response->assertSee(route('totens.iniciar', 'TOT-01'), false);
+        $response->assertSee(route('totens.parar', 'TOT-01'), false);
     }
 
     public function test_show_falls_back_to_totem_status_when_tag_has_no_command(): void
@@ -72,7 +87,7 @@ class TotemChargingTest extends TestCase
 
         $this->actingAs($user)->get(route('totens.carregar', 'TOT-01'))
             ->assertOk()
-            ->assertSee('Carga interrompida');
+            ->assertSee(__('totens.status_stopped'));
     }
 
     public function test_show_falls_back_to_local_balance_and_unknown_status(): void
@@ -84,7 +99,7 @@ class TotemChargingTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('15,75', false);
-        $response->assertSee('Sem conexão');
+        $response->assertSee(__('totens.status_offline'));
     }
 
     public function test_iniciar_sends_dynamic_tag_and_start_command(): void

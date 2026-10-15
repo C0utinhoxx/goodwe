@@ -49,7 +49,8 @@
                 $navInactive = 'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-[#706f6c] hover:bg-[#e3e3e0]/50 hover:text-[#1b1b18] dark:text-[#a0a0a0] dark:hover:bg-[#343843] dark:hover:text-white transition-colors';
 
                 $isHome = request()->routeIs('user.home');
-                $isChargers = request()->routeIs('chargers.*');
+                // A área de recarga abrange os carregadores e o controle do totem
+                $isChargers = request()->routeIs('chargers.*', 'totens.*');
                 $isProfile = request()->routeIs('user.profile');
                 $isManager = request()->routeIs('manager.dashboard');
                 $isUserChatbot = request()->routeIs('user.chatbot.page');

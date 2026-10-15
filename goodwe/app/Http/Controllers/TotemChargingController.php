@@ -19,35 +19,7 @@ use Throwable;
  */
 class TotemChargingController extends Controller
 {
-    /**
-     * Status possíveis do campo `comando_web` do totem e sua apresentação.
-     *
-     * @var array<string, array{label: string, badge: string, dot: string}>
-     */
-    private const TOTEM_STATUS = [
-        'iniciar' => [
-            'label' => 'Carregando',
-            'badge' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/30',
-            'dot' => 'bg-emerald-500 animate-pulse',
-        ],
-        'parar' => [
-            'label' => 'Carga interrompida',
-            'badge' => 'bg-red-50 text-red-700 ring-red-600/30',
-            'dot' => 'bg-red-500',
-        ],
-        'espera' => [
-            'label' => 'Aguardando comando',
-            'badge' => 'bg-amber-50 text-amber-700 ring-amber-600/30',
-            'dot' => 'bg-amber-500',
-        ],
-    ];
-
-    private const DEFAULT_STATUS = [
-        'label' => 'Sem conexão',
-        'badge' => 'bg-gray-100 text-gray-600 ring-gray-500/20',
-        'dot' => 'bg-gray-400',
-    ];
-
+    /** Tarifa padrão usada quando o totem ainda não tem `tarifa_kwh`. */
     private const DEFAULT_TARIFF = 5.50;
 
     public function __construct(
@@ -84,7 +56,6 @@ class TotemChargingController extends Controller
             : (float) $user->balance;
 
         $statusKey = (string) ($firestoreUser['comando_web'] ?? $totem['comando_web'] ?? '');
-        $status = self::TOTEM_STATUS[$statusKey] ?? self::DEFAULT_STATUS;
 
         return view('totens.carregar', [
             'totemId' => $totemId,
@@ -93,9 +64,6 @@ class TotemChargingController extends Controller
             'tagUid' => $tagUid,
             'saldo' => $saldo,
             'statusKey' => $statusKey,
-            'statusLabel' => $status['label'],
-            'statusBadge' => $status['badge'],
-            'statusDot' => $status['dot'],
             'tarifaKwh' => isset($totem['tarifa_kwh'])
                 ? (float) $totem['tarifa_kwh']
                 : self::DEFAULT_TARIFF,
@@ -116,7 +84,7 @@ class TotemChargingController extends Controller
 
             if ($saldo <= 0) {
                 return redirect()->route('totens.carregar', $totemId)
-                    ->with('error', 'Saldo insuficiente para iniciar a recarga. Recarregue sua carteira.');
+                    ->with('error', __('totens.no_balance'));
             }
 
             // Lê a tarifa do totem (fallback: 5.50)
@@ -138,10 +106,10 @@ class TotemChargingController extends Controller
             ]);
 
             return redirect()->route('totens.carregar', $totemId)
-                ->with('success', "Carga iniciada no totem {$totemId} para {$user->name}.");
+                ->with('success', __('totens.started', ['totem' => $totemId]));
         } catch (Throwable $e) {
             return redirect()->route('totens.carregar', $totemId)
-                ->with('error', 'Erro ao iniciar carga: '.$e->getMessage());
+                ->with('error', __('totens.start_failed', ['error' => $e->getMessage()]));
         }
     }
 
@@ -165,10 +133,10 @@ class TotemChargingController extends Controller
             ]);
 
             return redirect()->route('totens.carregar', $totemId)
-                ->with('success', "Carga interrompida no totem {$totemId}.");
+                ->with('success', __('totens.stopped', ['totem' => $totemId]));
         } catch (Throwable $e) {
             return redirect()->route('totens.carregar', $totemId)
-                ->with('error', 'Erro ao parar carga: '.$e->getMessage());
+                ->with('error', __('totens.stop_failed', ['error' => $e->getMessage()]));
         }
     }
 
