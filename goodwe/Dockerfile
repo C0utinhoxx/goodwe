@@ -27,7 +27,17 @@ COPY package.json package-lock.json .npmrc ./
 RUN npm ci --no-audit --no-fund
 
 COPY . .
-RUN npm run build
+
+# Falha explícita se o Vite não gerar o manifesto. Sem esta verificação, uma
+# build quebrada do Vite produzia uma imagem com public/build vazio, o
+# deploy passava e o site subia "sem estilo nenhum" — falha silenciosa.
+RUN npm run build \
+    && if [ ! -f public/build/manifest.json ]; then \
+        echo "ERRO: public/build/manifest.json nao foi gerado pelo Vite."; \
+        ls -la public/build 2>/dev/null || echo "public/build nao existe"; \
+        exit 1; \
+    fi \
+    && echo "Frontend OK: $(find public/build -type f | wc -l) arquivos em public/build"
 
 ###############################################################################
 # Etapa 2 — Backend: extensões PHP + dependências Composer
@@ -108,8 +118,21 @@ RUN docker-php-ext-enable pdo_mysql mbstring exif pcntl bcmath intl zip \
 # Código da aplicação com vendor já instalado (sem node_modules, sem .env)
 COPY --from=build /var/www/html /var/www/html
 
-# Assets do frontend compilados
+# Assets do frontend compilados.
+# A origem é /app/public/build (WORKDIR da etapa "frontend" é /app, não
+# /var/www/html). apontar o COPY para um caminho inexistente quebraria o
+# build da imagem inteira.
 COPY --from=frontend /app/public/build /var/www/html/public/build
+
+# Confere que os assets realmente chegaram na imagem final — o @vite do
+# Laravel depende deste manifesto para emitir as tags <link>/<script>, e
+# sem ele a página subiria sem nenhum estilo, silenciosamente.
+RUN if [ ! -f public/build/manifest.json ]; then \
+        echo "ERRO: public/build/manifest.json ausente na imagem final."; \
+        ls -la public/build 2>/dev/null || echo "public/build nao existe"; \
+        exit 1; \
+    fi \
+    && echo "Assets na imagem final: $(find public/build -type f | wc -l) arquivos"
 
 # EXPLÍCITO de propósito: fixa o cwd do container na raiz da aplicação,
 # para qualquer `php artisan` executado via docker exec (debug) rodar no lugar
