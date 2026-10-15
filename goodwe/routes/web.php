@@ -15,6 +15,7 @@ use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\WebChargingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -86,6 +87,9 @@ Route::middleware(['auth', 'gestor'])->prefix('gestor')->name('manager.')->group
 });
 
 Route::middleware(['auth', 'portal.user'])->group(function () {
+    Route::post('/reservas/{reservation}/iniciar-teste', [WebChargingController::class, 'start'])->middleware('throttle:60,1')->name('reservations.start-test');
+    Route::post('/recargas/{session}/atualizar-teste', [WebChargingController::class, 'advance'])->middleware('throttle:120,1')->name('charging-sessions.advance-test');
+    Route::post('/recargas/{session}/encerrar-teste', [WebChargingController::class, 'end'])->middleware('throttle:60,1')->name('charging-sessions.end-test');
 
     Route::post('/carregadores/{charger:code}/reservar', [ReservationController::class, 'store'])->name('reservations.store');
     Route::post('/reservas/{reservation}/cancelar', [ReservationController::class, 'cancel'])->name('reservations.cancel');

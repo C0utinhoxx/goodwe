@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\FilterManagerChargersRequest;
 use App\Http\Requests\ManagerChargerRequest;
 use App\Models\Charger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,9 +14,24 @@ use Illuminate\View\View;
 
 class ManagerChargerController extends Controller
 {
-    public function index(Request $request): View
+    public function index(FilterManagerChargersRequest $request): View
     {
-        return view('manager.chargers', ['establishment' => $request->user()->establishment, 'chargers' => $request->user()->establishment->chargers()->with('establishment')->orderBy('name')->paginate(12)]);
+        $search = $request->validated('search');
+        $chargers = $request->user()->establishment->chargers()->where('is_demo', false)->with('establishment');
+        if (filled($search)) {
+            $chargers->where(function (Builder $query) use ($search): void {
+                $query->whereLike('name', '%'.$search.'%')
+                    ->orWhereLike('code', '%'.$search.'%')
+                    ->orWhereLike('location', '%'.$search.'%')
+                    ->orWhereLike('connector', '%'.$search.'%');
+            });
+        }
+
+        return view('manager.chargers', [
+            'establishment' => $request->user()->establishment,
+            'chargers' => $chargers->orderBy('name')->orderBy('id')->paginate(12)->withQueryString(),
+            'search' => $search ?? '',
+        ]);
     }
 
     public function create(): View

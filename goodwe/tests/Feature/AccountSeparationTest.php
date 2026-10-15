@@ -241,6 +241,7 @@ class AccountSeparationTest extends TestCase
             return true;
         });
         $this->get(route('manager.chatbot.page'))->assertOk()->assertSee('Resposta segura')->assertDontSee('Histórico global secreto');
+        $this->get(route('manager.dashboard'))->assertOk()->assertSee('Resposta segura')->assertDontSee('Histórico global secreto');
         $this->deleteJson(route('manager.chatbot.clear'))->assertOk();
         $this->get(route('manager.chatbot.page'))->assertDontSee('Resposta segura');
     }

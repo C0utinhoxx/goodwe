@@ -20,6 +20,7 @@ class MeteredChargingService
     /** Checks eligibility before the future adapter authorizes energy; this does not start a session or hold cash. */
     public function assertCanAuthorize(User $user, Charger $charger, ?int $reservationId = null): void
     {
+        abort_if($charger->is_demo, 404);
         $this->reservations->expireForCharger($charger);
         DB::transaction(function () use ($user, $charger, $reservationId) {
             $locked = ChargerLock::acquire($charger->id);
@@ -44,6 +45,7 @@ class MeteredChargingService
 
     public function startConfirmed(User $user, Charger $charger, string $externalSessionId, ?int $reservationId = null): ChargingSession
     {
+        abort_if($charger->is_demo, 404);
         $this->reservations->expireForCharger($charger);
 
         return DB::transaction(function () use ($user, $charger, $externalSessionId, $reservationId) {
@@ -105,6 +107,7 @@ class MeteredChargingService
 
     public function recordConsumption(ChargingSession $session, string $cumulativeEnergy, int $sequence, string $eventId): ChargingSession
     {
+        abort_if($session->is_demo, 404);
         $units = EnergyBilling::units($cumulativeEnergy);
 
         return DB::transaction(function () use ($session, $cumulativeEnergy, $units, $sequence, $eventId) {
@@ -144,6 +147,7 @@ class MeteredChargingService
 
     public function endConfirmed(ChargingSession $session, string $finalEnergy, string $eventId, bool $stopConfirmed = false): ChargingSession
     {
+        abort_if($session->is_demo, 404);
         $units = EnergyBilling::units($finalEnergy);
 
         return DB::transaction(function () use ($session, $finalEnergy, $units, $eventId, $stopConfirmed) {
@@ -194,6 +198,6 @@ class MeteredChargingService
 
     private function event(ChargingSession $session, string $type, string $eventId, array $metadata): void
     {
-        ChargingEvent::create(['charger_id' => $session->charger_id, 'charging_session_id' => $session->id, 'charging_reservation_id' => $session->charging_reservation_id, 'type' => $type, 'event_key' => "session:{$session->id}:{$type}:{$eventId}", 'metadata' => $metadata, 'occurred_at' => now()]);
+        ChargingEvent::create(['charger_id' => $session->charger_id, 'charging_session_id' => $session->id, 'charging_reservation_id' => $session->charging_reservation_id, 'type' => $type, 'event_key' => "session:{$session->id}:{$type}:{$eventId}", 'metadata' => $metadata + ($session->isWebSimulation() ? ['simulated' => true, 'physical_confirmation' => false, 'command_dispatched' => false, 'source' => 'web_test'] : []), 'occurred_at' => now()]);
     }
 }

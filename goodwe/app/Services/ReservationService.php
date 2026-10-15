@@ -15,6 +15,7 @@ class ReservationService
 {
     public function reserve(User $user, Charger $charger, string $key): ChargingReservation
     {
+        abort_if($charger->is_demo, 404);
         $this->expireForCharger($charger);
 
         return DB::transaction(function () use ($user, $charger, $key) {
@@ -120,7 +121,7 @@ class ReservationService
 
     public function expireForCharger(Charger $charger): void
     {
-        foreach ($charger->reservations()->where('status', 'active')->where('expires_at', '<=', now())->get() as $reservation) {
+        foreach ($charger->reservations()->where('is_demo', false)->where('status', 'active')->where('expires_at', '<=', now())->get() as $reservation) {
             $this->expire($reservation);
         }
     }
@@ -128,7 +129,7 @@ class ReservationService
     public function expireDue(): int
     {
         $count = 0;
-        foreach (ChargingReservation::where('status', 'active')->where('expires_at', '<=', now())->lazyById(100) as $reservation) {
+        foreach (ChargingReservation::where('is_demo', false)->where('status', 'active')->where('expires_at', '<=', now())->lazyById(100) as $reservation) {
             $count += $this->expire($reservation) ? 1 : 0;
         }
 

@@ -15,7 +15,7 @@ class WalletController extends Controller
     public function index(): View
     {
         $user = auth()->user();
-        $history = $user->transactions()->latest()->take(7)->get();
+        $history = $user->transactions()->where('is_demo', false)->latest()->take(7)->get();
 
         return view('user.carteira', [
             'user' => $user,
@@ -36,7 +36,7 @@ class WalletController extends Controller
 
         $amount = round((float) $validated['amount'], 2);
 
-        $this->walletService->deposit(auth()->user(), $amount);
+        $this->walletService->deposit(auth()->user(), $amount, $request->validated('idempotency_key'));
 
         return redirect()->route('wallet.index')
             ->with('success', __('wallet.deposit_success', ['amount' => number_format($amount, 2, ',', '.')]));
@@ -45,8 +45,8 @@ class WalletController extends Controller
     public function history(): View
     {
         $user = auth()->user();
-        $history = $user->transactions()->latest()->paginate(15, ['*'], 'transactions_page');
-        $sessions = $user->chargingSessions()->with(['establishment', 'coupon', 'reservation'])->latest()->paginate(15, ['*'], 'sessions_page');
+        $history = $user->transactions()->where('is_demo', false)->latest()->paginate(15, ['*'], 'transactions_page');
+        $sessions = $user->chargingSessions()->where('is_demo', false)->with(['establishment', 'coupon', 'reservation'])->latest()->paginate(15, ['*'], 'sessions_page');
 
         return view('user.carteira-historico', [
             'user' => $user,

@@ -16,12 +16,13 @@ class ChargingSession extends Model
         'charger_name',
         'energy_kwh',
         'amount_charged',
-        'payment_method',
+        'payment_method', 'simulation',
         'charger_id', 'charging_reservation_id', 'external_session_id', 'tariff_per_kwh', 'measured_energy_kwh', 'charging_state', 'payment_status', 'last_meter_sequence', 'started_at', 'ended_at', 'last_meter_at', 'stop_requested_at', 'stop_confirmed_at', 'paid_at', 'balance_exceeded',
         'status', 'original_amount', 'discount_amount', 'coupon_id', 'transaction_id', 'idempotency_key',
     ];
 
     protected $casts = [
+        'simulation' => 'array',
         'tariff_per_kwh' => 'decimal:4', 'measured_energy_kwh' => 'decimal:4', 'last_meter_sequence' => 'integer', 'started_at' => 'datetime', 'ended_at' => 'datetime', 'last_meter_at' => 'datetime', 'stop_requested_at' => 'datetime', 'stop_confirmed_at' => 'datetime', 'paid_at' => 'datetime', 'balance_exceeded' => 'boolean',
         'energy_kwh' => 'decimal:2',
         'amount_charged' => 'decimal:2', 'original_amount' => 'decimal:2', 'discount_amount' => 'decimal:2',
@@ -38,6 +39,11 @@ class ChargingSession extends Model
     public const STATUS_COMPLETED = 'completed';
 
     public const STATUS_CANCELLED = 'cancelled';
+
+    public function isWebSimulation(): bool
+    {
+        return $this->simulation !== null;
+    }
 
     public function charger(): BelongsTo
     {

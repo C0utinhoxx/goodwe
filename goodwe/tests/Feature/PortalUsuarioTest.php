@@ -161,13 +161,20 @@ class PortalUsuarioTest extends TestCase
         $this->get(route('wallet.history', ['sessions_page' => 2]))->assertOk()->assertViewHas('sessions', fn ($sessions) => $sessions->count() === 5 && ! $sessions->contains('status', 'pending'));
     }
 
-    public function test_checkout_form_uses_existing_gateway_and_signals_unconfigured_payment(): void
+    public function test_wallet_shows_stripe_pending_integration_without_sending_users_to_legacy_checkout(): void
     {
         $user = User::factory()->create();
-        config(['mercadopago.access_token' => null]);
-        $this->actingAs($user)->get(route('wallet.deposit.form'))->assertOk()->assertSee('Pagamento externo indisponível')->assertSee('action="'.route('checkout').'"', false)->assertSee('disabled', false);
-        config(['mercadopago.access_token' => 'test-token']);
-        $this->get(route('wallet.deposit.form'))->assertOk()->assertDontSee('Pagamento externo indisponível');
+        foreach ([null, 'test-token'] as $legacyToken) {
+            config(['mercadopago.access_token' => $legacyToken]);
+            $this->actingAs($user)->get(route('wallet.deposit.form'))->assertOk()
+                ->assertSee('Continuar com Stripe')
+                ->assertSee('Stripe em integração')
+                ->assertSee('disabled aria-describedby="stripe-status"', false)
+                ->assertDontSee('Mercado Pago')
+                ->assertDontSee('action="'.route('checkout').'"', false)
+                ->assertSee('action="'.route('wallet.deposit.store').'"', false);
+        }
+        $this->get(route('wallet.index'))->assertOk()->assertSee('Stripe')->assertDontSee('Mercado Pago');
     }
 
     public function test_floating_chat_uses_existing_ai_and_session_history_can_be_cleared(): void
@@ -191,11 +198,22 @@ class PortalUsuarioTest extends TestCase
         $this->getJson(route('user.chatbot.history'))->assertJsonCount(0, 'history');
     }
 
-    public function test_manager_pages_keep_the_original_layout_and_user_portal_still_has_five_links(): void
+    public function test_manager_pages_share_visual_navigation_without_exposing_personal_routes(): void
     {
         $manager = Establishment::factory()->create()->user;
-        $this->actingAs($manager)->get(route('manager.dashboard'))->assertOk()->assertDontSee('data-chat-widget', false)->assertDontSee('pt-shell')->assertDontSee(route('wallet.index'))->assertDontSee(route('user.profile'));
-        $this->get(route('manager.chatbot.page'))->assertOk()->assertDontSee('data-chat-widget', false);
+        foreach (['manager.dashboard', 'manager.chargers.index', 'manager.demand.index', 'manager.establishment.edit', 'manager.chatbot.page'] as $route) {
+            $response = $this->actingAs($manager)->get(route($route))->assertOk()
+                ->assertSee('data-chat-role="manager"', false)
+                ->assertSee('data-chat-url="'.route('manager.chatbot').'"', false)
+                ->assertSee('Navegação do gestor')
+                ->assertDontSee('data-chat-role="user"', false)
+                ->assertDontSee(route('user.chatbot.history'))
+                ->assertDontSee('Portal do usuário')
+                ->assertDontSee(route('wallet.index'))
+                ->assertDontSee(route('user.profile'))
+                ->assertDontSee('href="'.route('manager.chatbot.page').'"', false);
+            $this->assertSame(4, preg_match_all('/<a[^>]+class="pt-nav-link /', $response->getContent()));
+        }
         $this->get(route('user.home'))->assertForbidden();
         $this->actingAs(User::factory()->create());
         $response = $this->get(route('user.home'))->assertOk();

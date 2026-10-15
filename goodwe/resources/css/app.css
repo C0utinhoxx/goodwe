@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 @import './portal.css';
+@import './manager-chat.css';
+@import './interface.css';
+@import './menus.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

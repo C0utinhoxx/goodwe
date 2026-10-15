@@ -22,9 +22,9 @@ class ChargingController extends Controller
         $user = auth()->user();
 
         return view('chargers.index', [
-            'chargers' => Charger::with(['establishment', 'activeReservation'])->orderBy('name')->get(),
-            'reservations' => $user->reservations()->with(['charger', 'establishment'])->latest()->paginate(10, ['*'], 'reservations_page'),
-            'activeSessions' => $user->chargingSessions()->with('establishment')->whereNotNull('charging_state')->where('payment_status', '!=', 'paid')->latest()->get(),
+            'chargers' => Charger::where('is_demo', false)->with(['establishment', 'activeReservation'])->orderBy('name')->get(),
+            'reservations' => $user->reservations()->where('is_demo', false)->with(['charger', 'establishment'])->latest()->paginate(10, ['*'], 'reservations_page'),
+            'activeSessions' => $user->chargingSessions()->where('is_demo', false)->with('establishment')->whereNotNull('charging_state')->where('payment_status', '!=', 'paid')->latest()->get(),
         ]);
     }
 

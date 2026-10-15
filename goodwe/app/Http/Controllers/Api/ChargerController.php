@@ -29,7 +29,7 @@ class ChargerController extends Controller
 
         return response()->json([
             'chargers' => $chargers,
-            'registered_chargers' => Charger::with('establishment')->orderBy('name')->get()->map(fn (Charger $c) => ['id' => $c->code, 'name' => $c->name, 'establishment' => $c->establishment->name, 'location' => $c->location, 'power_kw' => (float) $c->power_kw, 'status' => $c->status(), 'tariff_per_kwh' => $c->currentTariff(), 'can_reserve' => $c->canReserve(), 'source' => 'registered']),
+            'registered_chargers' => Charger::where('is_demo', false)->with('establishment')->orderBy('name')->get()->map(fn (Charger $c) => ['id' => $c->code, 'name' => $c->name, 'establishment' => $c->establishment->name, 'location' => $c->location, 'power_kw' => (float) $c->power_kw, 'status' => $c->status(), 'tariff_per_kwh' => $c->currentTariff(), 'can_reserve' => $c->canReserve(), 'source' => 'registered']),
         ]);
     }
 

@@ -1,34 +1,4 @@
 function setupPortal() {
-    const shell = document.querySelector('[data-portal-shell]');
-    const opener = document.querySelector('[data-mobile-open]');
-    const sidebar = document.getElementById('portal-sidebar');
-    const overlay = document.querySelector('[data-mobile-close]');
-    const mobile = matchMedia('(max-width: 990px)');
-    const setMenu = active => {
-        if (!shell || !sidebar) return;
-        shell.classList.toggle('is-menu-open', active);
-        opener?.setAttribute('aria-expanded', String(active));
-        if (overlay) overlay.hidden = !active;
-        sidebar.inert = mobile.matches && !active;
-        document.body.style.overflow = mobile.matches && active ? 'hidden' : '';
-        if (active) sidebar.querySelector('a')?.focus();
-    };
-    opener?.addEventListener('click', () => setMenu(!shell.classList.contains('is-menu-open')));
-    overlay?.addEventListener('click', () => { setMenu(false); opener?.focus(); });
-    mobile.addEventListener('change', () => setMenu(false));
-    setMenu(false);
-    document.addEventListener('keydown', event => {
-        if (!shell?.classList.contains('is-menu-open')) return;
-        if (event.key === 'Escape') { setMenu(false); opener?.focus(); }
-        if (event.key === 'Tab') {
-            const targets = [...sidebar.querySelectorAll('a, button')];
-            const first = targets[0];
-            const last = targets[targets.length - 1];
-            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-            if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-        }
-    });
-
     const search = document.querySelector('[data-charger-search]');
     const status = document.querySelector('[data-charger-status]');
     const power = document.querySelector('[data-charger-power]');
@@ -47,6 +17,13 @@ function setupPortal() {
         if (empty) empty.hidden = count > 0;
     };
     [search, status, power].forEach(input => input?.addEventListener('input', filterStations));
+    document.querySelector('[data-charger-reset]')?.addEventListener('click', () => {
+        if (search) search.value = '';
+        if (status) status.value = 'all';
+        if (power) power.value = 'all';
+        filterStations();
+        search?.focus();
+    });
 
     const updateEstimate = dialog => {
         const estimate = dialog.querySelector('[data-estimate]');
@@ -86,6 +63,11 @@ function setupPortal() {
         const amount = document.getElementById('deposit-amount');
         if (amount) { amount.value = button.dataset.setAmount; amount.focus(); }
     }));
+    const amountInput = document.getElementById('deposit-amount');
+    const updatePresets = () => document.querySelectorAll('[data-set-amount]').forEach(button => button.setAttribute('aria-pressed', String(Number(amountInput?.value) === Number(button.dataset.setAmount))));
+    amountInput?.addEventListener('input', updatePresets);
+    document.querySelectorAll('[data-set-amount]').forEach(button => button.addEventListener('click', updatePresets));
+    updatePresets();
     document.querySelector('[data-profile-theme]')?.addEventListener('click', () => document.getElementById('theme-toggle')?.click());
     const localTime = new Intl.DateTimeFormat('pt-BR', {dateStyle:'short', timeStyle:'medium'});
     document.querySelectorAll('time[data-local-time]').forEach(time => {
@@ -113,7 +95,7 @@ function setupReservations() {
             checking = true;
             clearInterval(timer);
             countdown.textContent = 'Prazo encerrado. Conferindo estado…';
-            card.querySelector('[data-reservation-cancel] button')?.setAttribute('disabled', '');
+            card.querySelectorAll('[data-reservation-cancel] button, [data-reservation-start] button').forEach(button => button.setAttribute('disabled', ''));
             try {
                 const response = await fetch(card.dataset.statusUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
                 if (!response.ok) throw new Error('state');
@@ -188,7 +170,8 @@ function setupChat() {
         if (loaded || busy) { input.focus(); return; }
         setBusy(true);
         try {
-            const data = await request(widget.dataset.historyUrl);
+            const initialHistory = widget.querySelector('[data-chat-initial-history]');
+            const data = initialHistory ? { history: JSON.parse(initialHistory.textContent) } : await request(widget.dataset.historyUrl);
             (data.history || []).forEach(message => addMessage(String(message.content ?? ''), message.role === 'user' ? 'user' : 'bot'));
             loaded = true;
         } catch (_) { addMessage('Não foi possível recuperar o histórico. Tente abrir novamente ou inicie uma nova conversa.', 'bot', true); }
@@ -226,7 +209,7 @@ function setupChat() {
             await request(widget.dataset.clearUrl, { method: 'DELETE' });
             messages.replaceChildren();
             loaded = true;
-            addMessage('Olá! 👋 Sou o assistente PowerTag. Como posso ajudar?', 'bot');
+            addMessage(widget.dataset.welcome, 'bot');
         } catch (_) { addMessage('Não foi possível reiniciar a conversa.', 'bot', true); }
         finally { setBusy(false); input.focus(); }
     });

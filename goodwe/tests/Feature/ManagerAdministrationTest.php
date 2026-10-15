@@ -165,6 +165,30 @@ class ManagerAdministrationTest extends TestCase
         $this->assertSame($charger->code, $charger->fresh()->code);
     }
 
+    public function test_charger_search_covers_all_fields_without_crossing_the_establishment_boundary(): void
+    {
+        $own = Establishment::factory()->create();
+        $charger = Charger::factory()->for($own)->create(['name' => 'Estação Solar', 'code' => 'GW-FILTRO-001', 'location' => 'Garagem Norte', 'connector' => 'CCS2']);
+        $foreign = Charger::factory()->create(['name' => 'Estação Solar secreta', 'code' => 'GW-FILTRO-EXTERNO', 'location' => 'Garagem Norte', 'connector' => 'CCS2']);
+        foreach (['Solar', 'GW-FILTRO', 'Garagem Norte', 'CCS2', '0', '  Solar  ', ''] as $search) {
+            $this->actingAs($own->user)->get(route('manager.chargers.index', ['search' => $search, 'establishment_id' => $foreign->establishment_id]))
+                ->assertOk()->assertViewHas('chargers', fn ($chargers) => $chargers->pluck('id')->all() === [$charger->id]);
+        }
+    }
+
+    public function test_charger_search_preserves_pagination_and_rejects_invalid_queries(): void
+    {
+        $own = Establishment::factory()->create();
+        Charger::factory()->count(14)->for($own)->create(['name' => 'Filtro de busca']);
+        $this->actingAs($own->user)->get(route('manager.chargers.index', ['search' => 'Filtro']))
+            ->assertOk()->assertViewHas('chargers', fn ($chargers) => $chargers->count() === 12 && $chargers->total() === 14 && str_contains($chargers->nextPageUrl(), 'search=Filtro'));
+        $this->get(route('manager.chargers.index', ['search' => 'Filtro', 'page' => 2]))
+            ->assertOk()->assertViewHas('chargers', fn ($chargers) => $chargers->count() === 2);
+        foreach ([str_repeat('a', 101), ['invalid']] as $invalid) {
+            $this->getJson(route('manager.chargers.index', ['search' => $invalid]))->assertUnprocessable()->assertJsonValidationErrors('search');
+        }
+    }
+
     public function test_manager_cannot_read_or_edit_a_foreign_charger(): void
     {
         $own = $this->store();

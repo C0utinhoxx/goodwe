@@ -154,4 +154,20 @@ PHP;
         $this->assertDatabaseCount('transactions', 1);
         $this->assertEquals(1, $user->chargingSessions()->where('payment_status', 'pending')->count());
     }
+
+    public function test_simultaneous_web_starts_create_only_one_session_for_the_existing_reservation(): void
+    {
+        $user = User::factory()->create(['balance' => 100]);
+        $charger = Charger::factory()->create();
+        $reservation = app(ReservationService::class)->reserve($user, $charger, (string) Str::uuid());
+        $op = "app(App\\Services\\WebChargingService::class)->start(App\\Models\\User::find({$user->id}), App\\Models\\ChargingReservation::find({$reservation->id}))->id";
+        $results = $this->race([$op, $op]);
+        $this->assertTrue($results[0]['ok']);
+        $this->assertTrue($results[1]['ok']);
+        $this->assertSame($results[0]['id'], $results[1]['id']);
+        $this->assertDatabaseCount('charging_sessions', 1);
+        $this->assertDatabaseCount('transactions', 0);
+        $this->assertTrue(ChargingSession::sole()->isWebSimulation());
+        $this->assertSame('100.00', $user->refresh()->balance);
+    }
 }

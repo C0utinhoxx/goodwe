@@ -12,7 +12,7 @@ class StoreCheckoutRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return ! $this->routeIs('wallet.deposit.store') || app()->environment(['local', 'testing']);
     }
 
     /**
@@ -23,6 +23,7 @@ class StoreCheckoutRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'idempotency_key' => ['nullable', 'uuid'],
             'amount' => ['required', 'numeric', 'decimal:0,2', 'min:1', 'max:10000'],
         ];
     }

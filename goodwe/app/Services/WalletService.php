@@ -17,14 +17,22 @@ class WalletService
 {
     public function __construct(private LoyaltyService $loyalty) {}
 
-    public function deposit(User $user, float $amount): Transaction
+    public function deposit(User $user, float $amount, ?string $key = null): Transaction
     {
         if ($amount <= 0) {
             throw ValidationException::withMessages(['amount' => 'Valor inválido.']);
         }
 
-        return DB::transaction(function () use ($user, $amount) {
-            $deposit = Transaction::create(['user_id' => $user->id, 'type' => Transaction::TYPE_DEPOSIT, 'amount' => DecimalAmount::decimal(DecimalAmount::units($amount)), 'description' => "Depósito de R$ {$amount}", 'status' => Transaction::STATUS_PENDING]);
+        return DB::transaction(function () use ($user, $amount, $key) {
+            UserBalanceLock::acquire($user->id);
+            if ($key && ($existing = $user->transactions()->where('is_demo', false)->where('reference', 'test-deposit:'.$key)->first())) {
+                if (DecimalAmount::units($existing->amount) !== DecimalAmount::units($amount)) {
+                    throw ValidationException::withMessages(['amount' => 'Solicitação já usada com outro valor.']);
+                }
+
+                return $existing;
+            }
+            $deposit = Transaction::create(['reference' => $key ? 'test-deposit:'.$key : null, 'user_id' => $user->id, 'type' => Transaction::TYPE_DEPOSIT, 'amount' => DecimalAmount::decimal(DecimalAmount::units($amount)), 'description' => "Depósito de R$ {$amount}", 'status' => Transaction::STATUS_PENDING]);
             $this->creditApprovedDeposit($deposit);
 
             return $deposit->refresh();
@@ -36,6 +44,7 @@ class WalletService
         DB::transaction(function () use ($transaction, $paymentId) {
             $user = UserBalanceLock::acquire($transaction->user_id);
             $deposit = Transaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+            abort_if($deposit->is_demo, 404);
             if ($paymentId && $deposit->gateway_payment_id && $deposit->gateway_payment_id !== $paymentId) {
                 throw ValidationException::withMessages(['payment' => 'Depósito associado a outro pagamento.']);
             }
@@ -60,6 +69,7 @@ class WalletService
         DB::transaction(function () use ($transaction, $refundedAmount, $manual, $paymentId) {
             $user = UserBalanceLock::acquire($transaction->user_id);
             $deposit = Transaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+            abort_if($deposit->is_demo, 404);
             if ($paymentId && $deposit->gateway_payment_id && $deposit->gateway_payment_id !== $paymentId) {
                 throw ValidationException::withMessages(['payment' => 'Estorno associado a outro pagamento.']);
             }
@@ -123,6 +133,7 @@ class WalletService
         return DB::transaction(function () use ($user, $session, $couponId, $key) {
             $lockedUser = UserBalanceLock::acquire($user->id);
             $locked = ChargingSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->is_demo, 404);
             if ($locked->payment_status === 'paid') {
                 if ($locked->coupon_id !== $couponId) {
                     throw ValidationException::withMessages(['coupon_id' => 'Pagamento já confirmado com outra seleção de cupom.']);
@@ -170,7 +181,7 @@ class WalletService
 
     private function paymentCoupon(User $user, ?int $couponId): ?Coupon
     {
-        $coupon = $couponId ? $user->coupons()->whereKey($couponId)->lockForUpdate()->first() : null;
+        $coupon = $couponId ? $user->coupons()->where('is_demo', false)->whereKey($couponId)->lockForUpdate()->first() : null;
         if ($couponId && (! $coupon || $coupon->status !== 'available')) {
             throw ValidationException::withMessages(['coupon_id' => 'Cupom inválido, utilizado ou pertencente a outra conta.']);
         }
@@ -180,11 +191,11 @@ class WalletService
 
     public function getHistory(User $user): Collection
     {
-        return $user->transactions()->latest()->get();
+        return $user->transactions()->where('is_demo', false)->latest()->get();
     }
 
     public function getRecentSessions(User $user): Collection
     {
-        return $user->chargingSessions()->latest()->take(5)->get();
+        return $user->chargingSessions()->where('is_demo', false)->latest()->take(5)->get();
     }
 }

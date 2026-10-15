@@ -128,14 +128,14 @@ class UserController extends Controller
     {
         $user = auth()->user();
         $reservations->expireDue();
-        $chargers = Charger::all();
+        $chargers = Charger::where('is_demo', false)->get();
 
         return view('user.home-usuario', [
-            'sessions' => $user->chargingSessions()->with(['establishment', 'coupon'])->latest()->take(5)->get(),
-            'pendingSession' => $user->chargingSessions()->where('status', ChargingSession::STATUS_PENDING)->latest()->first(),
-            'activeReservations' => $user->reservations()->with(['charger', 'establishment'])->where('status', 'active')->latest()->get(),
-            'recentTransactions' => $user->transactions()->latest()->take(5)->get(),
-            'totalSessions' => $user->chargingSessions()->where('status', ChargingSession::STATUS_COMPLETED)->count(),
+            'sessions' => $user->chargingSessions()->where('is_demo', false)->with(['establishment', 'coupon'])->latest()->take(5)->get(),
+            'pendingSession' => $user->chargingSessions()->where('is_demo', false)->where('status', ChargingSession::STATUS_PENDING)->latest()->first(),
+            'activeReservations' => $user->reservations()->where('is_demo', false)->with(['charger', 'establishment'])->where('status', 'active')->latest()->get(),
+            'recentTransactions' => $user->transactions()->where('is_demo', false)->latest()->take(5)->get(),
+            'totalSessions' => $user->chargingSessions()->where('is_demo', false)->where('status', ChargingSession::STATUS_COMPLETED)->count(),
             'availableChargers' => collect($chargers)->filter(fn ($charger) => $charger->isAvailable())->count(),
             'totalChargers' => count($chargers),
         ]);

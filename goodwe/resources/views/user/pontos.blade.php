@@ -1,11 +1,11 @@
 <x-user-layout>
     <x-slot name="pageTitle">Meus pontos</x-slot>
-    <x-slot name="header"><div><p class="pt-eyebrow">PROGRAMA DE FIDELIDADE</p><h1 class="pt-heading">Seus pontos valem energia <span class="pt-heading-icon">🎁</span></h1><p class="pt-muted pt-subheading">Deposite, acumule e escolha seu próximo benefício.</p></div></x-slot>
+    <x-slot name="header"><div><p class="pt-eyebrow">PROGRAMA DE FIDELIDADE</p><h1 class="pt-heading">Seus pontos valem energia</h1><p class="pt-muted pt-subheading">Deposite, acumule e escolha seu próximo benefício.</p></div></x-slot>
     <section class="pt-points-hero">
         <div><span class="pt-points-kicker"><i data-lucide="sparkles"></i> POWERTAG REWARDS</span><p>Pontos disponíveis</p><h2>{{ number_format($user->points, 2, ',', '.') }} <small>pontos</small></h2><p>R$ 100,00 em depósitos confirmados = 10,00 pontos.</p><a class="pt-button pt-button-outline" href="#historico-pontos">Consultar histórico <i data-lucide="arrow-down"></i></a></div>
         <div class="pt-loyalty-totals"><div><span>Total acumulado</span><strong>{{ number_format($earned, 2, ',', '.') }} pts</strong></div><div><span>Total utilizado em resgates</span><strong>{{ number_format($spent, 2, ',', '.') }} pts</strong></div></div>
     </section>
-    <section class="pt-card pt-mt">
+    <section class="pt-card pt-mt" id="recompensas">
         <div class="pt-card-heading"><div><p class="pt-eyebrow">ESCOLHA SEU BENEFÍCIO</p><h2>Catálogo de recompensas</h2></div><span class="pt-status success">Sem prazo de validade</span></div>
         <div class="pt-loyalty-grid">
             @foreach($catalog as $tier => $benefit)
@@ -15,7 +15,7 @@
         </div>
         <p class="pt-form-note pt-mt">Os pontos são usados no resgate. Cada cupom pertence à sua conta e vale para uma única recarga; descontos não são cumulativos.</p>
     </section>
-    <section class="pt-card pt-mt">
+    <section class="pt-card pt-mt" id="meus-cupons">
         <div class="pt-card-heading"><div><p class="pt-eyebrow">PRONTOS PARA SUA PRÓXIMA RECARGA</p><h2>Meus cupons</h2></div><a href="{{ route('chargers.index') }}" class="pt-text-link">Escolher carregador <i data-lucide="arrow-right"></i></a></div>
         <div class="pt-loyalty-grid">
             @forelse($coupons as $coupon)

@@ -15,7 +15,7 @@ class PointsController extends Controller
     public function index(Request $request): View|JsonResponse
     {
         $user = $request->user();
-        $data = ['user' => $user, 'earned' => $user->pointMovements()->where('type', 'deposit')->sum('amount'), 'spent' => -$user->pointMovements()->where('type', 'redemption')->sum('amount'), 'catalog' => config('loyalty.coupons'), 'coupons' => $user->coupons()->latest()->paginate(9, ['*'], 'coupons_page'), 'movements' => $user->pointMovements()->latest('id')->paginate(15, ['*'], 'points_page')];
+        $data = ['user' => $user, 'earned' => $user->pointMovements()->where('is_demo', false)->where('type', 'deposit')->sum('amount'), 'spent' => -$user->pointMovements()->where('is_demo', false)->where('type', 'redemption')->sum('amount'), 'catalog' => config('loyalty.coupons'), 'coupons' => $user->coupons()->where('is_demo', false)->latest()->paginate(9, ['*'], 'coupons_page'), 'movements' => $user->pointMovements()->where('is_demo', false)->latest('id')->paginate(15, ['*'], 'points_page')];
 
         return $request->expectsJson() ? response()->json($data) : view('user.pontos', $data);
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChargingSession;
+use App\Services\WebChargingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -57,10 +58,14 @@ class ChatbotController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $sessions = ChargingSession::where(
+        $sessions = ChargingSession::where('is_demo', false)->where(
             'establishment_id',
             $establishment->id
         );
+
+        if (! WebChargingService::available()) {
+            $sessions->whereNull('simulation');
+        }
 
         $totalSessions = $sessions->clone()->count();
 
@@ -113,10 +118,7 @@ class ChatbotController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $recentSessions = ChargingSession::where(
-            'establishment_id',
-            $establishment->id
-        )
+        $recentSessions = (clone $sessions)
             ->with('user:id,name')
             ->latest()
             ->take(10)
@@ -143,6 +145,7 @@ class ChatbotController extends Controller
                     "- Data: {$date}\n".
                     "  Usuário: {$sessionUserName}\n".
                     "  Carregador: {$session->charger_name}\n".
+                    '  Origem: '.($session->isWebSimulation() ? 'Recarga de teste' : 'Recarga')."\n".
                     "  Energia: {$session->energy_kwh} kWh\n".
                     "  Valor: R$ {$session->amount_charged}\n".
                     "  Pagamento: {$session->payment_method}\n".
@@ -150,7 +153,7 @@ class ChatbotController extends Controller
             }
         }
 
-        $chargers = $establishment->chargers()->orderBy('name')->get();
+        $chargers = $establishment->chargers()->where('is_demo', false)->orderBy('name')->get();
         $totalChargers = $chargers->count();
         $availableChargers = $chargers->filter(fn ($charger) => $charger->isAvailable())->count();
         $occupiedChargers = $chargers->filter(fn ($charger) => $charger->status() === 'in_use')->count();
@@ -177,7 +180,7 @@ class ChatbotController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $context = "
+        $context = (WebChargingService::available() ? "Os indicadores deste ambiente incluem recargas de teste, sem operação física ou pagamento externo.\n" : '')."
 Você é o Assistente GoodWe, o assistente operacional da plataforma GoodWe.
 
 {$languageInstruction}

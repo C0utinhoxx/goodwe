@@ -32,7 +32,7 @@ class LoyaltyService
             $locked = UserBalanceLock::acquire($user->id);
             $existing = $locked->coupons()->where('redemption_key', $key)->first();
             if ($existing) {
-                if ($existing->tier !== $tier) {
+                if ($existing->is_demo || $existing->tier !== $tier) {
                     throw ValidationException::withMessages(['idempotency_key' => 'Identificador já usado para outro benefício.']);
                 }
 
