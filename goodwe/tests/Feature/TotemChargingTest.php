@@ -40,10 +40,12 @@ class TotemChargingTest extends TestCase
         $this->firestore->seed('users', $tagUid, [
             'saldo_pontos' => 42.50,
             'status_tag' => 'ativo',
-            'comando_web' => 'espera',
-        ]);
-        $this->firestore->seed('totems', 'TOT-01', [
             'comando_web' => 'iniciar',
+        ]);
+        // O espelho do totem tem outro valor: a tela deve priorizar o canal
+        // que o ESP consome (users/{TAG}.comando_web)
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'espera',
             'tarifa_kwh' => 4.99,
         ]);
 
@@ -55,8 +57,22 @@ class TotemChargingTest extends TestCase
         $response->assertSee('ID '.$user->id, false);
         $response->assertSee('42,50', false);   // saldo real do Firestore
         $response->assertSee('4,99', false);    // tarifa do totem
-        $response->assertSee('Carregando');     // status derivado de comando_web
+        $response->assertSee('Carregando');     // status lido do canal do ESP
         $response->assertSee('Parar Carga');    // botão secundário
+    }
+
+    public function test_show_falls_back_to_totem_status_when_tag_has_no_command(): void
+    {
+        $user = User::factory()->create();
+        $tagUid = "WEB_USER_{$user->id}";
+
+        // Documento da TAG existe mas sem comando_web => usa o espelho do totem
+        $this->firestore->seed('users', $tagUid, ['saldo_pontos' => 10]);
+        $this->firestore->seed('totems', 'TOT-01', ['comando_web' => 'parar']);
+
+        $this->actingAs($user)->get(route('totens.carregar', 'TOT-01'))
+            ->assertOk()
+            ->assertSee('Carga interrompida');
     }
 
     public function test_show_falls_back_to_local_balance_and_unknown_status(): void
@@ -93,6 +109,26 @@ class TotemChargingTest extends TestCase
         $this->assertSame('iniciar', $totem['comando_web']);
         $this->assertSame($tagUid, $totem['tag_uid']);
         $this->assertNotSame('WEB_USER_1', $totem['tag_uid']);
+
+        // Comando entregue ao ESP no canal users/{TAG}.comando_web
+        $this->assertSame('iniciar', $this->firestore->documents["users/{$tagUid}"]['comando_web']);
+    }
+
+    public function test_iniciar_targets_physical_tag_document_when_registered(): void
+    {
+        $user = User::factory()->create(['balance' => 20]);
+        $user->tag_uid = 'CARD-77';
+        $user->save();
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'TOT-01'))
+            ->assertSessionHas('success');
+
+        // O comando vai para o documento da TAG física (canal do ESP)...
+        $this->assertSame('iniciar', $this->firestore->documents['users/CARD-77']['comando_web']);
+        // ...e a TAG é a que aparece espelhada no totem
+        $this->assertSame('CARD-77', $this->firestore->documents['totems/TOT-01']['tag_uid']);
+        // Nada foi gravado no documento WEB_USER
+        $this->assertArrayNotHasKey("users/WEB_USER_{$user->id}", $this->firestore->documents);
     }
 
     public function test_iniciar_creates_firestore_user_document_when_missing(): void
@@ -110,6 +146,7 @@ class TotemChargingTest extends TestCase
         $this->assertSame($user->name, $created['nome']);
         $this->assertSame(10.0, $created['saldo_pontos']);
         $this->assertSame('ativo', $created['status_tag']);
+        $this->assertSame('iniciar', $created['comando_web']);
         $this->assertSame('iniciar', $this->firestore->documents['totems/TOT-01']['comando_web']);
     }
 
@@ -128,8 +165,12 @@ class TotemChargingTest extends TestCase
         $response->assertRedirect(route('totens.carregar', 'TOT-01'));
         $response->assertSessionHas('error');
 
-        // Nenhum comando foi enviado ao totem
+        // Nenhum comando foi enviado ao totem nem ao canal do ESP
         $this->assertArrayNotHasKey('totems/TOT-01', $this->firestore->documents);
+        $this->assertArrayNotHasKey(
+            'comando_web',
+            $this->firestore->documents["users/WEB_USER_{$user->id}"]
+        );
     }
 
     public function test_iniciar_syncs_stale_firestore_balance_from_wallet(): void
@@ -161,6 +202,12 @@ class TotemChargingTest extends TestCase
         $response->assertSessionHas('success');
 
         $this->assertSame('parar', $this->firestore->documents['totems/TOT-01']['comando_web']);
+
+        // Canal do ESP
+        $this->assertSame(
+            'parar',
+            $this->firestore->documents["users/WEB_USER_{$user->id}"]['comando_web']
+        );
     }
 
     public function test_parar_reports_firestore_failure(): void

@@ -56,7 +56,10 @@ class TotemChargingController extends Controller
 
     /**
      * Exibe a tela de recarga com os dados reais do usuário lidos do Firestore
-     * (nome, id, saldo) e o status atual do totem (`comando_web`).
+     * (nome, id, saldo) e o status atual da TAG (`comando_web`).
+     *
+     * O status é lido primeiro do documento da TAG (users/{TAG}) — que é o
+     * canal que o ESP consome — e, na falta dele, do espelho em totems/{id}.
      */
     public function show(string $totemId): View
     {
@@ -80,7 +83,7 @@ class TotemChargingController extends Controller
             ? (float) $firestoreUser['saldo_pontos']
             : (float) $user->balance;
 
-        $statusKey = (string) ($totem['comando_web'] ?? '');
+        $statusKey = (string) ($firestoreUser['comando_web'] ?? $totem['comando_web'] ?? '');
         $status = self::TOTEM_STATUS[$statusKey] ?? self::DEFAULT_STATUS;
 
         return view('totens.carregar', [
@@ -122,7 +125,12 @@ class TotemChargingController extends Controller
                 ? (float) $totem['tarifa_kwh']
                 : self::DEFAULT_TARIFF;
 
-            // Dispara o comando de início para o totem com a TAG dinâmica do usuário
+            // 1) Comando para o ESP: canal que ele consome em tempo real
+            $this->firestore->setDocumentMerge('users', $tagUid, [
+                'comando_web' => 'iniciar',
+            ]);
+
+            // 2) Espelho no documento do totem (status na tela + TAG autenticada)
             $this->firestore->setDocumentMerge('totems', $totemId, [
                 'comando_web' => 'iniciar',
                 'tag_uid' => $tagUid,
@@ -138,11 +146,20 @@ class TotemChargingController extends Controller
     }
 
     /**
-     * Envia o comando `parar` para o totem, interrompendo a recarga remotamente.
+     * Envia o comando `parar` para o ESP (users/{TAG}.comando_web) e espelha
+     * no totem, interrompendo a recarga remotamente.
      */
     public function parar(string $totemId): RedirectResponse
     {
+        $tagUid = $this->tagUid(Auth::user());
+
         try {
+            // 1) Comando para o ESP: canal que ele consome em tempo real
+            $this->firestore->setDocumentMerge('users', $tagUid, [
+                'comando_web' => 'parar',
+            ]);
+
+            // 2) Espelho no documento do totem (status na tela)
             $this->firestore->setDocumentMerge('totems', $totemId, [
                 'comando_web' => 'parar',
             ]);
@@ -156,11 +173,18 @@ class TotemChargingController extends Controller
     }
 
     /**
-     * Identificador da TAG do usuário no Firestore (formato WEB_USER_{id}).
+     * ID do documento da TAG do usuário no Firestore.
+     *
+     * Usa a TAG física cadastrada no cadastro (coluna `tag_uid`, quando
+     * preenchida) e, na falta dela, o identificador WEB_USER_{id} usado pelo
+     * web — que é o documento criado no registro em UserController::store.
+     * É para esse documento que o ESP escuta `comando_web`.
      */
     private function tagUid(User $user): string
     {
-        return "WEB_USER_{$user->id}";
+        $tagFisica = filled($user->tag_uid) ? strtoupper((string) $user->tag_uid) : '';
+
+        return $tagFisica !== '' ? $tagFisica : "WEB_USER_{$user->id}";
     }
 
     /**

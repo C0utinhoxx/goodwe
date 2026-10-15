@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{-- Atualização automática para refletir o status que o ESP escreve no Firestore --}}
+    <meta http-equiv="refresh" content="5">
     <title>Carregar - Totem {{ $totemId }}</title>
     @vite(['resources/css/app.css'])
 </head>
@@ -99,8 +101,11 @@
         </div>
 
         <p class="text-center text-xs text-gray-400">
-            Comando enviado ao totem via Firebase Firestore
-            <span class="font-mono">totems/{{ $totemId }}</span>
+            Comando enviado ao ESP em
+            <span class="font-mono">users/{{ $tagUid }}</span>
+            <span class="font-mono">.comando_web</span>
+            <br>
+            Espelho de status em <span class="font-mono">totems/{{ $totemId }}</span>
         </p>
     </div>
 </body>
