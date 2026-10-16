@@ -252,4 +252,152 @@ class TotemChargingTest extends TestCase
             ->post(route('totens.parar', 'TOT-01'))
             ->assertSessionHas('error');
     }
+
+    public function test_iniciar_resets_pin_digitado_to_empty_string(): void
+    {
+        $user = User::factory()->create(['balance' => 30]);
+        $tagUid = "WEB_USER_{$user->id}";
+
+        // Totem com PIN de sessão anterior
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'espera',
+            'pin_digitado' => '1234',
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('totens.carregar', 'TOT-01'))
+            ->post(route('totens.iniciar', 'TOT-01'))
+            ->assertSessionHas('success');
+
+        // O pin_digitado deve ser resetado para string vazia
+        $this->assertSame('', $this->firestore->documents['totems/TOT-01']['pin_digitado']);
+    }
+
+    public function test_enviar_pin_updates_pin_digitado_field(): void
+    {
+        $user = User::factory()->create();
+
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'aguardando_pin',
+            'pin_gerado' => '5678',
+            'pin_digitado' => '',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson(route('totens.pin', 'TOT-01'), ['pin' => '5678']);
+
+        $response->assertOk();
+        $response->assertJson(['success' => true]);
+
+        // Verifica que apenas o campo pin_digitado foi atualizado
+        $totem = $this->firestore->documents['totems/TOT-01'];
+        $this->assertSame('5678', $totem['pin_digitado']);
+        $this->assertSame('aguardando_pin', $totem['comando_web']);
+        $this->assertSame('5678', $totem['pin_gerado']);
+    }
+
+    public function test_enviar_pin_validates_numeric_4_digits(): void
+    {
+        $user = User::factory()->create();
+
+        // PIN com letras
+        $this->actingAs($user)
+            ->postJson(route('totens.pin', 'TOT-01'), ['pin' => '12ab'])
+            ->assertStatus(422);
+
+        // PIN com menos de 4 dígitos
+        $this->actingAs($user)
+            ->postJson(route('totens.pin', 'TOT-01'), ['pin' => '123'])
+            ->assertStatus(422);
+
+        // PIN com mais de 4 dígitos
+        $this->actingAs($user)
+            ->postJson(route('totens.pin', 'TOT-01'), ['pin' => '12345'])
+            ->assertStatus(422);
+
+        // PIN vazio
+        $this->actingAs($user)
+            ->postJson(route('totens.pin', 'TOT-01'), ['pin' => ''])
+            ->assertStatus(422);
+    }
+
+    public function test_enviar_pin_reports_firestore_failure(): void
+    {
+        $user = User::factory()->create();
+        $this->firestore->shouldFail = true;
+
+        $response = $this->actingAs($user)
+            ->postJson(route('totens.pin', 'TOT-01'), ['pin' => '1234']);
+
+        $response->assertStatus(500);
+        $response->assertJson(['success' => false]);
+    }
+
+    public function test_status_returns_current_totem_state(): void
+    {
+        $user = User::factory()->create();
+
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'aguardando_pin',
+            'pin_gerado' => '4321',
+            'tag_uid' => 'WEB_USER_1',
+            'tarifa_kwh' => 6.99,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson(route('totens.status', 'TOT-01'));
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'comando_web' => 'aguardando_pin',
+            'pin_gerado' => '4321',
+            'tag_uid' => 'WEB_USER_1',
+            'tarifa_kwh' => 6.99,
+        ]);
+    }
+
+    public function test_status_returns_empty_comando_when_totem_not_found(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->getJson(route('totens.status', 'TOT-99'));
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'comando_web' => '',
+        ]);
+    }
+
+    public function test_status_reports_firestore_failure(): void
+    {
+        $user = User::factory()->create();
+        $this->firestore->shouldFail = true;
+
+        $response = $this->actingAs($user)
+            ->getJson(route('totens.status', 'TOT-01'));
+
+        $response->assertStatus(500);
+        $response->assertJson(['success' => false]);
+    }
+
+    public function test_view_contains_pin_modal_and_polling_script(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('totens.carregar', 'TOT-01'));
+
+        $response->assertOk();
+        // Modal de PIN presente no HTML
+        $response->assertSee('id="pin-modal"', false);
+        $response->assertSee('id="pin-form"', false);
+        $response->assertSee('id="pin-input"', false);
+        // Script de polling presente
+        $response->assertSee('POLLING_INTERVAL', false);
+        $response->assertSee('aguardando_pin', false);
+        $response->assertSee('STATUS_URL', false);
+        $response->assertSee('PIN_URL', false);
+    }
 }

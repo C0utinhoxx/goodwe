@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\FirestoreService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Throwable;
@@ -73,6 +75,15 @@ class TotemChargingController extends Controller
     /**
      * Envia o comando `iniciar` para o totem, desde que o usuário tenha
      * saldo maior que zero na coleção `users` do Firestore.
+     *
+     * O contrato do Firestore para `totems/{TOTEM_ID}` define:
+     *  - comando_web: "iniciar"
+     *  - tag_uid: ID virtual do usuário (ex: "WEB_USER_1")
+     *  - pin_digitado: "" (resetado para nova sessão)
+     *
+     * O ESP32 processa o comando, gera um `pin_gerado` de 4 dígitos e altera
+     * o `comando_web` para "aguardando_pin". O front-end deteta essa mudança
+     * via polling e abre a modal para o utilizador digitar o PIN.
      */
     public function iniciar(string $totemId): RedirectResponse
     {
@@ -99,10 +110,12 @@ class TotemChargingController extends Controller
             ]);
 
             // 2) Espelho no documento do totem (status na tela + TAG autenticada)
+            //    Reseta o pin_digitado para garantir que o ESP32 gera um novo PIN
             $this->firestore->setDocumentMerge('totems', $totemId, [
                 'comando_web' => 'iniciar',
                 'tag_uid' => $tagUid,
                 'tarifa_kwh' => $tarifaKwh,
+                'pin_digitado' => '',
             ]);
 
             return redirect()->route('totens.carregar', $totemId)
@@ -110,6 +123,69 @@ class TotemChargingController extends Controller
         } catch (Throwable $e) {
             return redirect()->route('totens.carregar', $totemId)
                 ->with('error', __('totens.start_failed', ['error' => $e->getMessage()]));
+        }
+    }
+
+    /**
+     * Recebe o PIN digitado pelo utilizador na modal e atualiza apenas o campo
+     * `pin_digitado` no documento `totems/{totemId}` do Firestore.
+     *
+     * O ESP32 compara o `pin_digitado` com o `pin_gerado` e, se coincidirem,
+     * inicia a recarga e altera o `comando_web` para "carregando".
+     */
+    public function enviarPin(Request $request, string $totemId): JsonResponse
+    {
+        $request->validate([
+            'pin' => ['required', 'string', 'size:4', 'regex:/^\d{4}$/'],
+        ]);
+
+        $pin = (string) $request->input('pin');
+
+        try {
+            // Atualiza apenas o campo pin_digitado no documento do totem
+            $this->firestore->setDocumentMerge('totems', $totemId, [
+                'pin_digitado' => $pin,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => __('totens.pin_sent'),
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => __('totens.pin_failed', ['error' => $e->getMessage()]),
+            ], 500);
+        }
+    }
+
+    /**
+     * Endpoint AJAX para consulta do estado atual do totem.
+     *
+     * Retorna os campos relevantes do documento `totems/{totemId}` para que
+     * o front-end possa monitorizar o `comando_web` e reagir em tempo real
+     * (ex: abrir a modal quando `comando_web === 'aguardando_pin'`).
+     */
+    public function status(string $totemId): JsonResponse
+    {
+        try {
+            $totem = $this->firestore->getDocumentData('totems', $totemId) ?? [];
+
+            return response()->json([
+                'success' => true,
+                'comando_web' => (string) ($totem['comando_web'] ?? ''),
+                'pin_gerado' => (string) ($totem['pin_gerado'] ?? ''),
+                'tag_uid' => (string) ($totem['tag_uid'] ?? ''),
+                'tarifa_kwh' => isset($totem['tarifa_kwh'])
+                    ? (float) $totem['tarifa_kwh']
+                    : self::DEFAULT_TARIFF,
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'comando_web' => '',
+                'message' => $e->getMessage(),
+            ], 500);
         }
     }
 

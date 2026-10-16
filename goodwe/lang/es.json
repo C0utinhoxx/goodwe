@@ -284,5 +284,11 @@
     "totens.status_charging": "Cargando",
     "totens.status_stopped": "Carga interrumpida",
     "totens.status_waiting": "Esperando comando",
-    "totens.status_offline": "Sin conexión"
+    "totens.status_offline": "Sin conexión",
+    "totens.pin_modal_title": "Confirmación de PIN",
+    "totens.pin_modal_description": "El tótem ha generado un PIN de seguridad. Introduce los 4 dígitos para autorizar la recarga.",
+    "totens.pin_cancel": "Cancelar",
+    "totens.pin_confirm": "Confirmar",
+    "totens.pin_sent": "PIN enviado con éxito. Espera la validación del tótem.",
+    "totens.pin_failed": "Error al enviar el PIN: :error"
 }

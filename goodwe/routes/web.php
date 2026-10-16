@@ -87,6 +87,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/{totem_id}', [TotemChargingController::class, 'show'])->name('carregar');
         Route::post('/{totem_id}/iniciar', [TotemChargingController::class, 'iniciar'])->name('iniciar');
         Route::post('/{totem_id}/parar', [TotemChargingController::class, 'parar'])->name('parar');
+        Route::post('/{totem_id}/pin', [TotemChargingController::class, 'enviarPin'])->name('pin');
+        Route::get('/{totem_id}/status', [TotemChargingController::class, 'status'])->name('status');
     });
 
     Route::middleware('gestor')->prefix('gestor')->name('manager.')->group(function () {

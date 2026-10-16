@@ -284,5 +284,11 @@
     "totens.status_charging": "Charging",
     "totens.status_stopped": "Charging stopped",
     "totens.status_waiting": "Waiting for command",
-    "totens.status_offline": "Offline"
+    "totens.status_offline": "Offline",
+    "totens.pin_modal_title": "PIN Confirmation",
+    "totens.pin_modal_description": "The totem has generated a security PIN. Enter the 4 digits to authorize charging.",
+    "totens.pin_cancel": "Cancel",
+    "totens.pin_confirm": "Confirm",
+    "totens.pin_sent": "PIN sent successfully. Wait for totem validation.",
+    "totens.pin_failed": "Error sending PIN: :error"
 }
