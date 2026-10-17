@@ -4,8 +4,10 @@ use App\Http\Controllers\AtendimentoHumanoController;
 use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChargingSessionController;
 use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DemandPricingController;
 use App\Http\Controllers\EstablishmentController;
+use App\Http\Controllers\LegacyPaymentWebhookController;
 use App\Http\Controllers\ManagerAuthController;
 use App\Http\Controllers\ManagerChargerController;
 use App\Http\Controllers\ManagerController;
@@ -18,9 +20,6 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\WebChargingController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\CheckoutController;
-use App\Http\Controllers\LegacyPaymentWebhookController;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -111,7 +110,7 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('carregadores')
+    Route::middleware('portal.user')->prefix('carregadores')
         ->name('chargers.')
         ->group(function () {
 
@@ -131,7 +130,7 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('carteira')
+    Route::middleware('portal.user')->prefix('carteira')
         ->name('wallet.')
         ->group(function () {
 
@@ -154,18 +153,54 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::post('/meus-pontos/resgatar', [PointsController::class, 'redeem'])->name('points.redeem');
-    Route::get('/meus-pontos', [PointsController::class, 'index'])->name('points.index');
-    Route::patch('/meu-perfil', [UserController::class, 'updateProfile'])->name('user.profile.update');
-    Route::post('/meus-veiculos', [VehicleController::class, 'store'])->name('vehicles.store');
-    Route::delete('/meus-veiculos/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
-    Route::get('/chatbot/historico', [UserChatbotController::class, 'history'])->name('user.chatbot.history');
+    Route::middleware('portal.user')->group(function () {
+        Route::post('/meus-pontos/resgatar', [PointsController::class, 'redeem'])->name('points.redeem');
+        Route::get('/meus-pontos', [PointsController::class, 'index'])->name('points.index');
+        Route::patch('/meu-perfil', [UserController::class, 'updateProfile'])->name('user.profile.update');
+        Route::post('/meus-veiculos', [VehicleController::class, 'store'])->name('vehicles.store');
+        Route::middleware('portal.user')->delete('/meus-veiculos/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+        Route::get('/chatbot/historico', [UserChatbotController::class, 'history'])->name('user.chatbot.history');
 
-    Route::get('/meu-perfil', [UserController::class, 'profile'])
-        ->name('user.profile');
+        Route::get('/meu-perfil', [UserController::class, 'profile'])
+            ->name('user.profile');
 
-    Route::get('/inicio', [UserController::class, 'home'])
-        ->name('user.home');
+        Route::get('/inicio', [UserController::class, 'home'])
+            ->name('user.home');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Reservas e recargas
+        |--------------------------------------------------------------------------
+        */
+
+        Route::middleware('portal.user')->post('/carregadores/{charger:code}/reservar', [ReservationController::class, 'store'])
+            ->middleware('throttle:20,1')->name('reservations.store');
+        Route::middleware('portal.user')->post('/reservas/{reservation}/cancelar', [ReservationController::class, 'cancel'])
+            ->name('reservations.cancel');
+        Route::middleware('portal.user')->get('/reservas/{reservation}/estado', [ReservationController::class, 'status'])
+            ->name('reservations.status');
+
+        Route::middleware('portal.user')->get('/recargas/{session}', [ChargingSessionController::class, 'show'])
+            ->name('charging-sessions.show');
+        Route::middleware('portal.user')->post('/recargas/{session}/pagar', [ChargingSessionController::class, 'pay'])
+            ->name('charging-sessions.pay');
+
+        Route::post('/reservas/{reservation}/iniciar-teste', [WebChargingController::class, 'start'])
+            ->middleware('throttle:60,1')->name('reservations.start-test');
+        Route::post('/recargas/{session}/atualizar-teste', [WebChargingController::class, 'advance'])
+            ->middleware('throttle:120,1')->name('charging-sessions.advance-test');
+        Route::post('/recargas/{session}/encerrar-teste', [WebChargingController::class, 'end'])
+            ->middleware('throttle:60,1')->name('charging-sessions.end-test');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Senha
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/atualizar-senha', [UserController::class, 'updatePassword'])
+            ->name('user.update-password');
+    });
 
     Route::prefix('carregar')->name('totens.')->group(function () {
         Route::get('/{totem_id}', [TotemChargingController::class, 'show'])->name('carregar');
@@ -176,18 +211,20 @@ Route::middleware('auth')->group(function () {
     });
 
     /*
+
+    /*
     |--------------------------------------------------------------------------
     | Chatbot do usuário
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/assistente', [UserChatbotController::class, 'page'])
+    Route::middleware('portal.user')->get('/assistente', [UserChatbotController::class, 'page'])
         ->name('user.chatbot.page');
 
-    Route::post('/chatbot', [UserChatbotController::class, 'chat'])
+    Route::middleware('portal.user')->post('/chatbot', [UserChatbotController::class, 'chat'])
         ->name('user.chatbot');
 
-    Route::delete('/chatbot', [UserChatbotController::class, 'clear'])
+    Route::middleware('portal.user')->delete('/chatbot', [UserChatbotController::class, 'clear'])
         ->name('user.chatbot.clear');
 
     /*
@@ -200,6 +237,39 @@ Route::middleware('auth')->group(function () {
         ->prefix('gestor')
         ->name('manager.')
         ->group(function () {
+
+            Route::get('/estabelecimento/cadastro', [EstablishmentController::class, 'create'])
+                ->name('establishment.setup');
+            Route::post('/estabelecimento/cadastro', [EstablishmentController::class, 'store'])
+                ->name('establishment.store');
+
+            Route::middleware('establishment')->group(function () {
+                Route::get('/estabelecimento', [EstablishmentController::class, 'edit'])
+                    ->name('establishment.edit');
+                Route::patch('/estabelecimento', [EstablishmentController::class, 'update'])
+                    ->name('establishment.update');
+            });
+
+            Route::get('/carregadores', [ManagerChargerController::class, 'index'])
+                ->name('chargers.index');
+
+            Route::get('/carregadores/novo', [ManagerChargerController::class, 'create'])
+                ->name('chargers.create');
+
+            Route::post('/carregadores', [ManagerChargerController::class, 'store'])
+                ->name('chargers.store');
+
+            Route::get('/carregadores/{charger}/editar', [ManagerChargerController::class, 'edit'])
+                ->name('chargers.edit');
+
+            Route::patch('/carregadores/{charger}', [ManagerChargerController::class, 'update'])
+                ->name('chargers.update');
+
+            Route::get('/demanda', [DemandPricingController::class, 'index'])
+                ->name('demand.index');
+
+            Route::post('/demanda/{peak}/decisao', [DemandPricingController::class, 'decide'])
+                ->name('demand.decide');
 
             Route::get('/dashboard', [ManagerController::class, 'dashboard'])
                 ->name('dashboard');
@@ -217,7 +287,6 @@ Route::middleware('auth')->group(function () {
                 ->name('chatbot.clear');
         });
 
-
     /*
     |--------------------------------------------------------------------------
     | Tickets - Atendimento Humano
@@ -229,25 +298,25 @@ Route::middleware('auth')->group(function () {
         ->group(function () {
 
             Route::get('/', [
-                AtendimentoHumanoController::class, 'index'
+                AtendimentoHumanoController::class, 'index',
             ])->name('index');
 
             Route::post('/', [
-                AtendimentoHumanoController::class, 'store'
+                AtendimentoHumanoController::class, 'store',
             ])
                 ->middleware('throttle:10,1')
                 ->name('store');
 
             Route::get('/{atendimento}', [
-                AtendimentoHumanoController::class, 'show'
+                AtendimentoHumanoController::class, 'show',
             ])->name('show');
 
             Route::post('/{atendimento}/responder', [
-                AtendimentoHumanoController::class, 'responder'
+                AtendimentoHumanoController::class, 'responder',
             ])->name('responder');
 
             Route::patch('/{atendimento}/concluir', [
-                AtendimentoHumanoController::class, 'concluir'
+                AtendimentoHumanoController::class, 'concluir',
             ])->name('concluir');
         });
 
@@ -257,16 +326,24 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::post('/checkout', [CheckoutController::class, 'checkout'])
+    Route::middleware('portal.user')->post('/checkout', [CheckoutController::class, 'checkout'])
         ->name('checkout');
 
-    Route::get('/pagamento/sucesso', [CheckoutController::class, 'success'])
+    Route::middleware('portal.user')->get('/pagamento/sucesso', [CheckoutController::class, 'success'])
         ->name('pagamento.sucesso');
 
-    Route::get('/pagamento/erro', [CheckoutController::class, 'cancel'])
+    Route::middleware('portal.user')->get('/pagamento/erro', [CheckoutController::class, 'cancel'])
         ->name('pagamento.erro');
-});
 
+    Route::middleware('portal.user')->get('/pagamento/pendente', [CheckoutController::class, 'pending'])
+        ->name('pagamento.pendente');
+});
+/* |--------------------------------------------------------------------------| Autenticação do gestor|-------------------------------------------------------------------------- */ Route::prefix('gestor')->name('manager.')->middleware('guest')->group(function () {
+    Route::get('/login', [ManagerAuthController::class, 'login'])->name('login');
+    Route::post('/login', [ManagerAuthController::class, 'authenticate'])->middleware('throttle:5,1')->name('login.store');
+    Route::get('/cadastro', [ManagerAuthController::class, 'create'])->name('register');
+    Route::post('/cadastro', [ManagerAuthController::class, 'store'])->middleware('throttle:10,1')->name('register.store');
+});
 /*
 |--------------------------------------------------------------------------
 | Webhook de pagamentos legados
