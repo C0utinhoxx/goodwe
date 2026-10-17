@@ -7,6 +7,7 @@ use App\Http\Requests\PasswordRecoveryRequest;
 use App\Http\Requests\PasswordResetRequest;
 use App\Http\Requests\UserRequest;
 use App\Models\User;
+use App\Services\FirestoreService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -41,20 +42,24 @@ class UserController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function store(UserRequest $request): RedirectResponse
+    public function store(UserRequest $request, FirestoreService $firestore): RedirectResponse
     {
         $request->validated();
 
-        User::create([
+        $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => $request->password,
         ]);
 
-        return redirect()
-            ->route('user.login')
-            ->with('success', __('auth.registered'));
+        $firestore->saveDocument('users', "WEB_USER_{$user->id}", [
+            'saldo_pontos' => $user->points,
+            'status_tag' => 'ativo',
+            'comando_web' => 'espera',
+        ]);
+
+        return redirect()->route('user.login')->with('success', __('auth.registered'));
     }
 
     /*

@@ -5,6 +5,7 @@ use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\MercadoPagoController;
+use App\Http\Controllers\TotemChargingController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalletController;
@@ -40,7 +41,7 @@ Route::get('/', function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get('/login-user', [UserController::class, 'login'])
+Route::get('/login', [UserController::class, 'login'])
     ->name('user.login');
 
 Route::post('/login', [UserController::class, 'logar'])
@@ -159,6 +160,14 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/inicio', [UserController::class, 'home'])
         ->name('user.home');
+
+    Route::prefix('carregar')->name('totens.')->group(function () {
+        Route::get('/{totem_id}', [TotemChargingController::class, 'show'])->name('carregar');
+        Route::post('/{totem_id}/iniciar', [TotemChargingController::class, 'iniciar'])->name('iniciar');
+        Route::post('/{totem_id}/parar', [TotemChargingController::class, 'parar'])->name('parar');
+        Route::post('/{totem_id}/pin', [TotemChargingController::class, 'enviarPin'])->name('pin');
+        Route::get('/{totem_id}/status', [TotemChargingController::class, 'status'])->name('status');
+    });
 
     /*
     |--------------------------------------------------------------------------

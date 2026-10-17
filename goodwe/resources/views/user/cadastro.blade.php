@@ -47,7 +47,7 @@
         </div>
 
         {{-- Lado Formulario --}}
-        <div class="w-full lg:w-[calc(40%+28px)] lg:-ml-7 bg-[#FDFDFC] dark:bg-[#0f1117] flex items-center justify-center relative lg:rounded-l-[28px] z-20">
+        <div class="w-full lg:w-[calc(40%+28px)] lg:-ml-7 bg-[#FDFDFC] dark:bg-[#0f1117] flex flex-col items-center relative min-h-screen lg:rounded-l-[28px] z-20">
             {{-- Seletor de Idioma --}}
             <div class="absolute top-6 right-8 z-10">
                 <x-lang-switcher variant="boxed" />
@@ -58,7 +58,7 @@
                 <x-theme-toggle />
             </div>
 
-            <div class="w-[85%] max-w-[460px]">
+            <div class="w-[85%] max-w-[460px] my-auto pt-24 pb-8">
                 <h2 class="text-3xl mb-3 text-gray-900 dark:text-white">{{ __('auth.create_account') }}</h2>
                 <div class="w-[45px] h-[3px] bg-[#e53935] mb-5"></div>
                 <h3 class="text-lg mb-2 font-normal text-gray-900 dark:text-white">{{ __('auth.platform_name') }}</h3>
@@ -144,10 +144,14 @@
                 </p>
             </div>
 
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[85%] text-center">
-                <p class="text-sm text-gray-400 dark:text-[#b0b4bc] mb-2">{{ __('app.footer_tagline') }}</p>
-                <span class="text-xs text-gray-400 dark:text-[#8a8f98]">{{ __('app.footer_copyright') }}</span>
-            </div>
+            <footer class="w-full shrink-0 px-4 py-5 text-center">
+                <p class="text-sm text-gray-400 dark:text-[#b0b4bc] mb-2">
+                    {{ __('app.footer_tagline') }}
+                </p>
+                <span class="text-xs text-gray-400 dark:text-[#8a8f98]">
+                    {{ __('app.footer_copyright') }}
+                </span>
+            </footer>
         </div>
     </div>
 
