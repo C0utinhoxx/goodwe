@@ -152,10 +152,14 @@
                 </p>
             </div>
 
-            <div class="mt-10 w-[85%] text-center">
-                <p class="text-sm text-gray-400 dark:text-[#b0b4bc] mb-2">{{ __('app.footer_tagline') }}</p>
-                <span class="text-xs text-gray-400 dark:text-[#8a8f98]">{{ __('app.footer_copyright') }}</span>
-            </div>
+            <footer class="w-full shrink-0 px-4 py-5 text-center">
+                <p class="text-sm text-gray-400 dark:text-[#b0b4bc] mb-2">
+                    {{ __('app.footer_tagline') }}
+                </p>
+                <span class="text-xs text-gray-400 dark:text-[#8a8f98]">
+                    {{ __('app.footer_copyright') }}
+                </span>
+            </footer>
         </div>
     </div>
 

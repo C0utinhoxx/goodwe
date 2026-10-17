@@ -10,6 +10,7 @@ use App\Http\Requests\UserRequest;
 use App\Models\Charger;
 use App\Models\ChargingSession;
 use App\Models\User;
+use App\Services\FirestoreService;
 use App\Services\ReservationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -27,16 +28,22 @@ class UserController extends Controller
         return view('user.cadastro');
     }
 
-    public function store(UserRequest $request): RedirectResponse
+    public function store(UserRequest $request, FirestoreService $firestore): RedirectResponse
     {
         $data = $request->validated();
 
-        User::create([
+        $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'],
             'password' => $data['password'],
             'is_admin' => false,
+        ]);
+
+        $firestore->saveDocument('users', "WEB_USER_{$user->id}", [
+            'saldo_pontos' => $user->points,
+            'status_tag' => 'ativo',
+            'comando_web' => 'espera',
         ]);
 
         return redirect()->route('user.login')->with('success', __('auth.registered'));

@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChargerController;
+use App\Http\Controllers\Api\ChargingSessionController;
+use App\Http\Controllers\Api\FirestoreUserController;
 use App\Http\Controllers\Api\WalletController;
-use App\Http\Controllers\ChargingSessionController;
+use App\Http\Controllers\ChargingSessionController as WebChargingSessionController;
 use App\Http\Controllers\PointsController;
 use App\Http\Controllers\ReservationController;
 use Illuminate\Support\Facades\Route;
@@ -37,5 +39,12 @@ Route::middleware(['auth:sanctum', 'portal.user'])->group(function () {
         Route::post('/deposit', [WalletController::class, 'deposit'])->name('deposit');
         Route::get('/points', [PointsController::class, 'index'])->name('points');
         Route::post('/redeem-points', [PointsController::class, 'redeem'])->name('redeem-points');
+    });
+
+    Route::prefix('firestore')->name('api.firestore.')->group(function () {
+        Route::post('/users', [FirestoreUserController::class, 'store'])->name('users.store');
+        Route::put('/users/{tagUid}', [FirestoreUserController::class, 'update'])->name('users.update');
+        Route::post('/users/{tagUid}/comando', [FirestoreUserController::class, 'setCommand'])->name('users.command');
+        Route::get('/charging-sessions', [WebChargingSessionController::class, 'index'])->name('charging-sessions.index');
     });
 });

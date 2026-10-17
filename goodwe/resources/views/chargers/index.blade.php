@@ -6,7 +6,18 @@
         <section class="pt-info-panel pt-mt"><span class="pt-info-icon"><i data-lucide="battery-charging"></i></span><div><strong>{{ $session->charger_name }} · {{ $session->charging_state === 'ended' ? 'Pagamento pendente' : ($session->isWebSimulation() ? 'Recarga em andamento · início de teste' : ($session->charging_state === 'stop_requested' ? 'Interrupção necessária; confirmação física pendente' : 'Recarga confirmada pelo equipamento')) }}</strong><p>Tarifa da sessão: R$ {{ number_format($session->tariff_per_kwh, 4, ',', '.') }}/kWh. Consumo registrado: {{ number_format($session->measured_energy_kwh, 4, ',', '.') }} kWh.</p><a href="{{ route('charging-sessions.show', $session) }}">{{ $session->charging_state === 'ended' ? 'Revisar e pagar recarga' : 'Consultar sessão' }} <i data-lucide="arrow-right"></i></a></div></section>
     @endforeach
 
-    <section class="pt-card pt-filter-panel pt-mt">
+    <div class="flex items-center gap-2 rounded-full border border-[#e53935]/30 bg-[#e53935]/5 px-3 py-1.5">
+        <span class="relative flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e53935] opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#e53935]"></span>
+        </span>
+        <span class="text-xs text-[#e53935] font-medium">{{ __('chargers.live_status') }}</span>
+    </div>
+</x-slot>
+
+<x-flash-messages />
+
+<section class="pt-card pt-filter-panel pt-mt">
         <div class="pt-filter-top"><div class="pt-filter-search"><i data-lucide="search"></i><label for="charger-search" class="sr-only">Buscar carregador</label><input id="charger-search" type="search" placeholder="Nome, estabelecimento ou localização..." data-charger-search></div><label class="pt-select-label">Status <select data-charger-status><option value="all">Todos</option><option value="available">Disponíveis</option><option value="reserved">Reservados</option><option value="in_use">Em uso</option><option value="unavailable">Indisponíveis</option></select></label><label class="pt-select-label">Potência <select data-charger-power><option value="all">Todas</option>@foreach($chargers->pluck('power_kw')->unique()->sort() as $power)<option value="{{ (float) $power }}">{{ (float) $power }} kW</option>@endforeach</select></label></div>
         <div class="pt-filter-foot"><span aria-live="polite"><strong data-charger-count>{{ $chargers->count() }}</strong> carregadores cadastrados</span><span>Disponibilidade e regras conferidas novamente ao confirmar.</span><button type="button" class="pt-text-link" data-charger-reset>Limpar filtros</button></div>
     </section>
@@ -20,6 +31,13 @@
                 <div class="pt-station-foot"><div><small>Tarifa vigente</small><strong>@if((float) $charger->currentTariff() > 0)R$ {{ number_format($charger->currentTariff(), 4, ',', '.') }} <span>/ kWh</span>@else Não configurada @endif</strong></div><button type="button" class="pt-button {{ $charger->canReserve() ? 'pt-button-primary' : 'pt-button-outline' }}" data-charger-open="charger-{{ $loop->index }}">{{ $charger->canReserve() ? 'Reservar agora' : 'Ver detalhes' }}</button></div>
                 @if($charger->isAvailable() && !$charger->canReserve())<p class="pt-form-note">Reserva aguardando configuração de tarifa ou tolerância pelo estabelecimento.</p>@endif
             </article>
+
+            {{-- Controle remoto do totem vinculado a este ponto de recarga --}}
+            @if ($charger->hasTotem())
+                <div class="pt-card pt-charger-controls">
+                    <a href="{{ route('totens.carregar', $charger->totemId) }}" class="pt-button pt-button-outline w-full">{{ __('totens.open_control') }}</a>
+                </div>
+            @endif
         @endforeach
     </section>
     @if($chargers->isEmpty())<section class="pt-card pt-mt"><div class="pt-empty"><i data-lucide="plug-zap"></i><strong>Nenhum carregador cadastrado para reservas</strong><p>Os estabelecimentos ainda precisam disponibilizar seus equipamentos e configurar as regras de reserva.</p></div></section>@endif
