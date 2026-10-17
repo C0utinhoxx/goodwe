@@ -1,21 +1,47 @@
 <?php
 
+use App\Http\Controllers\AtendimentoHumanoController;
 use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\MercadoPagoController;
+use App\Http\Controllers\TotemChargingController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
 
+/*
+|--------------------------------------------------------------------------
+| Página inicial
+|--------------------------------------------------------------------------
+*/
+
 Route::get('/', function () {
-    return auth()->check()
-        ? redirect()->route('user.home')
-        : redirect()->route('user.login');
+    if (! auth()->check()) {
+        return redirect()->route('user.login');
+    }
+
+    $user = auth()->user();
+
+    if ($user->isSuporte()) {
+        return redirect()->route('support.dashboard');
+    }
+
+    if ($user->isGestor()) {
+        return redirect()->route('manager.dashboard');
+    }
+
+    return redirect()->route('user.home');
 });
 
-Route::get('/login-user', [UserController::class, 'login'])
+/*
+|--------------------------------------------------------------------------
+| Autenticação
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/login', [UserController::class, 'login'])
     ->name('user.login');
 
 Route::post('/login', [UserController::class, 'logar'])
@@ -39,6 +65,12 @@ Route::post('/store-user', [UserController::class, 'store'])
 Route::post('/logout', [UserController::class, 'logout'])
     ->name('logout');
 
+/*
+|--------------------------------------------------------------------------
+| Idiomas
+|--------------------------------------------------------------------------
+*/
+
 Route::get('/locale/{locale}', function (string $locale) {
     if (! in_array($locale, ['pt', 'en', 'es'])) {
         abort(400);
@@ -49,32 +81,79 @@ Route::get('/locale/{locale}', function (string $locale) {
     return redirect()->back();
 })->name('locale.set');
 
+/*
+|--------------------------------------------------------------------------
+| Rotas autenticadas
+|--------------------------------------------------------------------------
+*/
+
 Route::middleware('auth')->group(function () {
 
-    Route::prefix('carregadores')->name('chargers.')->group(function () {
-        Route::get('/', [ChargingController::class, 'index'])
-            ->name('index');
+    /*
+    |--------------------------------------------------------------------------
+    | Central de Atendimento - Suporte
+    |--------------------------------------------------------------------------
+    */
 
-        Route::post('/{charger}/agendar', [ChargingController::class, 'schedule'])
-            ->name('schedule');
+    Route::middleware('can:access-support')
+        ->prefix('suporte')
+        ->name('support.')
+        ->group(function () {
 
-        Route::post('/{charger}/liberar', [ChargingController::class, 'release'])
-            ->name('release');
-    });
+            Route::get('/dashboard', function () {
+                return view('suporte.dashboard');
+            })->name('dashboard');
 
-    Route::prefix('carteira')->name('wallet.')->group(function () {
-        Route::get('/', [WalletController::class, 'index'])
-            ->name('index');
+        });
 
-        Route::get('/adicionar', [WalletController::class, 'depositForm'])
-            ->name('deposit.form');
+    /*
+    |--------------------------------------------------------------------------
+    | Carregadores
+    |--------------------------------------------------------------------------
+    */
 
-        Route::post('/adicionar', [WalletController::class, 'storeDeposit'])
-            ->name('deposit.store');
+    Route::prefix('carregadores')
+        ->name('chargers.')
+        ->group(function () {
 
-        Route::get('/historico', [WalletController::class, 'history'])
-            ->name('history');
-    });
+            Route::get('/', [ChargingController::class, 'index'])
+                ->name('index');
+
+            Route::post('/{charger}/agendar', [ChargingController::class, 'schedule'])
+                ->name('schedule');
+
+            Route::post('/{charger}/liberar', [ChargingController::class, 'release'])
+                ->name('release');
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Carteira
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('carteira')
+        ->name('wallet.')
+        ->group(function () {
+
+            Route::get('/', [WalletController::class, 'index'])
+                ->name('index');
+
+            Route::get('/adicionar', [WalletController::class, 'depositForm'])
+                ->name('deposit.form');
+
+            Route::post('/adicionar', [WalletController::class, 'storeDeposit'])
+                ->name('deposit.store');
+
+            Route::get('/historico', [WalletController::class, 'history'])
+                ->name('history');
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Área do usuário
+    |--------------------------------------------------------------------------
+    */
 
     Route::get('/meu-perfil', [UserController::class, 'profile'])
         ->name('user.profile');
@@ -82,14 +161,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/inicio', [UserController::class, 'home'])
         ->name('user.home');
 
-    Route::middleware('gestor')->prefix('gestor')->name('manager.')->group(function () {
-        Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
-        Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])->name('dashboard.export');
+    Route::prefix('carregar')->name('totens.')->group(function () {
+        Route::get('/{totem_id}', [TotemChargingController::class, 'show'])->name('carregar');
+        Route::post('/{totem_id}/iniciar', [TotemChargingController::class, 'iniciar'])->name('iniciar');
+        Route::post('/{totem_id}/parar', [TotemChargingController::class, 'parar'])->name('parar');
+        Route::post('/{totem_id}/pin', [TotemChargingController::class, 'enviarPin'])->name('pin');
+        Route::get('/{totem_id}/status', [TotemChargingController::class, 'status'])->name('status');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Assistente IA do usuário
+    | Chatbot do usuário
     |--------------------------------------------------------------------------
     */
 
@@ -112,6 +194,13 @@ Route::middleware('auth')->group(function () {
         ->prefix('gestor')
         ->name('manager.')
         ->group(function () {
+
+            Route::get('/dashboard', [ManagerController::class, 'dashboard'])
+                ->name('dashboard');
+
+            Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])
+                ->name('dashboard.export');
+
             Route::get('/assistente', [ChatbotController::class, 'page'])
                 ->name('chatbot.page');
 
@@ -122,15 +211,63 @@ Route::middleware('auth')->group(function () {
                 ->name('chatbot.clear');
         });
 
+    /*
+    |--------------------------------------------------------------------------
+    | Tickets - Atendimento Humano
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('tickets')
+        ->name('tickets.')
+        ->group(function () {
+
+            Route::get('/', [
+                AtendimentoHumanoController::class, 'index'
+            ])->name('index');
+
+            Route::post('/', [
+                AtendimentoHumanoController::class, 'store'
+            ])
+                ->middleware('throttle:10,1')
+                ->name('store');
+
+            Route::get('/{atendimento}', [
+                AtendimentoHumanoController::class, 'show'
+            ])->name('show');
+
+            Route::post('/{atendimento}/responder', [
+                AtendimentoHumanoController::class, 'responder'
+            ])->name('responder');
+
+            Route::patch('/{atendimento}/concluir', [
+                AtendimentoHumanoController::class, 'concluir'
+            ])->name('concluir');
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pagamentos
+    |--------------------------------------------------------------------------
+    */
+
     Route::post('/checkout', [MercadoPagoController::class, 'checkout'])
         ->name('checkout');
+
     Route::get('/pagamento/sucesso', [MercadoPagoController::class, 'sucesso'])
         ->name('pagamento.sucesso');
+
     Route::get('/pagamento/erro', [MercadoPagoController::class, 'erro'])
         ->name('pagamento.erro');
+
     Route::get('/pagamento/pendente', [MercadoPagoController::class, 'pendente'])
         ->name('pagamento.pendente');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Webhook Mercado Pago
+|--------------------------------------------------------------------------
+*/
 
 Route::post('/webhook/mercadopago', [MercadoPagoController::class, 'webhook'])
     ->name('mercadopago.webhook');

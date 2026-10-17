@@ -1,0 +1,38 @@
+# Artefatos de build locais (seriam incompatíveis com a arquitetura Linux)
+node_modules
+vendor
+public/build
+public/hot
+
+# Segredos e configuração local — as envs chegam em runtime
+.env
+.env.*
+!.env.example
+auth.json
+*.key
+
+# Credenciais do Firebase: o credentials.json é gerado em runtime via
+# FIREBASE_CREDENTIALS_JSON e NUNCA deve entrar na imagem
+storage/app/firebase/*.json
+
+# Estado de runtime local (recriado no container)
+storage/app/public/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+bootstrap/cache/*.php
+
+# VCS e ferramentas de desenvolvimento
+.git
+.gitattributes
+.github
+.idea
+.vscode
+.nova
+.cursor
+.zed
+.DS_Store
+*.log
+.phpunit.result.cache
+.phpactor.json
