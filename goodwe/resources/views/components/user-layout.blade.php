@@ -13,7 +13,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ isset($pageTitle) ? $pageTitle.' · ' : '' }}PowerTag</title>
-    <link rel="icon" href="{{ asset('favicon.ico') }}" type="image/x-icon">
+    <link rel="icon" href="{{ asset('imagens/goodwe-logo.png') }}" type="image/x-icon">
     <script>
         (() => {
             const theme = localStorage.getItem('theme');
@@ -45,6 +45,12 @@
                 ['name'=>'Preferências','route'=>'user.profile','hash'=>'preferencias'],
             ]],
         ];
+
+        if (auth()->user()?->isSuporte()) {
+            $links = [
+                ['name'=>__('support.overview_title'),'route'=>'support.dashboard','active'=>'support.*','icon'=>'life-buoy','description'=>__('support.support_panel')],
+            ] + $links;
+        }
     @endphp
     <div class="pt-shell" data-portal-shell data-portal-role="user">
         <div class="pt-mobile-overlay" data-mobile-close hidden></div>

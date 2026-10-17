@@ -18,15 +18,34 @@ use Illuminate\View\View;
 
 class UserController extends Controller
 {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tela de login
+    |--------------------------------------------------------------------------
+    */
+
     public function login(): View
     {
         return view('user.login');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Tela de cadastro
+    |--------------------------------------------------------------------------
+    */
+
     public function create(): View
     {
         return view('user.cadastro');
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cadastro de usuário comum
+    |--------------------------------------------------------------------------
+    */
 
     public function store(UserRequest $request, FirestoreService $firestore): RedirectResponse
     {
@@ -49,28 +68,66 @@ class UserController extends Controller
         return redirect()->route('user.login')->with('success', __('auth.registered'));
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login com redirecionamento por perfil
+    |--------------------------------------------------------------------------
+    */
+
     public function logar(LoginRequest $request): RedirectResponse
     {
         $credentials = [...$request->safe()->only(['email', 'password']), 'is_admin' => false];
 
-        if (Auth::attempt($credentials, $request->boolean('lembrar'))) {
-            request()->session()->regenerate();
-
-            return redirect()->route('user.home')->with('success', __('auth.logged_in'));
+        if (! Auth::attempt($credentials, $request->boolean('lembrar'))) {
+            return back()->withErrors([
+                'email' => __('auth.failed'),
+            ])->onlyInput('email');
         }
 
-        return back()->withErrors([
-            'email' => __('auth.driver_failed'),
-        ])->onlyInput('email');
+        $request->session()->regenerate();
+
+        $user = Auth::user();
+
+        // Perfil Suporte
+        if ($user->isSuporte()) {
+            return redirect()
+                ->route('support.dashboard')
+                ->with('success', __('auth.logged_in'));
+        }
+
+        // Perfil Gestor
+        if ($user->isGestor()) {
+            return redirect()
+                ->route('manager.dashboard')
+                ->with('success', __('auth.logged_in'));
+        }
+
+        // Usuário comum
+        return redirect()
+            ->route('user.home')
+            ->with('success', __('auth.logged_in'));
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tela de recuperação de senha
+    |--------------------------------------------------------------------------
+    */
 
     public function showPasswordRecovery(): View
     {
         return view('user.recover');
     }
 
-    public function verifyPasswordRecovery(PasswordRecoveryRequest $request): RedirectResponse
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Verificar identidade para recuperação de senha
+    |--------------------------------------------------------------------------
+    */
+
+    public function verifyPasswordRecovery(
+        PasswordRecoveryRequest $request
+    ): RedirectResponse {
         $request->validated();
 
         $user = User::where('email', $request->email)->first();
@@ -81,7 +138,24 @@ class UserController extends Controller
             ]);
         }
 
-        if ($user->phone === null || $user->phone !== $request->phone) {
+        // Contas de suporte precisam de recuperação
+        // por um procedimento administrativo seguro.
+        if ($user->isSuporte()) {
+            session()->forget([
+                'password_recovery_user_id',
+                'password_recovery_verified',
+                'password_recovery_email',
+            ]);
+
+            return back()->withErrors([
+                'email' => 'Entre em contato com a administração para recuperar o acesso.',
+            ]);
+        }
+
+        if (
+            $user->phone === null ||
+            $user->phone !== $request->phone
+        ) {
             session()->forget([
                 'password_recovery_user_id',
                 'password_recovery_verified',
@@ -90,7 +164,9 @@ class UserController extends Controller
 
             return back()
                 ->withInput($request->only('email'))
-                ->withErrors(['phone' => __('auth.phone_mismatch')]);
+                ->withErrors([
+                    'phone' => __('auth.phone_mismatch'),
+                ]);
         }
 
         session([
@@ -99,22 +175,54 @@ class UserController extends Controller
             'password_recovery_email' => $user->email,
         ]);
 
-        return back()->with('success', __('auth.identity_verified'));
+        return back()->with(
+            'success',
+            __('auth.identity_verified')
+        );
     }
 
-    public function updatePassword(PasswordResetRequest $request): RedirectResponse
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Atualizar senha
+    |--------------------------------------------------------------------------
+    */
+
+    public function updatePassword(
+        PasswordResetRequest $request
+    ): RedirectResponse {
+        $request->validated();
+
         $userId = session('password_recovery_user_id');
 
-        if ($userId === null) {
-            return redirect()->route('user.password.recovery')
-                ->withErrors(['email' => __('auth.verify_before_reset')]);
+        if (
+            $userId === null ||
+            session('password_recovery_verified') !== true
+        ) {
+            return redirect()
+                ->route('user.password.recovery')
+                ->withErrors([
+                    'email' => __('auth.verify_before_reset'),
+                ]);
         }
 
         $user = User::findOrFail($userId);
 
+        if ($user->isSuporte()) {
+            session()->forget([
+                'password_recovery_user_id',
+                'password_recovery_verified',
+                'password_recovery_email',
+            ]);
+
+            return redirect()
+                ->route('user.password.recovery')
+                ->withErrors([
+                    'email' => 'Recuperação da conta de suporte deve ser feita pela administração.',
+                ]);
+        }
+
         $user->update([
-            'password' => bcrypt($request->password),
+            'password' => $request->password,
         ]);
 
         session()->forget([
@@ -126,14 +234,32 @@ class UserController extends Controller
         return redirect()->route($user->isGestor() ? 'manager.login' : 'user.login')->with('success', __('auth.password_updated'));
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Perfil do usuário
+    |--------------------------------------------------------------------------
+    */
+
     public function profile(): View
     {
         return view('user.profile', ['vehicles' => auth()->user()->vehicles()->latest()->get()]);
     }
 
-    public function home(ReservationService $reservations): View
+    /*
+    |--------------------------------------------------------------------------
+    | Página inicial
+    |--------------------------------------------------------------------------
+    */
+
+    public function home(ReservationService $reservations): View|RedirectResponse
     {
-        $user = auth()->user();
+        $user = Auth::user();
+
+        // A conta de suporte permanece na Central de Atendimento.
+        if ($user->isSuporte()) {
+            return redirect()->route('support.dashboard');
+        }
+
         $reservations->expireDue();
         $chargers = Charger::where('is_demo', false)->get();
 
@@ -158,6 +284,12 @@ class UserController extends Controller
 
         return back()->with('success', 'Dados atualizados com sucesso.');
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logout
+    |--------------------------------------------------------------------------
+    */
 
     public function logout(): RedirectResponse
     {

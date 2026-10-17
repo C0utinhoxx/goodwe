@@ -2,80 +2,203 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\DemandPricingService;
-use App\Services\WebChargingService;
+use App\Models\ChargingSession;
+use App\Models\Establishment;
+use App\Services\ChargingSimulator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ManagerController extends Controller
 {
-    public function dashboard(Request $request, DemandPricingService $pricing): View
+    public function dashboard(Request $request): View
     {
-        $establishment = $request->user()->establishment;
-        $establishment->load('activePeak');
-        $period = $request->integer('period', 30);
+        $user = $request->user();
+        $establishment = $user->establishment;
+
+        if (! $establishment) {
+            $establishment = Establishment::create([
+                'user_id' => $user->id,
+                'name' => 'Meu Estabelecimento',
+                'address' => 'Endereco nao definido',
+                'type' => Establishment::TYPE_COMERCIAL,
+                'operating_hours' => '08:00 - 22:00',
+                'cost_per_kwh' => 1.5000,
+            ]);
+        }
+
+        $period = (int) $request->integer('period', 30);
         if (! in_array($period, [7, 30, 90], true)) {
             $period = 30;
         }
-        $periodSince = now()->subDays($period);
-        $includeTestSessions = WebChargingService::available();
-        $sessions = $establishment->chargingSessions()->where('is_demo', false)->getQuery();
-        if (! $includeTestSessions) {
-            $sessions->whereNull('simulation');
-        }
-        $paid = (clone $sessions)->where('status', 'completed')->whereHas('transaction', fn ($query) => $query->where('type', 'charge_payment')->where('status', 'approved'));
-        $consumed = (clone $sessions)->where('status', '!=', 'cancelled');
-        $totalSessions = (clone $sessions)->count();
-        $totalRevenue = (clone $paid)->sum('amount_charged');
-        $totalEnergy = (clone $consumed)->sum(DB::raw('COALESCE(measured_energy_kwh, energy_kwh)'));
-        $paidEnergy = (clone $paid)->sum(DB::raw('COALESCE(measured_energy_kwh, energy_kwh)'));
-        $avgCostPerKwh = $paidEnergy > 0 ? $totalRevenue / $paidEnergy : 0;
-        $periodSessionsCount = (clone $sessions)->where('created_at', '>=', $periodSince)->count();
-        $periodRevenue = (clone $paid)->where('created_at', '>=', $periodSince)->sum('amount_charged');
-        $periodEnergy = (clone $consumed)->where('created_at', '>=', $periodSince)->sum(DB::raw('COALESCE(measured_energy_kwh, energy_kwh)'));
-        $periodActiveUsers = (clone $sessions)->where('created_at', '>=', $periodSince)->distinct('user_id')->count('user_id');
-        $totalUsers = (clone $sessions)->distinct('user_id')->count('user_id');
-        $energyDays = (clone $consumed)->where('created_at', '>=', $periodSince)
-            ->selectRaw('DATE(created_at) as date, SUM(COALESCE(measured_energy_kwh, energy_kwh)) as total_kwh')->groupBy('date')->orderBy('date')->pluck('total_kwh', 'date');
-        $revenueDays = (clone $paid)->where('created_at', '>=', $periodSince)
-            ->selectRaw('DATE(created_at) as date, SUM(amount_charged) as total_revenue')->groupBy('date')->orderBy('date')->pluck('total_revenue', 'date');
-        $dates = $energyDays->keys()->merge($revenueDays->keys())->unique()->sort()->values();
-        $dailyLabels = $dates->map(fn ($date) => Carbon::parse($date)->format('d/m'));
-        $dailyKwh = $dates->map(fn ($date) => $energyDays->get($date, 0));
-        $dailyRevenue = $dates->map(fn ($date) => $revenueDays->get($date, 0));
-        $chargerDistribution = (clone $sessions)->where('created_at', '>=', $periodSince)->where('status', 'completed')->select('charger_name', DB::raw('COUNT(*) as total'))->groupBy('charger_name')->orderByDesc('total')->get();
-        $statusDistribution = (clone $sessions)->where('created_at', '>=', $periodSince)->select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->get();
-        $topUsers = (clone $paid)->where('created_at', '>=', $periodSince)->select('user_id', DB::raw('COUNT(*) as sessions_count'), DB::raw('SUM(COALESCE(measured_energy_kwh, energy_kwh)) as total_kwh'), DB::raw('SUM(amount_charged) as total_spent'))->groupBy('user_id')->orderByDesc('total_spent')->take(5)->with('user:id,name,email')->get();
-        $recentSessions = $establishment->chargingSessions()->where('is_demo', false)->with('user:id,name')->latest()->latest('id')->take(10)->get();
-        $liveChargers = $establishment->chargers()->where('is_demo', false)->orderBy('name')->get()->map(fn ($charger) => [
-            'id' => $charger->code, 'name' => $charger->name, 'location' => $charger->location, 'power_kw' => $charger->power_kw,
-            'connector' => $charger->connector, 'status' => $charger->status(), 'is_available' => $charger->isAvailable(),
-        ]);
-        $chargerCounts = ['total' => $liveChargers->count()];
-        foreach (['available', 'reserved', 'in_use', 'unavailable'] as $status) {
-            $chargerCounts[$status] = $liveChargers->where('status', $status)->count();
-        }
-        $detectorConfigured = $pricing->detectorConfigured();
 
-        return view('manager.dashboard', compact('establishment', 'period', 'includeTestSessions', 'totalSessions', 'totalRevenue', 'totalEnergy', 'avgCostPerKwh', 'totalUsers', 'periodSessionsCount', 'periodRevenue', 'periodEnergy', 'periodActiveUsers', 'dailyLabels', 'dailyKwh', 'dailyRevenue', 'chargerDistribution', 'statusDistribution', 'topUsers', 'recentSessions', 'liveChargers', 'chargerCounts', 'detectorConfigured'));
+        $establishmentSessions = ChargingSession::query()
+            ->where('establishment_id', $establishment->id);
+
+        $historicalTotals = (clone $establishmentSessions)
+            ->selectRaw('COUNT(*) as sessions_count')
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN amount_charged ELSE 0 END), 0) as total_revenue',
+                [ChargingSession::STATUS_COMPLETED]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN energy_kwh ELSE 0 END), 0) as total_energy',
+                [ChargingSession::STATUS_COMPLETED]
+            )
+            ->first();
+
+        $totalSessions = (int) $historicalTotals->sessions_count;
+        $totalRevenue = (float) $historicalTotals->total_revenue;
+        $totalEnergy = (float) $historicalTotals->total_energy;
+        $avgCostPerKwh = $totalEnergy > 0 ? $totalRevenue / $totalEnergy : 0;
+        $totalUsers = (clone $establishmentSessions)->distinct()->count('user_id');
+
+        $periodSince = now()->subDays($period - 1)->startOfDay();
+        $periodUntil = now()->endOfDay();
+        $periodSessions = (clone $establishmentSessions)
+            ->whereBetween('created_at', [$periodSince, $periodUntil]);
+
+        $periodTotals = (clone $periodSessions)
+            ->selectRaw('COUNT(*) as sessions_count')
+            ->selectRaw('COUNT(DISTINCT user_id) as active_users')
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN amount_charged ELSE 0 END), 0) as total_revenue',
+                [ChargingSession::STATUS_COMPLETED]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN energy_kwh ELSE 0 END), 0) as total_energy',
+                [ChargingSession::STATUS_COMPLETED]
+            )
+            ->first();
+
+        $periodSessionsCount = (int) $periodTotals->sessions_count;
+        $periodRevenue = (float) $periodTotals->total_revenue;
+        $periodEnergy = (float) $periodTotals->total_energy;
+        $periodActiveUsers = (int) $periodTotals->active_users;
+        $hasPeriodData = $periodSessionsCount > 0;
+
+        $dailyUsage = (clone $periodSessions)
+            ->where('status', ChargingSession::STATUS_COMPLETED)
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('SUM(energy_kwh) as total_kwh'),
+                DB::raw('SUM(amount_charged) as total_revenue')
+            )
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        $hasCompletedData = $dailyUsage->isNotEmpty();
+        $dailyUsageByDate = $dailyUsage->keyBy('date');
+        $periodDates = collect(range(0, $period - 1))
+            ->map(fn (int $day) => $periodSince->copy()->addDays($day));
+        $dailyLabels = $periodDates->map(fn (Carbon $date) => $date->format('d/m'));
+        $dailyKwh = $periodDates->map(
+            fn (Carbon $date) => (float) ($dailyUsageByDate->get($date->toDateString())?->total_kwh ?? 0)
+        );
+        $dailyRevenue = $periodDates->map(
+            fn (Carbon $date) => (float) ($dailyUsageByDate->get($date->toDateString())?->total_revenue ?? 0)
+        );
+
+        $chargerDistribution = (clone $periodSessions)
+            ->select('charger_name', DB::raw('COUNT(*) as total'))
+            ->groupBy('charger_name')
+            ->orderByDesc('total')
+            ->get();
+
+        $statusTotals = (clone $periodSessions)
+            ->select('status', DB::raw('COUNT(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $statusDistribution = collect([
+            ChargingSession::STATUS_COMPLETED,
+            ChargingSession::STATUS_PENDING,
+            ChargingSession::STATUS_CANCELLED,
+        ])->map(fn (string $status) => [
+            'status' => $status,
+            'total' => (int) ($statusTotals[$status] ?? 0),
+        ]);
+
+        $topUsers = (clone $periodSessions)
+            ->select('user_id', DB::raw('COUNT(*) as sessions_count'))
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN energy_kwh ELSE 0 END), 0) as total_kwh',
+                [ChargingSession::STATUS_COMPLETED]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN amount_charged ELSE 0 END), 0) as total_spent',
+                [ChargingSession::STATUS_COMPLETED]
+            )
+            ->groupBy('user_id')
+            ->orderByDesc('total_spent')
+            ->orderByDesc('sessions_count')
+            ->take(5)
+            ->with('user:id,name,email')
+            ->get();
+
+        $recentSessions = (clone $establishmentSessions)
+            ->with('user:id,name')
+            ->latest()
+            ->take(10)
+            ->get();
+
+        $liveChargers = collect(ChargingSimulator::all())->map(fn ($charger) => [
+            'id' => $charger->id,
+            'name' => $charger->name,
+            'location' => $charger->location,
+            'power_kw' => $charger->powerKw,
+            'connector' => $charger->connector,
+            'status' => $charger->status(),
+            'is_available' => $charger->isAvailable(),
+            'vehicle_plate' => $charger->vehiclePlate,
+            'available_in_minutes' => $charger->availableInMinutes(),
+        ]);
+
+        return view('manager.dashboard', compact(
+            'establishment',
+            'period',
+            'totalSessions',
+            'totalRevenue',
+            'totalEnergy',
+            'avgCostPerKwh',
+            'totalUsers',
+            'periodSessionsCount',
+            'periodRevenue',
+            'periodEnergy',
+            'periodActiveUsers',
+            'hasPeriodData',
+            'hasCompletedData',
+            'dailyLabels',
+            'dailyKwh',
+            'dailyRevenue',
+            'chargerDistribution',
+            'statusDistribution',
+            'topUsers',
+            'recentSessions',
+            'liveChargers'
+        ));
     }
 
-    public function exportSessions(Request $request)
+    public function exportSessions(Request $request): StreamedResponse
     {
         $period = (int) $request->integer('period', 30);
         if (! in_array($period, [7, 30, 90], true)) {
             $period = 30;
         }
 
-        $sessions = $request->user()->establishment->chargingSessions()->where('is_demo', false)->with('user:id,name,email')
-            ->where('created_at', '>=', now()->subDays($period))
-            ->latest();
-        if (! WebChargingService::available()) {
-            $sessions->whereNull('simulation');
-        }
-        $sessions = $sessions->get();
+        $establishment = $request->user()->establishment;
+        $periodSince = now()->subDays($period - 1)->startOfDay();
+
+        $sessions = $establishment
+            ? ChargingSession::with('user:id,name,email')
+                ->where('establishment_id', $establishment->id)
+                ->whereBetween('created_at', [$periodSince, now()->endOfDay()])
+                ->latest()
+                ->get()
+            : collect();
 
         $filename = 'sessoes-goodwe-'.now()->format('Y-m-d-His').'.csv';
 
@@ -84,10 +207,10 @@ class ManagerController extends Controller
             'Content-Disposition' => "attachment; filename=\"$filename\"",
         ];
 
-        $callback = function () use ($sessions) {
+        $callback = function () use ($sessions): void {
             $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['Data', 'Usuario', 'Email', 'Carregador', 'Energia (kWh)', 'Valor (R$)', 'Metodo', 'Status', 'Origem'], ',', '"', '\\');
+            fputcsv($handle, ['Data', 'Usuario', 'Email', 'Carregador', 'Energia (kWh)', 'Valor (R$)', 'Metodo', 'Status'], ',', '"', '\\');
 
             foreach ($sessions as $session) {
                 fputcsv($handle, [
@@ -99,7 +222,6 @@ class ManagerController extends Controller
                     number_format((float) $session->amount_charged, 2, ',', '.'),
                     $session->payment_method,
                     $session->status,
-                    $session->isWebSimulation() ? 'Recarga de teste' : 'Recarga',
                 ], ',', '"', '\\');
             }
 

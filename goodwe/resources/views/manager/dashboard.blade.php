@@ -92,8 +92,14 @@
                 {{ __('manager.energy_usage') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_' . $period) }}</p>
-            <div class="mt-4" style="height: 280px;">
-                <canvas id="energyChart" role="img" aria-label="Consumo de energia no período"></canvas>
+            <div class="mt-4 h-[280px]">
+                @if($hasCompletedData)
+                    <canvas id="energyChart"></canvas>
+                @else
+                    <div class="flex h-full items-center justify-center text-center text-sm text-gray-500 dark:text-[#a0a0a0]">
+                        {{ __('manager.no_chart_data') }}
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -102,8 +108,14 @@
                 {{ __('manager.revenue_chart') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.period_' . $period) }}</p>
-            <div class="mt-4" style="height: 280px;">
-                <canvas id="revenueChart" role="img" aria-label="Receita diária no período"></canvas>
+            <div class="mt-4 h-[280px]">
+                @if($hasCompletedData)
+                    <canvas id="revenueChart"></canvas>
+                @else
+                    <div class="flex h-full items-center justify-center text-center text-sm text-gray-500 dark:text-[#a0a0a0]">
+                        {{ __('manager.no_chart_data') }}
+                    </div>
+                @endif
             </div>
         </div>
     </section>
@@ -114,9 +126,12 @@
                 {{ __('manager.charger_distribution') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.sessions_by_charger') }}</p>
-            <div class="gw-chart-frame mt-4 flex items-center justify-center" style="height: 280px;">
-                @if($chargerDistribution->isEmpty())<p class="gw-chart-empty">Nenhuma sessão registrada neste período.</p>@endif
-                <canvas id="chargerChart" role="img" aria-label="Distribuição de sessões por carregador"></canvas>
+            <div class="mt-4 flex h-[280px] items-center justify-center">
+                @if($hasPeriodData)
+                    <canvas id="chargerChart"></canvas>
+                @else
+                    <p class="text-center text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.no_chart_data') }}</p>
+                @endif
             </div>
         </div>
 
@@ -125,9 +140,12 @@
                 {{ __('manager.status_distribution') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.sessions_by_status') }}</p>
-            <div class="gw-chart-frame mt-4 flex items-center justify-center" style="height: 280px;">
-                @if($statusDistribution->isEmpty())<p class="gw-chart-empty">Nenhuma sessão registrada neste período.</p>@endif
-                <canvas id="statusChart" role="img" aria-label="Distribuição de sessões por status"></canvas>
+            <div class="mt-4 flex h-[280px] items-center justify-center">
+                @if($hasPeriodData)
+                    <canvas id="statusChart"></canvas>
+                @else
+                    <p class="text-center text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.no_chart_data') }}</p>
+                @endif
             </div>
         </div>
     </section>
@@ -251,6 +269,233 @@
         </div>
     </section>
 
-    @php($chartData = ['labels'=>$dailyLabels,'kwhData'=>$dailyKwh,'revenueData'=>$dailyRevenue,'chargerData'=>$chargerDistribution,'statusData'=>$statusDistribution])
-    <script type="application/json" id="manager-chart-data">@json($chartData)</script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(160, 160, 160, 0.18)' : 'rgba(112, 111, 108, 0.18)';
+            const textColor = isDark ? '#a0a0a0' : '#706f6c';
+            const strongTextColor = isDark ? '#ffffff' : '#111827';
+            const locale = document.documentElement.lang || 'pt-BR';
+            const labels = @json($dailyLabels);
+            const kwhData = @json($dailyKwh);
+            const revenueData = @json($dailyRevenue);
+            const chargerData = @json($chargerDistribution);
+            const statusData = @json($statusDistribution);
+            const periodSessions = @json($periodSessionsCount);
+            const sessionsLabel = @json(strtolower(__('manager.table_sessions')));
+            const totalLabel = @json(__('manager.chart_total'));
+            const numberFormatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
+            const integerFormatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+            const currencyFormatter = new Intl.NumberFormat(locale, { style: 'currency', currency: 'BRL' });
+            const chargerColors = ['#e53935', '#7c3aed', '#f59e0b', '#059669', '#2563eb', '#db2777', '#0891b2', '#65a30d'];
+            const statusColors = {
+                completed: '#10b981',
+                pending: '#f59e0b',
+                cancelled: '#ef4444'
+            };
+            const statusLabels = {
+                completed: @json(__('manager.status_completed')),
+                pending: @json(__('manager.status_pending')),
+                cancelled: @json(__('manager.status_cancelled'))
+            };
+
+            const percentage = (value, total) => total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+            const distributionTooltip = context => {
+                const value = Number(context.raw);
+                const total = context.dataset.data.reduce((sum, item) => sum + Number(item), 0);
+
+                return `${context.label}: ${integerFormatter.format(value)} ${sessionsLabel} (${percentage(value, total)}%)`;
+            };
+            const distributionLegend = chart => {
+                const dataset = chart.data.datasets[0];
+                const total = dataset.data.reduce((sum, item) => sum + Number(item), 0);
+
+                return chart.data.labels.map((label, index) => ({
+                    text: `${label} · ${integerFormatter.format(dataset.data[index])} (${percentage(dataset.data[index], total)}%)`,
+                    fillStyle: dataset.backgroundColor[index],
+                    strokeStyle: dataset.backgroundColor[index],
+                    lineWidth: 0,
+                    hidden: false,
+                    index
+                }));
+            };
+            const centerTextPlugin = {
+                id: 'centerText',
+                afterDraw(chart, args, options) {
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) {
+                        return;
+                    }
+
+                    const centerX = (chartArea.left + chartArea.right) / 2;
+                    const centerY = (chartArea.top + chartArea.bottom) / 2;
+
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = textColor;
+                    ctx.font = '500 12px Instrument Sans, sans-serif';
+                    ctx.fillText(options.title, centerX, centerY - 10);
+                    ctx.fillStyle = strongTextColor;
+                    ctx.font = '600 18px Instrument Sans, sans-serif';
+                    ctx.fillText(options.subtitle, centerX, centerY + 12);
+                    ctx.restore();
+                }
+            };
+            const cartesianOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textColor, maxTicksLimit: 10, maxRotation: 0 }
+                    }
+                }
+            };
+
+            const energyCanvas = document.getElementById('energyChart');
+            if (energyCanvas) {
+                new Chart(energyCanvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'kWh',
+                            data: kwhData,
+                            borderColor: '#e53935',
+                            backgroundColor: 'rgba(229, 57, 53, 0.12)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: '#e53935'
+                        }]
+                    },
+                    options: {
+                        ...cartesianOptions,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: context => `${numberFormatter.format(context.parsed.y)} kWh`
+                                }
+                            }
+                        },
+                        scales: {
+                            ...cartesianOptions.scales,
+                            y: {
+                                beginAtZero: true,
+                                grace: '8%',
+                                grid: { color: gridColor },
+                                ticks: { color: textColor, callback: value => `${numberFormatter.format(value)} kWh` }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const revenueCanvas = document.getElementById('revenueChart');
+            if (revenueCanvas) {
+                new Chart(revenueCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'R$',
+                            data: revenueData,
+                            backgroundColor: 'rgba(229, 57, 53, 0.72)',
+                            borderColor: '#e53935',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            borderSkipped: false,
+                            maxBarThickness: 32
+                        }]
+                    },
+                    options: {
+                        ...cartesianOptions,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: context => currencyFormatter.format(context.parsed.y)
+                                }
+                            }
+                        },
+                        scales: {
+                            ...cartesianOptions.scales,
+                            y: {
+                                beginAtZero: true,
+                                grace: '8%',
+                                grid: { color: gridColor },
+                                ticks: { color: textColor, callback: value => currencyFormatter.format(value) }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const createDistributionChart = (canvas, chartLabels, values, colors) => {
+                if (!canvas) {
+                    return;
+                }
+
+                new Chart(canvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colors,
+                            borderColor: isDark ? '#1a1a1a' : '#ffffff',
+                            borderWidth: 3,
+                            hoverOffset: 4
+                        }]
+                    },
+                    plugins: [centerTextPlugin],
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '62%',
+                        layout: { padding: { top: 2, bottom: 2 } },
+                        plugins: {
+                            centerText: {
+                                title: totalLabel,
+                                subtitle: `${integerFormatter.format(periodSessions)} ${sessionsLabel}`
+                            },
+                            tooltip: { callbacks: { label: distributionTooltip } },
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: textColor,
+                                    padding: 14,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    boxWidth: 8,
+                                    boxHeight: 8,
+                                    generateLabels: distributionLegend
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            createDistributionChart(
+                document.getElementById('chargerChart'),
+                chargerData.map(item => item.charger_name),
+                chargerData.map(item => Number(item.total)),
+                chargerData.map((item, index) => chargerColors[index % chargerColors.length])
+            );
+
+            createDistributionChart(
+                document.getElementById('statusChart'),
+                statusData.map(item => statusLabels[item.status] || item.status),
+                statusData.map(item => Number(item.total)),
+                statusData.map(item => statusColors[item.status] || '#6b7280')
+            );
+        });
+    </script>
 </x-user-layout>
