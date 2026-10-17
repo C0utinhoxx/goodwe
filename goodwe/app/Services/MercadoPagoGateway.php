@@ -53,6 +53,9 @@ class MercadoPagoGateway implements PaymentGatewayInterface
             'id' => (string) $payment->id,
             'status' => (string) $payment->status,
             'external_reference' => $payment->external_reference,
+            'transaction_amount' => (string) $payment->transaction_amount,
+            'transaction_amount_refunded' => (string) ($payment->transaction_amount_refunded ?? 0),
+            'currency_id' => $payment->currency_id,
         ];
     }
 }

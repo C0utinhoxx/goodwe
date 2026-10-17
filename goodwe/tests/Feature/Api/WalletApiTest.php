@@ -31,7 +31,7 @@ class WalletApiTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('balance', 50);
-        $response->assertJsonPath('points', 500);
+        $response->assertJsonPath('points', 5);
     }
 
     public function test_deposit_requires_valid_amount(): void

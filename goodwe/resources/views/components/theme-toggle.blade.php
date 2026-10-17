@@ -1,6 +1,6 @@
 @props(['variant' => ''])
 
-<button type="button" id="theme-toggle" class="{{ $variant === 'boxed' ? 'flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 dark:border-[#343843] bg-gray-50 dark:bg-[#181b22]' : '' }} text-gray-500 dark:text-[#A1A09A] hover:text-[#e53935] dark:hover:text-[#e53935] transition-colors cursor-pointer">
+<button type="button" id="theme-toggle" aria-label="Alternar tema" title="Alternar tema" class="{{ $variant === 'boxed' ? 'flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 dark:border-[#343843] bg-gray-50 dark:bg-[#181b22]' : '' }} text-gray-500 dark:text-[#A1A09A] hover:text-[#e53935] dark:hover:text-[#e53935] transition-colors cursor-pointer">
     <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
     </svg>

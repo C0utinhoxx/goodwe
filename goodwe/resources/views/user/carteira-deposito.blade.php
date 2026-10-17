@@ -1,68 +1,21 @@
 <x-user-layout>
-    <x-slot name="header">
-        <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">
-            {{ __('wallet.deposit_title') }}
-        </h1>
-        <p class="mt-2 text-sm text-gray-500 dark:text-[#a0a0a0]">
-            {{ __('wallet.deposit_description') }}
-        </p>
-    </x-slot>
-
-    <section class="mt-5 max-w-lg">
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
-            <div class="flex items-center gap-4 mb-6">
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#e53935]/10 text-[#e53935]">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">
-                        {{ __('wallet.available_balance_label') }}
-                    </p>
-                    <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                        R$ {{ number_format($user->balance, 2, ',', '.') }}
-                    </p>
-                </div>
-            </div>
-
-            <form method="POST" action="{{ route('checkout') }}">
-                @csrf
-                <div class="mb-6">
-                    <label for="amount" class="block text-sm font-medium text-gray-700 dark:text-[#a0a0a0] mb-2">
-                        {{ __('wallet.deposit_amount') }}
-                    </label>
-                    <input
-                        type="number"
-                        id="amount"
-                        name="amount"
-                        min="1"
-                        max="10000"
-                        step="0.01"
-                        value="{{ old('amount') }}"
-                        class="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg text-gray-900 dark:border-[#343843] dark:bg-[#22252d] dark:text-white focus:border-[#e53935] focus:ring-1 focus:ring-[#e53935] outline-none"
-                        required
-                    />
-                    @error('amount')
-                        <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <a
-                        href="{{ route('wallet.index') }}"
-                        class="rounded-lg border border-gray-300 px-6 py-3 text-sm font-medium hover:bg-gray-100 dark:border-[#343843] dark:hover:bg-[#22252d] transition-colors text-gray-900 dark:text-white"
-                    >
-                        {{ __('wallet.back') }}
-                    </a>
-                    <button
-                        type="submit"
-                        class="rounded-lg bg-[#e53935] px-6 py-3 text-sm font-semibold text-white hover:bg-[#c62828] transition-colors"
-                    >
-                        {{ __('wallet.deposit_button') }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </section>
+    <x-slot name="pageTitle">Adicionar saldo</x-slot>
+    <x-slot name="header"><p class="pt-eyebrow">CARTEIRA DIGITAL</p><h1 class="pt-heading">Adicionar saldo</h1><p class="pt-muted pt-subheading">Adicione créditos para suas próximas recargas.</p></x-slot>
+    <div class="pt-form-layout">
+        <section class="pt-card pt-form-card">
+            <div class="pt-card-heading"><div><p class="pt-eyebrow">NOVO DEPÓSITO</p><h2>Quanto deseja adicionar?</h2></div></div>
+            @if(app()->environment(['local', 'testing']))
+                <form id="wallet-test-deposit" method="POST" action="{{ route('wallet.deposit.store') }}">@csrf<input type="hidden" name="idempotency_key" value="{{ Illuminate\Support\Str::uuid() }}"><input type="hidden" name="amount" value="{{ old('amount', 50) }}" data-amount-mirror></form>
+            @endif
+            <form id="stripe-checkout" method="POST" action="{{ route('stripe.create') }}">@csrf</form>
+            <label class="pt-field">Valor do depósito (R$)<input id="deposit-amount" type="number" name="amount" form="stripe-checkout" min="1" max="10000" step="0.01" value="{{ old('amount', 50) }}" required aria-describedby="deposit-help"></label>
+            <div class="pt-amount-presets">@foreach([20,50,100,200] as $amount)<button type="button" data-set-amount="{{ $amount }}">R$ {{ $amount }}</button>@endforeach</div>
+            <p class="pt-form-note" id="deposit-help">O pagamento será realizado pelo checkout da Stripe. O saldo será creditado somente após a confirmação do pagamento.</p>
+            <div class="pt-form-actions"><a href="{{ route('wallet.index') }}" class="pt-button pt-button-outline">Voltar</a><button type="submit" form="stripe-checkout" class="pt-button pt-button-primary">Continuar com Stripe <i data-lucide="arrow-right"></i></button></div>
+            @if(app()->environment(['local', 'testing']))
+                <div class="pt-mt"><p class="pt-form-note">Para testar o fluxo, adicione o valor acima à sua carteira sem cobrança. O crédito também gera os pontos correspondentes.</p><button type="submit" form="wallet-test-deposit" class="pt-button pt-button-outline pt-mt" data-copy-amount>Adicionar crédito de teste</button></div>
+            @endif
+        </section>
+        <aside class="pt-right-stack"><div class="pt-wallet-side"><span>SEU SALDO ATUAL</span><strong>R$ {{ number_format($user->balance ?? 0, 2, ',', '.') }}</strong><p>O saldo funciona como crédito pré-pago.</p></div><section class="pt-info-panel"><span class="pt-info-icon"><i data-lucide="gift"></i></span><div><strong>Depósitos e pontos</strong><p>Cada depósito confirmado gera 10% do valor em pontos. R$ 85,50 gera 8,55 pontos.</p><a href="{{ route('points.index') }}">Consultar programa</a></div></section></aside>
+    </div>
 </x-user-layout>

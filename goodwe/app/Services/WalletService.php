@@ -3,145 +3,199 @@
 namespace App\Services;
 
 use App\Exceptions\InsufficientBalanceException;
-use App\Exceptions\InsufficientPointsException;
+use App\Models\ChargingEvent;
 use App\Models\ChargingSession;
+use App\Models\Coupon;
+use App\Models\PointMovement;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class WalletService
 {
-    private const CASHBACK_RATE = 0.10;
+    public function __construct(private LoyaltyService $loyalty) {}
 
-    public function deposit(User $user, float $amount): Transaction
+    public function deposit(User $user, float $amount, ?string $key = null): Transaction
     {
-        return DB::transaction(function () use ($user, $amount) {
-            $user->increment('balance', $amount);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages(['amount' => 'Valor inválido.']);
+        }
 
-            $transaction = Transaction::create([
-                'user_id' => $user->id,
-                'type' => Transaction::TYPE_DEPOSIT,
-                'amount' => $amount,
-                'description' => "Deposito de R$ {$amount}",
-            ]);
+        return DB::transaction(function () use ($user, $amount, $key) {
+            UserBalanceLock::acquire($user->id);
+            if ($key && ($existing = $user->transactions()->where('is_demo', false)->where('reference', 'test-deposit:'.$key)->first())) {
+                if (DecimalAmount::units($existing->amount) !== DecimalAmount::units($amount)) {
+                    throw ValidationException::withMessages(['amount' => 'Solicitação já usada com outro valor.']);
+                }
 
-            $cashbackAmount = round($amount * self::CASHBACK_RATE, 2);
-
-            if ($cashbackAmount > 0) {
-                $points = (int) ($cashbackAmount * 100);
-                $user->increment('points', $points);
-
-                Transaction::create([
-                    'user_id' => $user->id,
-                    'type' => Transaction::TYPE_CASHBACK,
-                    'amount' => $cashbackAmount,
-                    'description' => "Cashback de 10% - {$points} pontos",
-                ]);
+                return $existing;
             }
+            $deposit = Transaction::create(['reference' => $key ? 'test-deposit:'.$key : null, 'user_id' => $user->id, 'type' => Transaction::TYPE_DEPOSIT, 'amount' => DecimalAmount::decimal(DecimalAmount::units($amount)), 'description' => "Depósito de R$ {$amount}", 'status' => Transaction::STATUS_PENDING]);
+            $this->creditApprovedDeposit($deposit);
 
-            return $transaction;
-        });
+            return $deposit->refresh();
+        }, 5);
     }
 
-    /**
-     * Credit a deposit that was pending confirmation from an external payment
-     * gateway (e.g. MercadoPago), applying the same cashback rules used for
-     * instant deposits.
-     */
-    public function creditApprovedDeposit(Transaction $transaction): void
+    public function creditApprovedDeposit(Transaction $transaction, ?string $paymentId = null): void
     {
-        DB::transaction(function () use ($transaction) {
-            $user = $transaction->user;
-
-            $user->increment('balance', $transaction->amount);
-
-            $cashbackAmount = round($transaction->amount * self::CASHBACK_RATE, 2);
-
-            if ($cashbackAmount > 0) {
-                $points = (int) ($cashbackAmount * 100);
-                $user->increment('points', $points);
-
-                Transaction::create([
-                    'user_id' => $user->id,
-                    'type' => Transaction::TYPE_CASHBACK,
-                    'amount' => $cashbackAmount,
-                    'description' => "Cashback de 10% - {$points} pontos",
-                    'reference' => $transaction->reference,
-                    'status' => Transaction::STATUS_APPROVED,
-                ]);
+        DB::transaction(function () use ($transaction, $paymentId) {
+            $user = UserBalanceLock::acquire($transaction->user_id);
+            $deposit = Transaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+            abort_if($deposit->is_demo, 404);
+            if ($paymentId && $deposit->gateway_payment_id && $deposit->gateway_payment_id !== $paymentId) {
+                throw ValidationException::withMessages(['payment' => 'Depósito associado a outro pagamento.']);
             }
-        });
+            if ($paymentId && $deposit->credited_at && ! $deposit->gateway_payment_id) {
+                $deposit->update(['gateway_payment_id' => $paymentId]);
+            }
+            if ($deposit->type !== Transaction::TYPE_DEPOSIT || $deposit->credited_at || $deposit->status !== Transaction::STATUS_PENDING) {
+                return;
+            }
+            $amount = DecimalAmount::units($deposit->amount);
+            if ($amount <= 0) {
+                throw ValidationException::withMessages(['amount' => 'Valor de depósito inválido.']);
+            }
+            $user->update(['balance' => DecimalAmount::decimal(DecimalAmount::units($user->balance) + $amount)]);
+            $this->loyalty->awardDeposit($user, $deposit);
+            $deposit->update(['status' => Transaction::STATUS_APPROVED, 'credited_at' => now(), 'gateway_payment_id' => $paymentId]);
+        }, 5);
     }
 
-    public function payCharging(User $user, float $amount, string $chargerName, float $energyKwh): ChargingSession
+    public function refundDeposit(Transaction $transaction, string|float $refundedAmount, bool $manual = false, ?string $paymentId = null): void
     {
-        return DB::transaction(function () use ($user, $amount, $chargerName, $energyKwh) {
-            if ($user->balance < $amount) {
+        DB::transaction(function () use ($transaction, $refundedAmount, $manual, $paymentId) {
+            $user = UserBalanceLock::acquire($transaction->user_id);
+            $deposit = Transaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+            abort_if($deposit->is_demo, 404);
+            if ($paymentId && $deposit->gateway_payment_id && $deposit->gateway_payment_id !== $paymentId) {
+                throw ValidationException::withMessages(['payment' => 'Estorno associado a outro pagamento.']);
+            }
+            if (! $deposit->credited_at || $deposit->type !== Transaction::TYPE_DEPOSIT) {
+                return;
+            }
+            $requested = max(DecimalAmount::units($deposit->refund_requested_amount), min(DecimalAmount::units($deposit->amount), DecimalAmount::units($refundedAmount)));
+            $old = DecimalAmount::units($deposit->refunded_amount);
+            if ($requested <= $old) {
+                return;
+            }
+            $deposit->update(['refund_requested_amount' => DecimalAmount::decimal($requested)]);
+            $money = $requested - $old;
+            $points = DecimalAmount::percentage($requested, config('loyalty.deposit_percent')) - DecimalAmount::percentage($old, config('loyalty.deposit_percent'));
+            if ((! $manual && $deposit->refund_review_required) || DecimalAmount::units($user->balance) < $money || DecimalAmount::units($user->points) < $points) {
+                $deposit->update(['refund_review_required' => true]);
+                PointMovement::firstOrCreate(['event_key' => "refund-review:{$deposit->id}:{$requested}"], ['user_id' => $user->id, 'transaction_id' => $deposit->id, 'type' => 'adjustment', 'amount' => '0.00', 'balance_after' => $user->points, 'description' => 'Estorno recebido: conciliação manual necessária, saldos preservados', 'metadata' => ['refund_requested' => DecimalAmount::decimal($requested), 'pending_points_reversal' => DecimalAmount::decimal($points)]]);
+
+                return;
+            }
+            $user->update(['balance' => DecimalAmount::decimal(DecimalAmount::units($user->balance) - $money), 'points' => DecimalAmount::decimal(DecimalAmount::units($user->points) - $points)]);
+            PointMovement::create(['user_id' => $user->id, 'transaction_id' => $deposit->id, 'type' => 'refund', 'amount' => DecimalAmount::decimal(-$points), 'balance_after' => $user->points, 'description' => 'Reversão de pontos por estorno de depósito', 'event_key' => "refund:{$deposit->id}:{$requested}", 'metadata' => ['refunded_money' => DecimalAmount::decimal($money)]]);
+            $deposit->update(['refunded_amount' => DecimalAmount::decimal($requested), 'refund_review_required' => false]);
+        }, 5);
+    }
+
+    public function payCharging(User $user, float $amount, string $chargerName, float $energyKwh, ?int $couponId, string $key): ChargingSession
+    {
+        $original = DecimalAmount::units($amount);
+        if ($original <= 0 || $energyKwh <= 0) {
+            throw ValidationException::withMessages(['amount' => 'Valor e energia devem ser positivos.']);
+        }
+
+        return DB::transaction(function () use ($user, $original, $chargerName, $energyKwh, $couponId, $key) {
+            $locked = UserBalanceLock::acquire($user->id);
+            if ($key && ($existing = $locked->chargingSessions()->where('idempotency_key', $key)->first())) {
+                if ($existing->charger_name !== $chargerName || DecimalAmount::units($existing->original_amount) !== $original || DecimalAmount::units($existing->energy_kwh) !== DecimalAmount::units($energyKwh) || $existing->coupon_id !== $couponId) {
+                    throw ValidationException::withMessages(['idempotency_key' => 'Identificador já utilizado para outro pagamento.']);
+                }
+
+                return $existing;
+            }
+            $coupon = $this->paymentCoupon($locked, $couponId);
+            $discount = $coupon ? min($original, DecimalAmount::percentage($original, $coupon->discount_percent)) : 0;
+            $final = $original - $discount;
+            if (! User::whereKey($locked->id)->where('balance', '>=', DecimalAmount::decimal($final))->decrement('balance', DecimalAmount::decimal($final))) {
                 throw new InsufficientBalanceException('Saldo insuficiente para realizar a recarga.');
             }
+            $transaction = Transaction::create(['user_id' => $locked->id, 'type' => Transaction::TYPE_CHARGE_PAYMENT, 'amount' => DecimalAmount::decimal($final), 'description' => "Pagamento de recarga - {$chargerName}", 'status' => Transaction::STATUS_APPROVED]);
+            $session = ChargingSession::create(['user_id' => $locked->id, 'charger_name' => $chargerName, 'energy_kwh' => $energyKwh, 'original_amount' => DecimalAmount::decimal($original), 'discount_amount' => DecimalAmount::decimal($discount), 'amount_charged' => DecimalAmount::decimal($final), 'coupon_id' => $coupon?->id, 'transaction_id' => $transaction->id, 'idempotency_key' => $key, 'payment_method' => ChargingSession::PAYMENT_WALLET, 'status' => ChargingSession::STATUS_COMPLETED]);
+            $coupon?->update(['status' => 'used', 'used_at' => now()]);
 
-            $user->decrement('balance', $amount);
+            return $session;
+        }, 5);
+    }
 
-            Transaction::create([
+    public function paySession(User $user, ChargingSession $session, ?int $couponId, string $key): ChargingSession
+    {
+        abort_unless($session->user_id === $user->id, 403);
+
+        return DB::transaction(function () use ($user, $session, $couponId, $key) {
+            $lockedUser = UserBalanceLock::acquire($user->id);
+            $locked = ChargingSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->is_demo, 404);
+            if ($locked->payment_status === 'paid') {
+                if ($locked->coupon_id !== $couponId) {
+                    throw ValidationException::withMessages(['coupon_id' => 'Pagamento já confirmado com outra seleção de cupom.']);
+                }
+
+                return $locked;
+            }
+            if ($locked->charging_state !== 'ended' || $locked->payment_status !== 'pending' || ! $locked->ended_at || $locked->measured_energy_kwh === null || $locked->tariff_per_kwh === null || $locked->transaction_id) {
+                throw ValidationException::withMessages(['session' => 'O pagamento depende da confirmação de encerramento e consumo do equipamento.']);
+            }
+            if ($lockedUser->chargingSessions()->where('idempotency_key', $key)->whereKeyNot($locked->id)->exists()) {
+                throw ValidationException::withMessages(['idempotency_key' => 'Identificador já usado em outro pagamento.']);
+            }
+            $original = DecimalAmount::units(EnergyBilling::amount($locked->measured_energy_kwh, $locked->tariff_per_kwh));
+            $coupon = $this->paymentCoupon($lockedUser, $couponId);
+            $discount = $coupon ? min($original, DecimalAmount::percentage($original, $coupon->discount_percent)) : 0;
+            $final = $original - $discount;
+            if ($final > 0 && ! User::whereKey($user->id)->where('balance', '>=', DecimalAmount::decimal($final))->decrement('balance', DecimalAmount::decimal($final))) {
+                throw new InsufficientBalanceException('Saldo insuficiente para confirmar o pagamento. Adicione créditos à carteira.');
+            }
+            $transaction = Transaction::create([
                 'user_id' => $user->id,
                 'type' => Transaction::TYPE_CHARGE_PAYMENT,
-                'amount' => $amount,
-                'description' => "Pagamento de recarga - {$chargerName}",
+                'amount' => DecimalAmount::decimal($final),
+                'description' => 'Pagamento da sessão #'.$locked->id.' — '.$locked->charger_name,
+                'status' => Transaction::STATUS_APPROVED,
             ]);
-
-            $cashbackAmount = round($amount * self::CASHBACK_RATE, 2);
-
-            if ($cashbackAmount > 0) {
-                $points = (int) ($cashbackAmount * 100);
-                $user->increment('points', $points);
-
-                Transaction::create([
-                    'user_id' => $user->id,
-                    'type' => Transaction::TYPE_CASHBACK,
-                    'amount' => $cashbackAmount,
-                    'description' => "Cashback de 10% - {$points} pontos",
-                ]);
-            }
-
-            return ChargingSession::create([
-                'user_id' => $user->id,
-                'charger_name' => $chargerName,
-                'energy_kwh' => $energyKwh,
-                'amount_charged' => $amount,
-                'payment_method' => ChargingSession::PAYMENT_WALLET,
+            $locked->update([
+                'original_amount' => DecimalAmount::decimal($original),
+                'discount_amount' => DecimalAmount::decimal($discount),
+                'amount_charged' => DecimalAmount::decimal($final),
+                'coupon_id' => $coupon?->id,
+                'transaction_id' => $transaction->id,
+                'idempotency_key' => $key,
+                'payment_status' => 'paid',
                 'status' => ChargingSession::STATUS_COMPLETED,
+                'paid_at' => now(),
             ]);
-        });
+            $coupon?->update(['status' => 'used', 'used_at' => now()]);
+            ChargingEvent::create(['charger_id' => $locked->charger_id, 'charging_session_id' => $locked->id, 'charging_reservation_id' => $locked->charging_reservation_id, 'type' => 'paid', 'event_key' => 'session:'.$locked->id.':paid', 'metadata' => ['transaction_id' => $transaction->id, 'coupon_id' => $coupon?->id, 'amount' => DecimalAmount::decimal($final)], 'occurred_at' => now()]);
+
+            return $locked;
+        }, 5);
     }
 
-    public function redeemPoints(User $user, int $points): Transaction
+    private function paymentCoupon(User $user, ?int $couponId): ?Coupon
     {
-        return DB::transaction(function () use ($user, $points) {
-            if ($user->points < $points) {
-                throw new InsufficientPointsException('Pontos insuficientes para resgate.');
-            }
+        $coupon = $couponId ? $user->coupons()->where('is_demo', false)->whereKey($couponId)->lockForUpdate()->first() : null;
+        if ($couponId && (! $coupon || $coupon->status !== 'available')) {
+            throw ValidationException::withMessages(['coupon_id' => 'Cupom inválido, utilizado ou pertencente a outra conta.']);
+        }
 
-            $creditAmount = $points / 100;
-
-            $user->decrement('points', $points);
-            $user->increment('balance', $creditAmount);
-
-            return Transaction::create([
-                'user_id' => $user->id,
-                'type' => Transaction::TYPE_POINTS_REDEEM,
-                'amount' => $creditAmount,
-                'description' => "Resgate de {$points} pontos - R$ {$creditAmount}",
-            ]);
-        });
+        return $coupon;
     }
 
-    public function getHistory(User $user)
+    public function getHistory(User $user): Collection
     {
-        return $user->transactions()->latest()->get();
+        return $user->transactions()->where('is_demo', false)->latest()->get();
     }
 
-    public function getRecentSessions(User $user)
+    public function getRecentSessions(User $user): Collection
     {
-        return $user->chargingSessions()->latest()->take(5)->get();
+        return $user->chargingSessions()->where('is_demo', false)->latest()->take(5)->get();
     }
 }

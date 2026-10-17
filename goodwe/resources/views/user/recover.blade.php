@@ -192,5 +192,6 @@
     </div>
 
     <script src="{{ asset('js/theme.js') }}"></script>
+    <p class="pb-6 text-center text-sm"><a class="text-[#c62828] dark:text-red-300 hover:underline" href="{{ route('manager.login') }}">{{ __('auth.manager_access') }}</a></p>
 </body>
 </html>

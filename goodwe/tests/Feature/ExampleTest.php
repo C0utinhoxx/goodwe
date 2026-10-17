@@ -6,6 +6,7 @@ use App\Models\ChargingPoint;
 use App\Models\User;
 use App\Services\ChargingSimulator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -46,8 +47,10 @@ class ExampleTest extends TestCase
 
     public function test_a_free_charging_point_can_be_scheduled(): void
     {
+        auth()->user()->update(['balance' => 100]);
         $response = $this->from(route('chargers.index'))
             ->post(route('chargers.schedule', 'CG-003'), [
+                'idempotency_key' => (string) Str::uuid(),
                 'vehicle_plate' => 'TEST-1X2',
                 'duration_minutes' => 30,
             ]);
@@ -64,12 +67,13 @@ class ExampleTest extends TestCase
     {
         $response = $this->from(route('chargers.index'))
             ->post(route('chargers.schedule', 'CG-002'), [
+                'idempotency_key' => (string) Str::uuid(),
                 'vehicle_plate' => 'ABC-2X3',
                 'duration_minutes' => 30,
             ]);
 
         $response->assertRedirect(route('chargers.index'));
-        $response->assertSessionHas('error');
+        $response->assertSessionHasErrors('charger');
 
         $charger = ChargingSimulator::find('CG-002');
 

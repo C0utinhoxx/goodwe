@@ -10,9 +10,7 @@ class IsGestor
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->user() || ! $request->user()->isGestor()) {
-            return redirect()->route('user.home')->with('error', 'Voce nao tem permissao para acessar esta pagina.');
-        }
+        abort_unless($request->user()?->isGestor(), 403, __('auth.manager_only'));
 
         return $next($request);
     }

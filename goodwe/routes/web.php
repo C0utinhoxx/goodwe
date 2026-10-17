@@ -2,15 +2,24 @@
 
 use App\Http\Controllers\AtendimentoHumanoController;
 use App\Http\Controllers\ChargingController;
+use App\Http\Controllers\ChargingSessionController;
 use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\DemandPricingController;
+use App\Http\Controllers\EstablishmentController;
+use App\Http\Controllers\ManagerAuthController;
+use App\Http\Controllers\ManagerChargerController;
 use App\Http\Controllers\ManagerController;
-use App\Http\Controllers\MercadoPagoController;
+use App\Http\Controllers\PointsController;
+use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\TotemChargingController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\WebChargingController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\LegacyPaymentWebhookController;
 
 
 /*
@@ -20,21 +29,9 @@ use App\Http\Controllers\CheckoutController;
 */
 
 Route::get('/', function () {
-    if (! auth()->check()) {
-        return redirect()->route('user.login');
-    }
-
-    $user = auth()->user();
-
-    if ($user->isSuporte()) {
-        return redirect()->route('support.dashboard');
-    }
-
-    if ($user->isGestor()) {
-        return redirect()->route('manager.dashboard');
-    }
-
-    return redirect()->route('user.home');
+    return auth()->check()
+        ? redirect()->route(auth()->user()->portalRoute())
+        : redirect()->route('user.login');
 });
 
 /*
@@ -44,28 +41,28 @@ Route::get('/', function () {
 */
 
 Route::get('/login', [UserController::class, 'login'])
-    ->name('user.login');
+    ->middleware('guest')->name('user.login');
 
 Route::post('/login', [UserController::class, 'logar'])
-    ->name('login-user');
+    ->middleware(['guest', 'throttle:5,1'])->name('login-user');
 
 Route::get('/recover-password', [UserController::class, 'showPasswordRecovery'])
-    ->name('user.password.recovery');
+    ->middleware('guest')->name('user.password.recovery');
 
 Route::post('/recover-password/verify', [UserController::class, 'verifyPasswordRecovery'])
-    ->name('user.password.verify');
+    ->middleware(['guest', 'throttle:5,1'])->name('user.password.verify');
 
 Route::post('/recover-password/update', [UserController::class, 'updatePassword'])
-    ->name('user.password.update');
+    ->middleware(['guest', 'throttle:5,1'])->name('user.password.update');
 
 Route::get('/create-user', [UserController::class, 'create'])
-    ->name('user.cadastro');
+    ->middleware('guest')->name('user.cadastro');
 
 Route::post('/store-user', [UserController::class, 'store'])
-    ->name('user-store');
+    ->middleware(['guest', 'throttle:10,1'])->name('user-store');
 
 Route::post('/logout', [UserController::class, 'logout'])
-    ->name('logout');
+    ->middleware('auth')->name('logout');
 
 /*
 |--------------------------------------------------------------------------
@@ -156,6 +153,13 @@ Route::middleware('auth')->group(function () {
     | Área do usuário
     |--------------------------------------------------------------------------
     */
+
+    Route::post('/meus-pontos/resgatar', [PointsController::class, 'redeem'])->name('points.redeem');
+    Route::get('/meus-pontos', [PointsController::class, 'index'])->name('points.index');
+    Route::patch('/meu-perfil', [UserController::class, 'updateProfile'])->name('user.profile.update');
+    Route::post('/meus-veiculos', [VehicleController::class, 'store'])->name('vehicles.store');
+    Route::delete('/meus-veiculos/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+    Route::get('/chatbot/historico', [UserChatbotController::class, 'history'])->name('user.chatbot.history');
 
     Route::get('/meu-perfil', [UserController::class, 'profile'])
         ->name('user.profile');
@@ -253,26 +257,23 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::post('/checkout', [MercadoPagoController::class, 'checkout'])
+    Route::post('/checkout', [CheckoutController::class, 'checkout'])
         ->name('checkout');
 
-    Route::get('/pagamento/sucesso', [MercadoPagoController::class, 'sucesso'])
+    Route::get('/pagamento/sucesso', [CheckoutController::class, 'success'])
         ->name('pagamento.sucesso');
 
-    Route::get('/pagamento/erro', [MercadoPagoController::class, 'erro'])
+    Route::get('/pagamento/erro', [CheckoutController::class, 'cancel'])
         ->name('pagamento.erro');
-
-    Route::get('/pagamento/pendente', [MercadoPagoController::class, 'pendente'])
-        ->name('pagamento.pendente');
 });
 
 /*
 |--------------------------------------------------------------------------
-| Webhook Mercado Pago
+| Webhook de pagamentos legados
 |--------------------------------------------------------------------------
 */
 
-Route::post('/webhook/mercadopago', [MercadoPagoController::class, 'webhook'])
+Route::post('/webhook/mercadopago', LegacyPaymentWebhookController::class)
     ->name('mercadopago.webhook');
 
 /*

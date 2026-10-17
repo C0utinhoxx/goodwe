@@ -16,11 +16,11 @@ class UserRequest extends FormRequest
         $userId = $this->route('user');
 
         return [
-            'name' => 'required',
-            'email' => 'required|email|unique:users,email,'.($userId ? $userId->id : null),
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,'.($userId ? $userId->id : null),
             'phone' => 'required|string|regex:/^[0-9+\-\s()]+$/|min:10|max:20',
-            'password' => 'required|min:6',
-            'password_confirmation' => 'required|same:password',
+            'password' => 'required|string|min:6',
+            'password_confirmation' => 'required|string|same:password',
         ];
     }
 

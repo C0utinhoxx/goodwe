@@ -16,7 +16,7 @@ interface PaymentGatewayInterface
     /**
      * Fetch a payment by its gateway id, returning normalized data.
      *
-     * @return array{id: string, status: string, external_reference: ?string}
+     * @return array{id: string, status: string, external_reference: ?string, transaction_amount?: string, transaction_amount_refunded?: string, currency_id?: string}
      */
     public function findPayment(string $paymentId): array;
 }
