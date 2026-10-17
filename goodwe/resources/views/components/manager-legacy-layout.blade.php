@@ -52,7 +52,7 @@
     </div>
     <x-portal-commands />
     @unless($setup)
-        <x-chat-widget manager :history="session('manager_chat_history.scoped_v1.'.Auth::user()->establishment->id, [])" />
+        <x-chat-widget manager :history="session('manager_chat_history.scoped_v1.'.optional(Auth::user()?->establishment)->id, [])" />
     @endunless
     <dialog data-manager-confirmation class="pt-dialog gw-confirmation" aria-labelledby="manager-confirm-title" aria-describedby="manager-confirm-message">
         <div class="pt-dialog-body">

@@ -64,9 +64,14 @@ class CheckoutController extends Controller
         return view('pagamento.erro');
     }
 
+    public function pending()
+    {
+        return view('pagamento.pendente');
+    }
+
     public function webhook(Request $request)
     {
-            Log::info('Stripe webhook recebido');
+        Log::info('Stripe webhook recebido');
 
         try {
             $event = Webhook::constructEvent(
@@ -74,7 +79,7 @@ class CheckoutController extends Controller
                 $request->header('Stripe-Signature'),
                 config('services.stripe.webhook_secret')
             );
-        } catch (\UnexpectedValueException | SignatureVerificationException $e) {
+        } catch (\UnexpectedValueException|SignatureVerificationException $e) {
             return response('Invalid payload or signature', 400);
         }
 
@@ -116,11 +121,13 @@ class CheckoutController extends Controller
                         'esperado' => $esperado,
                         'recebido' => $session->amount_total,
                     ]);
+
                     return;
                 }
 
                 $transaction->update(['status' => Transaction::STATUS_APPROVED]);
                 $this->walletService->creditApprovedDeposit($transaction);
+
                 return;
             }
 

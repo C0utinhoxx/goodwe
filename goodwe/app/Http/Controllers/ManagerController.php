@@ -113,6 +113,18 @@ class ManagerController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
 
+        $detectorConfigured = (bool) config('demand.detector');
+
+        // As recargas de teste (simulacao pelo portal) aparecem na lista de
+        // sessoes, mas so compoem os indicadores quando o ambiente permite.
+        $includeTestSessions = app()->environment(['local', 'testing']);
+
+        $chargerCounts = ['total' => 0, 'available' => 0, 'reserved' => 0, 'in_use' => 0, 'unavailable' => 0];
+        foreach ($establishment->chargers as $charger) {
+            $chargerCounts['total']++;
+            $chargerCounts[$charger->status()]++;
+        }
+
         $statusDistribution = collect([
             ChargingSession::STATUS_COMPLETED,
             ChargingSession::STATUS_PENDING,
@@ -174,6 +186,9 @@ class ManagerController extends Controller
             'dailyLabels',
             'dailyKwh',
             'dailyRevenue',
+            'chargerCounts',
+            'detectorConfigured',
+            'includeTestSessions',
             'chargerDistribution',
             'statusDistribution',
             'topUsers',
