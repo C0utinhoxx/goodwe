@@ -13,11 +13,11 @@ class Transaction extends Model
         'amount',
         'description',
         'reference',
-        'status',
+        'status', 'credited_at', 'gateway_payment_id', 'refunded_amount', 'refund_requested_amount', 'refund_review_required',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount' => 'decimal:2', 'refunded_amount' => 'decimal:2', 'refund_requested_amount' => 'decimal:2', 'credited_at' => 'datetime', 'refund_review_required' => 'boolean',
     ];
 
     public const TYPE_DEPOSIT = 'deposit';

@@ -6,6 +6,7 @@ use App\Models\ChargingPoint;
 use App\Models\User;
 use App\Services\ChargingSimulator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ChargerApiTest extends TestCase
@@ -31,6 +32,7 @@ class ChargerApiTest extends TestCase
         $this->assertNotNull($charger, 'Expected at least one available charger for the test.');
 
         $response = $this->actingAs($user, 'sanctum')->postJson("/api/chargers/{$charger->id}/start", [
+            'idempotency_key' => (string) Str::uuid(),
             'energy_kwh' => 5,
             'amount' => 9.5,
             'charge_type' => 'partial',
@@ -61,6 +63,7 @@ class ChargerApiTest extends TestCase
         $this->assertNotNull($charger);
 
         $response = $this->actingAs($user, 'sanctum')->postJson("/api/chargers/{$charger->id}/start", [
+            'idempotency_key' => (string) Str::uuid(),
             'energy_kwh' => 20,
             'amount' => 38,
             'charge_type' => 'full',
@@ -79,6 +82,7 @@ class ChargerApiTest extends TestCase
         $this->assertNotNull($charger, 'Expected at least one occupied charger for the test.');
 
         $response = $this->actingAs($user, 'sanctum')->postJson("/api/chargers/{$charger->id}/start", [
+            'idempotency_key' => (string) Str::uuid(),
             'energy_kwh' => 5,
             'amount' => 9.5,
             'charge_type' => 'partial',
@@ -93,6 +97,7 @@ class ChargerApiTest extends TestCase
         $charger = collect(ChargingSimulator::all())->first();
 
         $response = $this->postJson("/api/chargers/{$charger->id}/start", [
+            'idempotency_key' => (string) Str::uuid(),
             'energy_kwh' => 5,
             'amount' => 9.5,
             'charge_type' => 'partial',

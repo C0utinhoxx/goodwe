@@ -1,104 +1,19 @@
 <x-user-layout>
-    <x-slot name="header">
-        <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">
-            {{ __('wallet.full_history') }}
-        </h1>
-    </x-slot>
-
-    <section class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <div class="relative min-h-[100px] overflow-hidden rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
-            <div class="flex items-center gap-4">
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#e53935]/10 text-[#e53935]">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('wallet.available_balance_label') }}</p>
-                    <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                        R$ {{ number_format($user->balance, 2, ',', '.') }}
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="relative min-h-[100px] overflow-hidden rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
-            <div class="flex items-center gap-4">
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-400">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('wallet.total_points_label') }}</p>
-                    <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                        {{ number_format($user->points, 0, ',', '.') }} pts
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="mt-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#343843] dark:bg-[#1a1a1a]">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-            {{ __('wallet.history') }}
-        </h2>
-
-        @if ($history->isEmpty())
-            <div class="mt-5 text-center text-sm text-gray-500 dark:text-[#a0a0a0]">
-                {{ __('wallet.no_transactions') }}
-            </div>
-        @else
-            <div class="mt-5 overflow-x-auto">
-                <table class="w-full min-w-[620px] text-left text-sm">
-                    <thead class="border-b border-gray-200 text-gray-500 dark:border-[#343843] dark:text-[#a0a0a0]">
-                        <tr>
-                            <th class="py-3 font-medium">{{ __('wallet.date') }}</th>
-                            <th class="py-3 font-medium">{{ __('wallet.type') }}</th>
-                            <th class="py-3 font-medium">{{ __('wallet.description') }}</th>
-                            <th class="py-3 font-medium">{{ __('wallet.value') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($history as $transaction)
-                            <tr class="border-b border-gray-200 dark:border-[#343843]">
-                                <td class="py-4 text-gray-900 dark:text-white">
-                                    {{ $transaction->created_at->format('d/m/Y H:i') }}
-                                </td>
-                                <td class="py-4">
-                                    @if ($transaction->type === 'deposit')
-                                        <span class="rounded-lg bg-green-500/10 px-3 py-1 text-green-600 dark:text-green-400">
-                                            {{ __('wallet.deposit') }}
-                                        </span>
-                                    @elseif ($transaction->type === 'cashback')
-                                        <span class="rounded-lg bg-amber-500/10 px-3 py-1 text-amber-600 dark:text-amber-400">
-                                            {{ __('wallet.cashback') }}
-                                        </span>
-                                    @elseif ($transaction->type === 'charge_payment')
-                                        <span class="rounded-lg bg-[#e53935]/10 px-3 py-1 text-[#e53935]">
-                                            {{ __('wallet.charge_payment') }}
-                                        </span>
-                                    @else
-                                        <span class="rounded-lg bg-blue-500/10 px-3 py-1 text-blue-600 dark:text-blue-400">
-                                            {{ __('wallet.points_redeem') }}
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="py-4 text-gray-900 dark:text-white">
-                                    {{ $transaction->description }}
-                                </td>
-                                <td class="py-4 font-medium text-gray-900 dark:text-white">
-                                    @if ($transaction->type === 'charge_payment' || $transaction->type === 'points_redeem')
-                                        - R$ {{ number_format($transaction->amount, 2, ',', '.') }}
-                                    @else
-                                        + R$ {{ number_format($transaction->amount, 2, ',', '.') }}
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
+    <x-slot name="pageTitle">Histórico</x-slot>
+    <x-slot name="header"><div><p class="pt-eyebrow">SUAS ATIVIDADES</p><h1 class="pt-heading">Histórico financeiro</h1><p class="pt-muted pt-subheading">Consulte todas as movimentações da sua carteira e suas recargas.</p></div></x-slot>
+    <section class="pt-card"><div class="pt-card-heading"><div><p class="pt-eyebrow">CARTEIRA DIGITAL</p><h2>Movimentações</h2></div><a href="{{ route('wallet.index') }}" class="pt-text-link">Voltar à carteira <i data-lucide="arrow-left"></i></a></div>
+        <p class="gw-table-hint">Deslize a tabela para ver todas as colunas.</p><div class="pt-table-wrap" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal"><table class="pt-table"><thead><tr><th>Data</th><th>Descrição / detalhes</th><th>Tipo</th><th>Valor</th><th>Status</th></tr></thead><tbody>
+            @forelse($history as $transaction)<tr><td>{{ $transaction->created_at?->format('d/m/Y H:i') }}</td><td>{{ $transaction->description ?: 'Movimentação' }}<details class="pt-form-note"><summary>Detalhes</summary><p>Operação #{{ $transaction->id }}<br>Referência: {{ $transaction->reference ?: 'Não informada' }}</p>@if($transaction->type === 'points_redeem')<p>Resgate de {{ number_format(round((float) $transaction->amount * 100),0,',','.') }} pontos convertido em saldo pelo programa antigo; registro histórico preservado.</p>@endif
+@if($transaction->refunded_amount > 0)<p>Estorno conciliado: R$ {{ number_format($transaction->refunded_amount, 2, ',', '.') }}</p>@endif @if($transaction->refund_review_required)<p>Estorno de R$ {{ number_format($transaction->refund_requested_amount, 2, ',', '.') }} aguardando conciliação manual. Saldos preservados.</p>@endif</details></td><td>{{ match($transaction->type) {'deposit' => 'Depósito', 'cashback' => 'Crédito', 'charge_payment' => 'Recarga', 'points_redeem' => 'Pontos', default => ucfirst((string)$transaction->type)} }}</td><td><x-transaction-value :transaction="$transaction" /></td><td><span class="pt-status neutral">{{ match($transaction->status) {'approved' => 'Aprovado', 'pending' => 'Pendente', 'rejected' => 'Rejeitado', default => 'Registrado'} }}</span></td></tr>@empty<tr><td colspan="5" class="pt-table-empty">Nenhuma movimentação registrada.</td></tr>@endforelse
+        </tbody></table></div><div class="pt-mt">{{ $history->appends(request()->except('transactions_page'))->links() }}</div></section>
+    <section class="pt-card pt-mt">
+        <div class="pt-card-heading"><div><p class="pt-eyebrow">ENERGIA E PAGAMENTOS</p><h2>Recargas registradas</h2><p class="pt-form-note">Registros anteriores do simulador não representam medição física. Novas sessões conservam a tarifa e o consumo confirmados.</p></div></div>
+        <p class="gw-table-hint">Deslize a tabela para ver todas as colunas.</p><div class="pt-table-wrap" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal"><table class="pt-table"><thead><tr><th>Data</th><th>Carregador / estabelecimento</th><th>Energia</th><th>Tarifa / kWh</th><th>Original</th><th>Cupom</th><th>Desconto</th><th>Valor final</th><th>Pagamento</th></tr></thead><tbody>
+            @forelse($sessions as $session)
+                <tr><td>{{ ($session->ended_at ?? $session->created_at)?->format('d/m/Y H:i') }}</td><td>{{ $session->charger_name }}<small class="pt-origin">{{ $session->establishment?->name ?? 'Estabelecimento não registrado' }}</small><small class="pt-origin">{{ $session->isWebSimulation() ? 'Recarga de teste · consumo simulado' : ($session->charging_state ? 'Confirmação do equipamento' : 'Registro anterior / simulador') }}</small>@if($session->transaction_id)<small class="pt-origin">Transação #{{ $session->transaction_id }}</small>@endif</td><td>{{ number_format($session->measured_energy_kwh ?? $session->energy_kwh, $session->measured_energy_kwh !== null ? 4 : 2, ',', '.') }} kWh</td><td>{{ $session->tariff_per_kwh !== null ? 'R$ '.number_format($session->tariff_per_kwh, 4, ',', '.') : 'Não registrada' }}</td><td>R$ {{ number_format($session->original_amount ?? $session->amount_charged, 2, ',', '.') }}</td><td>{{ $session->coupon ? $session->coupon->name.' · '.$session->coupon->discount_percent.'%' : 'Sem cupom' }}</td><td>R$ {{ number_format($session->discount_amount, 2, ',', '.') }}</td><td>{{ $session->payment_status === 'pending' ? 'A confirmar' : 'R$ '.number_format($session->amount_charged, 2, ',', '.') }}</td><td><span class="pt-status {{ $session->payment_status === 'paid' || (!$session->payment_status && $session->status === 'completed') ? 'success' : 'neutral' }}">{{ match($session->payment_status) {'paid' => 'Pago', 'pending' => 'Pagamento pendente', 'not_due' => 'Aguardando encerramento', default => match($session->status) {'completed' => 'Registro concluído', 'cancelled' => 'Cancelado', default => 'Pendente'} } }}</span>@if($session->charging_state)<a class="pt-text-link pt-origin" href="{{ route('charging-sessions.show', $session) }}">{{ $session->payment_status === 'pending' ? 'Revisar e pagar' : 'Detalhes' }}</a>@endif</td></tr>
+            @empty
+                <tr><td colspan="9" class="pt-table-empty">Nenhuma recarga registrada.</td></tr>
+            @endforelse
+        </tbody></table></div><div class="pt-mt">{{ $sessions->appends(request()->except('sessions_page'))->links() }}</div>
     </section>
 </x-user-layout>

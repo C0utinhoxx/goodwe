@@ -8,6 +8,7 @@ use App\Services\ChargingSimulator;
 
 use App\Services\WalletService;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Http;
@@ -36,6 +37,16 @@ class UserChatbotController extends Controller
 
         ]);
 
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        return response()->json([
+            'history' => collect($request->session()->get('user_chat_history', []))
+                ->filter(fn ($message) => in_array($message['role'] ?? '', ['user', 'assistant'], true))
+                ->map(fn ($message) => ['role' => $message['role'], 'content' => $message['content'] ?? ''])
+                ->take(-40)->values(),
+        ]);
     }
 
     public function chat(Request $request)

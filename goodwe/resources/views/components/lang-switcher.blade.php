@@ -1,7 +1,7 @@
 @props(['variant' => ''])
 
 <div class="relative">
-    <button type="button" id="lang-toggle" class="flex items-center gap-2 {{ $variant === 'boxed' ? 'rounded-lg border border-gray-200 dark:border-[#343843] bg-gray-50 dark:bg-[#181b22] px-3 py-2' : '' }} text-sm text-gray-600 dark:text-[#A1A09A] hover:text-[#e53935] dark:hover:text-[#e53935] transition-colors cursor-pointer">
+    <button type="button" id="lang-toggle" aria-label="Selecionar idioma: {{ __('language.'.app()->getLocale()) }}" aria-expanded="false" aria-controls="lang-menu" class="flex items-center gap-2 {{ $variant === 'boxed' ? 'rounded-lg border border-gray-200 dark:border-[#343843] bg-gray-50 dark:bg-[#181b22] px-3 py-2' : '' }} text-sm text-gray-600 dark:text-[#A1A09A] hover:text-[#e53935] dark:hover:text-[#e53935] transition-colors cursor-pointer">
         <span class="text-base leading-none">@if(app()->getLocale() === 'pt') 🇧🇷 @elseif(app()->getLocale() === 'en') 🇺🇸 @else 🇪🇸 @endif</span>
         <span>{{ __('language.' . app()->getLocale()) }}</span>
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>

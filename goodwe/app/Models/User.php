@@ -36,8 +36,28 @@ class User extends Authenticatable
         'is_support' => 'boolean',
         'password' => 'hashed',
         'balance' => 'decimal:2',
-        'points' => 'integer',
+        'points' => 'decimal:2',
     ];
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(ChargingReservation::class);
+    }
+
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(Coupon::class);
+    }
+
+    public function pointMovements(): HasMany
+    {
+        return $this->hasMany(PointMovement::class);
+    }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class);
+    }
 
     public function transactions(): HasMany
     {
@@ -52,6 +72,19 @@ class User extends Authenticatable
     public function establishment(): HasOne
     {
         return $this->hasOne(Establishment::class);
+    }
+
+    public function portalRoute(): string
+    {
+        if ($this->isSuporte()) {
+            return 'support.dashboard';
+        }
+
+        if (! $this->isGestor()) {
+            return 'user.home';
+        }
+
+        return $this->establishment()->exists() ? 'manager.dashboard' : 'manager.establishment.setup';
     }
 
     public function isGestor(): bool
