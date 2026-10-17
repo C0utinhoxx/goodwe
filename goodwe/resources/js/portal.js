@@ -64,7 +64,11 @@ function setupPortal() {
         if (amount) { amount.value = button.dataset.setAmount; amount.focus(); }
     }));
     const amountInput = document.getElementById('deposit-amount');
-    const updatePresets = () => document.querySelectorAll('[data-set-amount]').forEach(button => button.setAttribute('aria-pressed', String(Number(amountInput?.value) === Number(button.dataset.setAmount))));
+    const mirrorAmount = document.querySelector('[data-amount-mirror]');
+    const updatePresets = () => {
+        document.querySelectorAll('[data-set-amount]').forEach(button => button.setAttribute('aria-pressed', String(Number(amountInput?.value) === Number(button.dataset.setAmount))));
+        if (mirrorAmount && amountInput) mirrorAmount.value = amountInput.value;
+    };
     amountInput?.addEventListener('input', updatePresets);
     document.querySelectorAll('[data-set-amount]').forEach(button => button.addEventListener('click', updatePresets));
     updatePresets();

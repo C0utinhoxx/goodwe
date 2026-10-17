@@ -17,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->appendToGroup('web', SetLocale::class);
+$middleware->appendToGroup('web', SetLocale::class);
         $middleware->alias([
             'gestor' => IsGestor::class,
             'portal.user' => IsPortalUser::class,
@@ -26,9 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn (Request $request) => route($request->is('gestor/*') ? 'manager.login' : 'user.login'));
         $middleware->redirectUsersTo(fn (Request $request) => route($request->user()->portalRoute()));
         $middleware->validateCsrfTokens(except: [
+            'stripe/webhook',
             'webhook/mercadopago',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
+

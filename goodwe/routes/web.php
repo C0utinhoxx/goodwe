@@ -9,7 +9,6 @@ use App\Http\Controllers\EstablishmentController;
 use App\Http\Controllers\ManagerAuthController;
 use App\Http\Controllers\ManagerChargerController;
 use App\Http\Controllers\ManagerController;
-use App\Http\Controllers\MercadoPagoController;
 use App\Http\Controllers\PointsController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\TotemChargingController;
@@ -19,6 +18,9 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\WebChargingController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\LegacyPaymentWebhookController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -215,6 +217,7 @@ Route::middleware('auth')->group(function () {
                 ->name('chatbot.clear');
         });
 
+
     /*
     |--------------------------------------------------------------------------
     | Tickets - Atendimento Humano
@@ -254,24 +257,34 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::post('/checkout', [MercadoPagoController::class, 'checkout'])
+    Route::post('/checkout', [CheckoutController::class, 'checkout'])
         ->name('checkout');
 
-    Route::get('/pagamento/sucesso', [MercadoPagoController::class, 'sucesso'])
+    Route::get('/pagamento/sucesso', [CheckoutController::class, 'success'])
         ->name('pagamento.sucesso');
 
-    Route::get('/pagamento/erro', [MercadoPagoController::class, 'erro'])
+    Route::get('/pagamento/erro', [CheckoutController::class, 'cancel'])
         ->name('pagamento.erro');
-
-    Route::get('/pagamento/pendente', [MercadoPagoController::class, 'pendente'])
-        ->name('pagamento.pendente');
 });
 
 /*
 |--------------------------------------------------------------------------
-| Webhook Mercado Pago
+| Webhook de pagamentos legados
 |--------------------------------------------------------------------------
 */
 
-Route::post('/webhook/mercadopago', [MercadoPagoController::class, 'webhook'])
+Route::post('/webhook/mercadopago', LegacyPaymentWebhookController::class)
     ->name('mercadopago.webhook');
+
+/*
+|--------------------------------------------------------------------------
+| Checkout Stripe
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('stripe')->name('stripe.')->group(function () {
+    Route::post('/checkout', [CheckoutController::class, 'checkout'])->name('create');
+    Route::get('/sucesso', [CheckoutController::class, 'success'])->name('success');
+    Route::get('/erro', [CheckoutController::class, 'cancel'])->name('cancel');
+    Route::post('/webhook', [CheckoutController::class, 'webhook'])->name('webhook');
+});

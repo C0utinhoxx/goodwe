@@ -3,42 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\PaymentGatewayInterface;
-use App\Http\Requests\StoreCheckoutRequest;
 use App\Models\Transaction;
 use App\Services\DecimalAmount;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\View\View;
 
-class MercadoPagoController extends Controller
+/**
+ * Processa os webhooks de pagamentos ja initiados antes da migracao para a
+ * Stripe. O checkout novo nao usa mais o MercadoPago, mas pedidos antigos
+ * ainda podem ser confirmados por este endpoint.
+ */
+class LegacyPaymentWebhookController extends Controller
 {
     public function __construct(
         private readonly PaymentGatewayInterface $gateway,
         private readonly WalletService $walletService,
     ) {}
 
-    public function checkout(StoreCheckoutRequest $request)
-    {
-        $amount = round((float) $request->validated('amount'), 2);
-        $user = $request->user();
-
-        $transaction = Transaction::create([
-            'user_id' => $user->id,
-            'type' => Transaction::TYPE_DEPOSIT,
-            'amount' => $amount,
-            'description' => "Deposito via MercadoPago de R$ {$amount}",
-            'status' => Transaction::STATUS_PENDING,
-        ]);
-
-        $preference = $this->gateway->createPreference($user, $amount, (string) $transaction->id);
-
-        $transaction->update(['reference' => $preference['id']]);
-
-        return redirect()->to($preference['init_point']);
-    }
-
-    public function webhook(Request $request): Response
+    public function __invoke(Request $request): Response
     {
         $paymentId = $request->input('data.id') ?? $request->query('id');
 
@@ -72,20 +55,5 @@ class MercadoPagoController extends Controller
         }
 
         return response()->noContent();
-    }
-
-    public function sucesso(Request $request): View
-    {
-        return view('pagamento.sucesso');
-    }
-
-    public function erro(Request $request): View
-    {
-        return view('pagamento.erro');
-    }
-
-    public function pendente(Request $request): View
-    {
-        return view('pagamento.pendente');
     }
 }
