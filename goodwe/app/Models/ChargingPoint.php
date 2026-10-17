@@ -26,7 +26,20 @@ class ChargingPoint
         public ?string $vehiclePlate = null,
         public readonly ?float $lat = null,
         public readonly ?float $lng = null,
+        public readonly ?string $totemId = null,
     ) {}
+
+    /**
+     * Totem (IoT) ao qual este ponto de recarga está vinculado.
+     *
+     * O `id` do simulador (`CG-001`) é apenas um código interno e não existe
+     * na coleção `totems` do Firestore, que usa `totem_XX`. Só este valor
+     * pode ser usado para ler/escrever o comando do totem.
+     */
+    public function hasTotem(): bool
+    {
+        return $this->totemId !== null;
+    }
 
     public function status(): string
     {
