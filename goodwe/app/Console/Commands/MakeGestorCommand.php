@@ -106,7 +106,7 @@ class MakeGestorCommand extends Command
             $users = [$fakeUser->id];
         }
 
-        $startDate = now()->subDays(30);
+        $startDate = now()->subDays(29)->startOfDay();
 
         for ($i = 0; $i < 60; $i++) {
             $createdAt = $faker->dateTimeBetween($startDate, now());
@@ -114,7 +114,7 @@ class MakeGestorCommand extends Command
             $amount = round($energyKwh * $establishment->cost_per_kwh, 2);
             $status = $faker->randomElement($statuses);
 
-            ChargingSession::create([
+            $session = ChargingSession::create([
                 'user_id' => $faker->randomElement($users),
                 'establishment_id' => $establishment->id,
                 'charger_name' => $faker->randomElement($chargerNames),
@@ -122,9 +122,12 @@ class MakeGestorCommand extends Command
                 'amount_charged' => $amount,
                 'payment_method' => $faker->randomElement($paymentMethods),
                 'status' => $status,
+            ]);
+
+            $session->forceFill([
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
-            ]);
+            ])->saveQuietly();
         }
 
         $this->info("Estabelecimento '{$establishment->name}' criado com 60 sessoes de teste!");
