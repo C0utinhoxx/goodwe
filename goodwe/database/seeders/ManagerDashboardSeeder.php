@@ -82,7 +82,7 @@ class ManagerDashboardSeeder extends Seeder
 
         $faker = Factory::create('pt_BR');
 
-        $startDate = now()->subDays(30);
+        $startDate = now()->subDays(29)->startOfDay();
 
         for ($i = 0; $i < 60; $i++) {
             $createdAt = $faker->dateTimeBetween($startDate, now());
@@ -90,7 +90,7 @@ class ManagerDashboardSeeder extends Seeder
             $amount = round($energyKwh * $establishment->cost_per_kwh, 2);
             $status = $faker->randomElement($statuses);
 
-            ChargingSession::create([
+            $session = ChargingSession::create([
                 'user_id' => $faker->randomElement($users),
                 'establishment_id' => $establishment->id,
                 'charger_name' => $faker->randomElement($chargerNames),
@@ -98,9 +98,12 @@ class ManagerDashboardSeeder extends Seeder
                 'amount_charged' => $amount,
                 'payment_method' => $faker->randomElement($paymentMethods),
                 'status' => $status,
+            ]);
+
+            $session->forceFill([
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
-            ]);
+            ])->saveQuietly();
         }
 
         $this->command->info('Dados de gestor criados com sucesso!');
