@@ -28,33 +28,63 @@ class TotemChargingTest extends TestCase
             ->assertRedirect(route('user.login'));
     }
 
-    public function test_chargers_section_links_to_totem_control(): void
+    public function test_recharge_page_lists_totems_and_links_to_control(): void
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('chargers.index'));
+        $response = $this->actingAs($user)->get(route('totens.index'));
 
-        // O controle do totem é acessado a partir da seção de recarga
+        // A página "Recarga" é o ponto de entrada para o controle do totem
         $response->assertOk();
-        $response->assertSee(__('totens.open_control'));
+        $response->assertSee(__('totens.title'));
+        $response->assertSee(__('totens.open_recharge'));
+        $response->assertSee('totem_01', false);
+        $response->assertSee('totem_02', false);
         $response->assertSee(route('totens.carregar', 'totem_01'), false);
         $response->assertSee(route('totens.carregar', 'totem_02'), false);
     }
 
-    public function test_chargers_section_never_links_using_the_simulator_code(): void
+    public function test_recharge_page_never_links_using_the_simulator_code(): void
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('chargers.index'));
+        $response = $this->actingAs($user)->get(route('totens.index'));
 
         // O id do simulador (CG-00X) não existe na coleção `totens` do Firestore,
         // então não pode virar link de controle remoto.
-        $response->assertSee(__('chargers.id_label').': totem_01', false);
-        $response->assertSee(__('chargers.id_label').': totem_02', false);
-
         foreach (['CG-001', 'CG-002', 'CG-003', 'CG-004'] as $code) {
             $response->assertDontSee('/carregar/'.$code, false);
         }
+    }
+
+    public function test_recharge_page_lists_every_configured_totem(): void
+    {
+        config()->set('totems.available', [
+            ['id' => 'totem_09', 'name' => 'Totem 09', 'location' => 'Teste'],
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get(route('totens.index'))
+            ->assertOk()
+            ->assertSee('Totem 09')
+            ->assertSee('totem_09', false)
+            ->assertDontSee('totem_01', false);
+    }
+
+    public function test_guest_is_redirected_from_recharge_page(): void
+    {
+        $this->get(route('totens.index'))->assertRedirect(route('user.login'));
+    }
+
+    public function test_portal_sidebar_exposes_recharge_entry(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get(route('totens.index'))
+            ->assertOk()
+            ->assertSee(__('nav.recharge'))
+            ->assertSee(route('totens.index'), false);
     }
 
     public function test_show_displays_dynamic_user_data_from_firestore(): void

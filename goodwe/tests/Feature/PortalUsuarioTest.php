@@ -15,12 +15,12 @@ class PortalUsuarioTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_portal_pages_render_with_exactly_five_navigation_links_and_floating_chat(): void
+    public function test_portal_pages_render_with_exactly_six_navigation_links_and_floating_chat(): void
     {
         $user = User::factory()->create();
         foreach (['user.home', 'chargers.index', 'wallet.index', 'wallet.deposit.form', 'wallet.history', 'points.index', 'user.profile', 'user.chatbot.page'] as $route) {
             $response = $this->actingAs($user)->get(route($route))->assertOk();
-            $this->assertSame(5, preg_match_all('/<a[^>]+class="pt-nav-link /', $response->getContent()));
+            $this->assertSame(6, preg_match_all('/<a[^>]+class="pt-nav-link /', $response->getContent()));
             $response->assertSee('data-chat-widget', false);
             $response->assertDontSee('href="'.route('user.chatbot.page').'"', false);
         }
@@ -217,7 +217,7 @@ class PortalUsuarioTest extends TestCase
         $this->get(route('user.home'))->assertForbidden();
         $this->actingAs(User::factory()->create());
         $response = $this->get(route('user.home'))->assertOk();
-        $this->assertSame(5, preg_match_all('/<a[^>]+class="pt-nav-link /', $response->getContent()));
+        $this->assertSame(6, preg_match_all('/<a[^>]+class="pt-nav-link /', $response->getContent()));
         $this->get(route('user.profile'))->assertDontSee('Acessar painel do gestor');
     }
 }

@@ -173,6 +173,29 @@ if [ "$migrated" -eq 0 ]; then
     entry_log "ERRO: migrações não concluídas após ${MIGRATE_ATTEMPTS} tentativas. O container subiu mesmo assim; rotas que usam a sessão vão retornar 500 até o banco estar acessível. Verifique DB_HOST/DB_PORT/DB_DATABASE/DB_USERNAME/DB_PASSWORD e se as tabelas (sessions, users, cache) existem."
 fi
 
+###############################################################################
+# 4.1) Cache de configuração, rotas, views e eventos
+#
+#    Compilado em RUNTIME (não no build) porque as envs do provedor — em
+#    especial FIREBASE_CREDENTIALS_JSON — só existem quando o container sobe.
+#    config:cache congelaria valores vazios se rodasse durante o build.
+#
+#    Benefício: cada request deixa de reler/parsear config e registrar ~100
+#    rotas. É o ganho de performance mais amplo e não altera nenhum fluxo.
+#
+#    Cada comando é resiliente: a falha de um não impede os demais nem o boot
+#    do Apache (o Laravel volta a compilar views/fluxos sob demanda).
+###############################################################################
+entry_log "Compilando caches do Laravel."
+
+for cache_command in config:cache event:cache route:cache view:cache; do
+    if php artisan "$cache_command" --no-interaction; then
+        entry_log "Cache OK: ${cache_command}."
+    else
+        entry_log "AVISO: falha ao executar '${cache_command}'; seguindo sem esse cache."
+    fi
+done
+
 # Os comandos artisan rodaram como root e podem ter criado arquivos em
 # bootstrap/cache e storage. Sem isto, o worker do Apache (www-data) perde
 # o direito de escrita e o erro reaparece em runtime.

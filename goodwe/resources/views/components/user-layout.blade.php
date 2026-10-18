@@ -30,6 +30,7 @@
             ['name'=>__('nav.chargers'),'route'=>'chargers.index','active'=>['chargers.*','reservations.*','charging-sessions.*'],'icon'=>'zap','description'=>'Estações e reservas','children'=>[
                 ['name'=>'Minhas reservas','route'=>'chargers.index','hash'=>'minhas-reservas'],
             ]],
+            ['name'=>__('nav.recharge'),'route'=>'totens.index','active'=>['totens.*'],'icon'=>'battery-charging','description'=>__('nav.recharge_hint')],
             ['name'=>__('nav.wallet'),'route'=>'wallet.index','active'=>'wallet.*','icon'=>'wallet','description'=>'Saldo e movimentações','children'=>[
                 ['name'=>'Adicionar saldo','route'=>'wallet.deposit.form'],
                 ['name'=>'Histórico financeiro','route'=>'wallet.history'],

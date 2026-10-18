@@ -338,7 +338,6 @@
     "support.nav_in_progress": "In Progress",
     "support.nav_resolved": "Resolved",
     "support.sidebar_subtitle": "Support Center",
-
     "totens.title": "Charging",
     "totens.subtitle": "Remote control of the PowerTAG totem",
     "totens.back_to_chargers": "Chargers",
@@ -369,5 +368,15 @@
     "totens.pin_cancel": "Cancel",
     "totens.pin_confirm": "Confirm",
     "totens.pin_sent": "PIN sent successfully. Wait for totem validation.",
-    "totens.pin_failed": "Error sending PIN: :error"
+    "totens.pin_failed": "Error sending PIN: :error",
+    "nav.recharge": "Charging",
+    "nav.recharge_hint": "Remote totem control",
+    "totens.open_recharge": "Open charging",
+    "totens.totem_id": "Totem ID",
+    "totens.index_subtitle": "Choose a totem to start or follow a charging session.",
+    "totens.index_kicker": "CHARGING CONTROL",
+    "totens.index_count": ":count totems available",
+    "totens.index_empty_title": "No totem available",
+    "totens.index_empty_body": "Configure the totems in config/totems.php to list them here.",
+    "totens.index_note": "Commands are sent to the device through Firestore. Keep this screen open during charging."
 }
