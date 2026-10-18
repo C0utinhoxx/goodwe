@@ -130,5 +130,6 @@
     </div>
 
     <script src="{{ asset('js/theme.js') }}"></script>
+<script src="{{ asset('js/pwa.js') }}"></script>
 </body>
 </html>

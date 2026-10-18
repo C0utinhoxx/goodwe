@@ -2,9 +2,21 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <title>{{ config('app.name', 'Laravel') }}</title>
-        <link rel="icon" href="{{ asset('imagens/logo.png') }}" type="image/x-icon">
+
+        <!-- PWA -->
+        <link rel="manifest" href="{{ asset('manifest.json') }}">
+        <meta name="theme-color" content="#0f1117">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="GoodWe">
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.ico') }}">
+        <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
+        <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
+
+        <link rel="icon" href="{{ asset('imagens/goodwe-logo.png') }}" type="image/png">
         <script>
             (function() {
                 var theme = localStorage.getItem('theme');
@@ -111,5 +123,6 @@
         </div>
 
         <script src="{{ asset('js/theme.js') }}"></script>
+        <script src="{{ asset('js/pwa.js') }}"></script>
     </body>
 </html>
