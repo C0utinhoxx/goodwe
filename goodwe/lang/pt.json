@@ -250,7 +250,7 @@
     "chatbot.no_answer": "Nao consegui gerar uma resposta.",
     "chatbot.error": "Nao foi possivel consultar o assistente agora.",
     "chatbot.connection_error": "Nao foi possivel conectar com o assistente.",
-"auth.manager_login_title": "Acesso do gestor",
+    "auth.manager_login_title": "Acesso do gestor",
     "auth.manager_login_subtitle": "Administre seu estabelecimento com sua conta de gestor.",
     "auth.driver_login_subtitle": "Acesse sua conta de usuário para reservar e gerenciar suas recargas.",
     "auth.manager_register_title": "Criar conta de gestor",
@@ -277,7 +277,6 @@
     "auth.manager_chargers": "Carregadores do estabelecimento",
     "auth.manager_chargers_subtitle": "Disponibilidade registrada no sistema para os equipamentos deste estabelecimento.",
     "auth.recorded_status": "Status registrado",
-
     "support.overview_title": "Central de Atendimento",
     "support.overview_description": "Visão geral dos chamados de usuários e gestores.",
     "support.all_title": "Todos os Tickets",
@@ -339,7 +338,6 @@
     "support.nav_in_progress": "Em Atendimento",
     "support.nav_resolved": "Resolvidos",
     "support.sidebar_subtitle": "Central de Atendimento",
-
     "totens.title": "Recarga",
     "totens.subtitle": "Controle remoto do totem PowerTAG",
     "totens.back_to_chargers": "Carregadores",
@@ -370,5 +368,15 @@
     "totens.pin_cancel": "Cancelar",
     "totens.pin_confirm": "Confirmar",
     "totens.pin_sent": "PIN enviado com sucesso. Aguarde a validação do totem.",
-    "totens.pin_failed": "Erro ao enviar PIN: :error"
+    "totens.pin_failed": "Erro ao enviar PIN: :error",
+    "nav.recharge": "Recarga",
+    "nav.recharge_hint": "Controle remoto dos totens",
+    "totens.open_recharge": "Abrir recarga",
+    "totens.totem_id": "ID do totem",
+    "totens.index_subtitle": "Escolha um totem para iniciar ou acompanhar a recarga.",
+    "totens.index_kicker": "CONTROLE DE RECARGA",
+    "totens.index_count": ":count totens disponíveis",
+    "totens.index_empty_title": "Nenhum totem disponível",
+    "totens.index_empty_body": "Configure os totens em config/totems.php para exibi-los aqui.",
+    "totens.index_note": "Os comandos são enviados ao equipamento pelo Firestore. Mantenha a tela aberta durante a recarga."
 }

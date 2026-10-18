@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\PaymentGatewayInterface;
 use App\Models\User;
+use App\Services\FirestoreService;
 use App\Services\MercadoPagoGateway;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
@@ -21,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
             PaymentGatewayInterface::class,
             MercadoPagoGateway::class
         );
+
+        // O FirestoreService constrói um FirestoreClient (com autenticação)
+        // no construtor. Como singleton, ele é criado uma única vez por
+        // requisição e reutilizado em quem o injetar.
+        $this->app->singleton(FirestoreService::class);
     }
 
     /**

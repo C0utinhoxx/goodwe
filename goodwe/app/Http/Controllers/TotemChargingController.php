@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use Throwable;
 
@@ -29,6 +30,20 @@ class TotemChargingController extends Controller
     ) {}
 
     /**
+     * Lista os totens de recarga disponíveis (config/totems.php) e dá acesso
+     * à tela de controle remoto de cada um.
+     *
+     * Não consulta o Firestore: a lista é configurável e estática, o que
+     * mantém a página rápida mesmo com o provedor externo indisponível.
+     */
+    public function index(): View
+    {
+        return view('totens.index', [
+            'totems' => config('totems.available', []),
+        ]);
+    }
+
+    /**
      * Exibe a tela de recarga com os dados reais do usuário lidos do Firestore
      * (nome, id, saldo) e o status atual da TAG (`comando_web`).
      *
@@ -42,13 +57,19 @@ class TotemChargingController extends Controller
 
         try {
             $firestoreUser = $this->firestore->getDocumentData('users', $tagUid) ?? [];
-            $totem = $this->firestore->getDocumentData('totems', $totemId) ?? [];
         } catch (Throwable $e) {
             // Se o Firestore estiver indisponível, a tela ainda abre com os
             // dados locais do usuário para não bloquear o fluxo de recarga.
             report($e);
 
             $firestoreUser = [];
+        }
+
+        try {
+            $totem = $this->totemData($totemId);
+        } catch (Throwable $e) {
+            report($e);
+
             $totem = [];
         }
 
@@ -118,6 +139,8 @@ class TotemChargingController extends Controller
                 'pin_digitado' => '',
             ]);
 
+            $this->forgetTotemData($totemId);
+
             return redirect()->route('totens.carregar', $totemId)
                 ->with('success', __('totens.started', ['totem' => $totemId]));
         } catch (Throwable $e) {
@@ -146,6 +169,8 @@ class TotemChargingController extends Controller
             $this->firestore->setDocumentMerge('totems', $totemId, [
                 'pin_digitado' => $pin,
             ]);
+
+            $this->forgetTotemData($totemId);
 
             return response()->json([
                 'success' => true,
@@ -208,12 +233,37 @@ class TotemChargingController extends Controller
                 'comando_web' => 'parar',
             ]);
 
+            $this->forgetTotemData($totemId);
+
             return redirect()->route('totens.carregar', $totemId)
                 ->with('success', __('totens.stopped', ['totem' => $totemId]));
         } catch (Throwable $e) {
             return redirect()->route('totens.carregar', $totemId)
                 ->with('error', __('totens.stop_failed', ['error' => $e->getMessage()]));
         }
+    }
+
+    /**
+     * Dados do totem (tarifa, localização e espelho de `comando_web`).
+     *
+     * A tarifa e os metadados do equipamento mudam raramente; um cache curto
+     * evita uma ida à rede (Firestore via REST) a cada abertura da tela de
+     * recarga. O cache é invalidado nas escritas (iniciar/parar/PIN).
+     *
+     * @return array<string, mixed>
+     */
+    private function totemData(string $totemId): array
+    {
+        return Cache::remember(
+            "totems:document:{$totemId}",
+            now()->addSeconds(60),
+            fn (): array => $this->firestore->getDocumentData('totems', $totemId) ?? []
+        );
+    }
+
+    private function forgetTotemData(string $totemId): void
+    {
+        Cache::forget("totems:document:{$totemId}");
     }
 
     /**

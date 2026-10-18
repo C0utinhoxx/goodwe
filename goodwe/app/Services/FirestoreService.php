@@ -15,12 +15,9 @@ class FirestoreService
     public function __construct()
     {
         $this->projectId = config('firebase.projects.app.project_id')
-            ?? env('FIREBASE_PROJECT_ID')
             ?? 'powertag--contas';
 
         $credentialsPath = config('firebase.projects.app.credentials')
-            ?? env('FIREBASE_CREDENTIALS')
-            ?? env('GOOGLE_APPLICATION_CREDENTIALS')
             ?? storage_path('app/firebase/credentials.json');
 
         if (! str_starts_with($credentialsPath, '/')) {
@@ -47,7 +44,7 @@ class FirestoreService
             return $credentialsPath;
         }
 
-        $json = env('FIREBASE_CREDENTIALS_JSON');
+        $json = config('firebase.projects.app.credentials_json');
 
         if (is_string($json) && $json !== '') {
             $decoded = base64_decode($json, true);

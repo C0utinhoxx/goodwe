@@ -7,12 +7,15 @@ use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DemandPricingController;
 use App\Http\Controllers\EstablishmentController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LegacyPaymentWebhookController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\ManagerAuthController;
 use App\Http\Controllers\ManagerChargerController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\PointsController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\SupportDashboardController;
 use App\Http\Controllers\TotemChargingController;
 use App\Http\Controllers\UserChatbotController;
 use App\Http\Controllers\UserController;
@@ -27,11 +30,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
-    return auth()->check()
-        ? redirect()->route(auth()->user()->portalRoute())
-        : redirect()->route('user.login');
-});
+Route::get('/', HomeController::class);
 
 /*
 |--------------------------------------------------------------------------
@@ -69,15 +68,7 @@ Route::post('/logout', [UserController::class, 'logout'])
 |--------------------------------------------------------------------------
 */
 
-Route::get('/locale/{locale}', function (string $locale) {
-    if (! in_array($locale, ['pt', 'en', 'es'])) {
-        abort(400);
-    }
-
-    session(['locale' => $locale]);
-
-    return redirect()->back();
-})->name('locale.set');
+Route::get('/locale/{locale}', LocaleController::class)->name('locale.set');
 
 /*
 |--------------------------------------------------------------------------
@@ -98,9 +89,7 @@ Route::middleware('auth')->group(function () {
         ->name('support.')
         ->group(function () {
 
-            Route::get('/dashboard', function () {
-                return view('suporte.dashboard');
-            })->name('dashboard');
+            Route::get('/dashboard', SupportDashboardController::class)->name('dashboard');
 
         });
 
@@ -203,6 +192,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('carregar')->name('totens.')->group(function () {
+        Route::get('/', [TotemChargingController::class, 'index'])->name('index');
         Route::get('/{totem_id}', [TotemChargingController::class, 'show'])->name('carregar');
         Route::post('/{totem_id}/iniciar', [TotemChargingController::class, 'iniciar'])->name('iniciar');
         Route::post('/{totem_id}/parar', [TotemChargingController::class, 'parar'])->name('parar');

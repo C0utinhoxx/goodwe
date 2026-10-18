@@ -338,7 +338,6 @@
     "support.nav_in_progress": "En atención",
     "support.nav_resolved": "Resueltos",
     "support.sidebar_subtitle": "Centro de Atención",
-
     "totens.title": "Recarga",
     "totens.subtitle": "Control remoto del tótem PowerTAG",
     "totens.back_to_chargers": "Cargadores",
@@ -369,5 +368,15 @@
     "totens.pin_cancel": "Cancelar",
     "totens.pin_confirm": "Confirmar",
     "totens.pin_sent": "PIN enviado con éxito. Espera la validación del tótem.",
-    "totens.pin_failed": "Error al enviar el PIN: :error"
+    "totens.pin_failed": "Error al enviar el PIN: :error",
+    "nav.recharge": "Recarga",
+    "nav.recharge_hint": "Control remoto de los tótems",
+    "totens.open_recharge": "Abrir recarga",
+    "totens.totem_id": "ID del tótem",
+    "totens.index_subtitle": "Elige un tótem para iniciar o seguir la recarga.",
+    "totens.index_kicker": "CONTROL DE RECARGA",
+    "totens.index_count": ":count tótems disponibles",
+    "totens.index_empty_title": "Ningún tótem disponible",
+    "totens.index_empty_body": "Configura los tótems en config/totems.php para mostrarlos aquí.",
+    "totens.index_note": "Los comandos se envían al equipo a través de Firestore. Mantén esta pantalla abierta durante la recarga."
 }
