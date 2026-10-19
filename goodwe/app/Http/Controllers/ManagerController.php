@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChargingSession;
-use App\Models\Establishment;
-use App\Services\ChargingSimulator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,59 +16,54 @@ class ManagerController extends Controller
         $user = $request->user();
         $establishment = $user->establishment;
 
-        if (! $establishment) {
-            $establishment = Establishment::create([
-                'user_id' => $user->id,
-                'name' => 'Meu Estabelecimento',
-                'address' => 'Endereco nao definido',
-                'type' => Establishment::TYPE_COMERCIAL,
-                'operating_hours' => '08:00 - 22:00',
-                'cost_per_kwh' => 1.5000,
-            ]);
-        }
-
         $period = (int) $request->integer('period', 30);
         if (! in_array($period, [7, 30, 90], true)) {
             $period = 30;
         }
 
+        // As recargas de teste (simulacao pelo portal) aparecem na lista de
+        // sessoes, mas so compoem os indicadores quando o ambiente permite.
+        $includeTestSessions = app()->environment(['local', 'testing']);
+
         $establishmentSessions = ChargingSession::query()
             ->where('establishment_id', $establishment->id);
 
-        $historicalTotals = (clone $establishmentSessions)
+        // Agregados financeiros e de consumo ignoram recargas de teste fora de
+        // ambientes de desenvolvimento.
+        $aggregateSessions = (clone $establishmentSessions);
+        if (! $includeTestSessions) {
+            $aggregateSessions->whereNull('simulation');
+        }
+
+        // Receita = somente pagamentos confirmados (transacao aprovada ou
+        // registro legado sem status de pagamento pendente).
+        $revenueExpression = "CASE WHEN status = 'completed' AND (transaction_id IS NOT NULL OR payment_status IS NULL OR payment_status <> 'pending') THEN amount_charged ELSE 0 END";
+        // Consumo = medida real quando registrada; senao, energia estimada de
+        // sessoes concluidas.
+        $energyExpression = "CASE WHEN measured_energy_kwh IS NOT NULL THEN measured_energy_kwh WHEN status = 'completed' THEN energy_kwh ELSE 0 END";
+
+        $historicalTotals = (clone $aggregateSessions)
             ->selectRaw('COUNT(*) as sessions_count')
-            ->selectRaw(
-                'COALESCE(SUM(CASE WHEN status = ? THEN amount_charged ELSE 0 END), 0) as total_revenue',
-                [ChargingSession::STATUS_COMPLETED]
-            )
-            ->selectRaw(
-                'COALESCE(SUM(CASE WHEN status = ? THEN energy_kwh ELSE 0 END), 0) as total_energy',
-                [ChargingSession::STATUS_COMPLETED]
-            )
+            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
+            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_energy")
             ->first();
 
         $totalSessions = (int) $historicalTotals->sessions_count;
         $totalRevenue = (float) $historicalTotals->total_revenue;
         $totalEnergy = (float) $historicalTotals->total_energy;
         $avgCostPerKwh = $totalEnergy > 0 ? $totalRevenue / $totalEnergy : 0;
-        $totalUsers = (clone $establishmentSessions)->distinct()->count('user_id');
+        $totalUsers = (clone $aggregateSessions)->distinct()->count('user_id');
 
         $periodSince = now()->subDays($period - 1)->startOfDay();
         $periodUntil = now()->endOfDay();
-        $periodSessions = (clone $establishmentSessions)
+        $periodSessions = (clone $aggregateSessions)
             ->whereBetween('created_at', [$periodSince, $periodUntil]);
 
         $periodTotals = (clone $periodSessions)
             ->selectRaw('COUNT(*) as sessions_count')
             ->selectRaw('COUNT(DISTINCT user_id) as active_users')
-            ->selectRaw(
-                'COALESCE(SUM(CASE WHEN status = ? THEN amount_charged ELSE 0 END), 0) as total_revenue',
-                [ChargingSession::STATUS_COMPLETED]
-            )
-            ->selectRaw(
-                'COALESCE(SUM(CASE WHEN status = ? THEN energy_kwh ELSE 0 END), 0) as total_energy',
-                [ChargingSession::STATUS_COMPLETED]
-            )
+            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
+            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_energy")
             ->first();
 
         $periodSessionsCount = (int) $periodTotals->sessions_count;
@@ -80,12 +73,9 @@ class ManagerController extends Controller
         $hasPeriodData = $periodSessionsCount > 0;
 
         $dailyUsage = (clone $periodSessions)
-            ->where('status', ChargingSession::STATUS_COMPLETED)
-            ->select(
-                DB::raw('DATE(created_at) as date'),
-                DB::raw('SUM(energy_kwh) as total_kwh'),
-                DB::raw('SUM(amount_charged) as total_revenue')
-            )
+            ->select(DB::raw('DATE(created_at) as date'))
+            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_kwh")
+            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
             ->groupBy('date')
             ->orderBy('date')
             ->get();
@@ -157,16 +147,16 @@ class ManagerController extends Controller
             ->take(10)
             ->get();
 
-        $liveChargers = collect(ChargingSimulator::all())->map(fn ($charger) => [
-            'id' => $charger->id,
+        // Lista de carregadores reais do estabelecimento (cadastro), nao o
+        // simulador global: evita vazar equipamentos de outros CNPJs.
+        $liveChargers = $establishment->chargers->map(fn ($charger) => [
+            'id' => $charger->code ?? $charger->id,
             'name' => $charger->name,
-            'location' => $charger->location,
-            'power_kw' => $charger->powerKw,
-            'connector' => $charger->connector,
+            'location' => $charger->location ?? '—',
+            'power_kw' => $charger->power_kw,
+            'connector' => $charger->connector ?? '—',
             'status' => $charger->status(),
             'is_available' => $charger->isAvailable(),
-            'vehicle_plate' => $charger->vehiclePlate,
-            'available_in_minutes' => $charger->availableInMinutes(),
         ]);
 
         return view('manager.dashboard', compact(
@@ -207,9 +197,14 @@ class ManagerController extends Controller
         $establishment = $request->user()->establishment;
         $periodSince = now()->subDays($period - 1)->startOfDay();
 
+        // Producao exporta apenas recargas reais; ambientes de teste tambem
+        // incluem simulacoes, com a coluna Origem sinalizando cada linha.
+        $includeTestSessions = app()->environment(['local', 'testing']);
+
         $sessions = $establishment
             ? ChargingSession::with('user:id,name,email')
                 ->where('establishment_id', $establishment->id)
+                ->when(! $includeTestSessions, fn ($query) => $query->whereNull('simulation'))
                 ->whereBetween('created_at', [$periodSince, now()->endOfDay()])
                 ->latest()
                 ->get()
@@ -225,7 +220,7 @@ class ManagerController extends Controller
         $callback = function () use ($sessions): void {
             $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['Data', 'Usuario', 'Email', 'Carregador', 'Energia (kWh)', 'Valor (R$)', 'Metodo', 'Status'], ',', '"', '\\');
+            fputcsv($handle, ['Data', 'Usuario', 'Email', 'Carregador', 'Origem', 'Energia (kWh)', 'Valor (R$)', 'Metodo', 'Status'], ',', '"', '\\');
 
             foreach ($sessions as $session) {
                 fputcsv($handle, [
@@ -233,7 +228,8 @@ class ManagerController extends Controller
                     $session->user->name ?? '-',
                     $session->user->email ?? '-',
                     $session->charger_name,
-                    number_format((float) $session->energy_kwh, 2, ',', '.'),
+                    $session->isWebSimulation() ? 'Recarga de teste' : 'Recarga própria',
+                    number_format((float) ($session->measured_energy_kwh ?? $session->energy_kwh), 2, ',', '.'),
                     number_format((float) $session->amount_charged, 2, ',', '.'),
                     $session->payment_method,
                     $session->status,

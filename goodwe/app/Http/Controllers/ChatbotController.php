@@ -1,23 +1,25 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\AtendimentoHumano;
 use App\Models\ChargingSession;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Services\ChargingSimulator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+
 class ChatbotController extends Controller
 {
-    public function page()
+    public function page(Request $request)
     {
         return view('manager.chatbot', [
-            'history' => session('manager_chat_history', []),
+            'history' => $request->session()->get($this->historyKey($request->user()->establishment), []),
         ]);
     }
+
     public function chat(Request $request)
     {
         $request->validate([
@@ -37,7 +39,7 @@ class ChatbotController extends Controller
         // Primeiro, o gestor precisa explicar qual problema deseja resolver.
         if ($this->pedidoGenericoDeSuporte($message)) {
             $answer = $this->mensagemPorIdioma($locale, 'detalhar');
-            $this->saveHistory($message, $answer);
+            $this->saveHistory($establishment, $message, $answer);
 
             return response()->json(['answer' => $answer]);
         }
@@ -79,6 +81,7 @@ class ChatbotController extends Controller
                     ?? 'Usuário não identificado';
                 $email = $session->user?->email
                     ?? 'E-mail não disponível';
+
                 return
                     "Data: {$date} | ".
                     "Usuário: {$name} | ".
@@ -88,7 +91,7 @@ class ChatbotController extends Controller
                     "Valor: R$ {$session->amount_charged} | ".
                     "Status: {$session->status}";
             })
-            ->implode("\n");
+                ->implode("\n");
         // Limita a consulta a contas ligadas a este estabelecimento
         // e ao próprio gestor, sem divulgar toda a base de usuários.
         $users = User::withCount([
@@ -114,23 +117,18 @@ class ChatbotController extends Controller
                 $phone = $this->safeText(
                     $registeredUser->phone ?? 'Não informado'
                 );
-                $balance = number_format(
-                    (float) ($registeredUser->balance ?? 0),
-                    2,
-                    ',',
-                    '.'
-                );
+
+                // Não expor saldo/pontos de clientes ao assistente do gestor:
+                // são dados financeiros individuais, fora do escopo operacional.
                 return
                     "ID: {$registeredUser->id} | ".
                     "Nome: {$registeredUser->name} | ".
                     "E-mail: {$registeredUser->email} | ".
                     "Telefone: {$phone} | ".
                     "Tipo: {$type} | ".
-                    "Saldo: R$ {$balance} | ".
-                    "Pontos: {$registeredUser->points} | ".
                     "Recargas no estabelecimento: {$registeredUser->charging_sessions_count}";
             })
-            ->implode("\n");
+                ->implode("\n");
         // Transações não possuem, no código fornecido, um vínculo
         // garantido com estabelecimentos: mostrar somente as do gestor.
         $transactions = Transaction::with('user:id,name,email')
@@ -158,6 +156,7 @@ class ChatbotController extends Controller
                 $reference = $this->safeText(
                     $transaction->reference ?? 'Não informada'
                 );
+
                 return
                     "Data: {$date} | ".
                     "Usuário: {$name} | ".
@@ -166,37 +165,27 @@ class ChatbotController extends Controller
                     "Descrição: {$description} | ".
                     "Referência: {$reference}";
             })
-            ->implode("\n");
-        $chargers = ChargingSimulator::all();
+                ->implode("\n");
+        // Carregadores reais do estabelecimento (cadastro), sem o simulador
+        // global: evita expor equipamentos de outros CNPJs ao assistente.
+        $chargers = $establishment->chargers;
         $availableChargers = 0;
         $occupiedChargers = 0;
         $chargersText = '';
         foreach ($chargers as $charger) {
             $status = $charger->status();
-            if ($status === $charger::STATUS_AVAILABLE) {
+            if ($status === 'available') {
                 $availableChargers++;
             } else {
                 $occupiedChargers++;
             }
             $chargersText .=
-                "Código: {$charger->id} | ".
+                "Código: {$charger->code} | ".
                 "Nome: {$charger->name} | ".
                 "Localização: {$charger->location} | ".
-                "Potência: {$charger->powerKw} kW | ".
+                "Potência: {$charger->power_kw} kW | ".
                 "Conector: {$charger->connector} | ".
-                "Status: {$status}";
-            if ($status === $charger::STATUS_OCCUPIED) {
-                $minutes = $charger->availableInMinutes();
-                $plate = $charger->vehiclePlate
-                    ?? 'Não informada';
-                $availableIn = $minutes !== null
-                    ? "{$minutes} minutos"
-                    : 'Não disponível';
-                $chargersText .=
-                    " | Placa: {$plate}".
-                    " | Disponível em: {$availableIn}";
-            }
-            $chargersText .= "\n";
+                "Status: {$status}\n";
         }
         $languageInstruction = match ($locale) {
             'en' => 'Always respond in English.',
@@ -303,7 +292,9 @@ TRIAGEM OBRIGATÓRIA (para a pergunta atual)
 - categoria fora_escopo só é válida para perguntas externas à GoodWe.
 - Escreva em resposta um texto útil ao gestor, sem marcadores técnicos de triagem.
 PROMPT;
-        $history = session('manager_chat_history', []);
+        // Histórico escopado por estabelecimento: um gestor nunca envia à IA
+        // conversas de outro CNPJ nem o histórico global legado.
+        $history = $request->session()->get($this->historyKey($establishment), []);
         $input = [];
 
         // Restringe o contexto de conversa enviado à IA, sem apagar o histórico.
@@ -392,6 +383,16 @@ PROMPT;
                     'responder', 'fora_escopo', 'pedir_detalhes', 'abrir_ticket',
                 ], true)
             ) {
+                // Fallback: se a IA devolveu texto simples (não JSON de triagem),
+                // devolve o texto ao gestor sem abrir ticket. Seguro porque não
+                // aciona nenhuma ação — apenas responde.
+                $fallback = is_string($jsonResult) ? trim($jsonResult) : '';
+                if ($fallback !== '') {
+                    $this->saveHistory($establishment, $message, $fallback);
+
+                    return response()->json(['answer' => $fallback]);
+                }
+
                 Log::warning('Chatbot do gestor: triagem inválida.', [
                     'response_id' => $data['id'] ?? null,
                 ]);
@@ -441,7 +442,7 @@ PROMPT;
                 $answer = $this->mensagemPorIdioma($locale, 'detalhar');
             }
 
-            $this->saveHistory($message, $answer);
+            $this->saveHistory($establishment, $message, $answer);
 
             return response()->json(['answer' => $answer]);
         } catch (\Throwable $e) {
@@ -530,16 +531,26 @@ PROMPT;
                 JSON_UNESCAPED_SLASHES
             ) ?: 'Não informado';
         }
+
         return (string) $value;
     }
+
+    /**
+     * Chave de histórico isolada por estabelecimento. O histórico global legado
+     * (`manager_chat_history`) é ignorado de propósito.
+     */
+    private function historyKey($establishment): string
+    {
+        return 'manager_chat_history.scoped_v1.'.($establishment?->id ?? 'none');
+    }
+
     private function saveHistory(
+        $establishment,
         string $message,
         string $answer
     ): void {
-        $history = session(
-            'manager_chat_history',
-            []
-        );
+        $key = $this->historyKey($establishment);
+        $history = session($key, []);
         $history[] = [
             'role' => 'user',
             'content' => $message,
@@ -548,15 +559,15 @@ PROMPT;
             'role' => 'assistant',
             'content' => $answer,
         ];
-        session([
-            'manager_chat_history' => $history,
-        ]);
+        session([$key => $history]);
     }
+
     public function clear(Request $request)
     {
         $request->session()->forget(
-            'manager_chat_history'
+            $this->historyKey($request->user()->establishment)
         );
+
         return response()->json([
             'success' => true,
         ]);

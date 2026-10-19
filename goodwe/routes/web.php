@@ -244,43 +244,43 @@ Route::middleware('auth')->group(function () {
                     ->name('demand-control.index');
                 Route::post('/demanda/consumo/sincronizar', [DemandControlController::class, 'syncFromFirestore'])
                     ->name('demand-control.sync');
+
+                Route::get('/carregadores', [ManagerChargerController::class, 'index'])
+                    ->name('chargers.index');
+
+                Route::get('/carregadores/novo', [ManagerChargerController::class, 'create'])
+                    ->name('chargers.create');
+
+                Route::post('/carregadores', [ManagerChargerController::class, 'store'])
+                    ->name('chargers.store');
+
+                Route::get('/carregadores/{charger}/editar', [ManagerChargerController::class, 'edit'])
+                    ->name('chargers.edit');
+
+                Route::patch('/carregadores/{charger}', [ManagerChargerController::class, 'update'])
+                    ->name('chargers.update');
+
+                Route::get('/demanda', [DemandPricingController::class, 'index'])
+                    ->name('demand.index');
+
+                Route::post('/demanda/{peak}/decisao', [DemandPricingController::class, 'decide'])
+                    ->name('demand.decide');
+
+                Route::get('/dashboard', [ManagerController::class, 'dashboard'])
+                    ->name('dashboard');
+
+                Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])
+                    ->name('dashboard.export');
+
+                Route::get('/assistente', [ChatbotController::class, 'page'])
+                    ->name('chatbot.page');
+
+                Route::post('/chatbot', [ChatbotController::class, 'chat'])
+                    ->name('chatbot');
+
+                Route::delete('/chatbot', [ChatbotController::class, 'clear'])
+                    ->name('chatbot.clear');
             });
-
-            Route::get('/carregadores', [ManagerChargerController::class, 'index'])
-                ->name('chargers.index');
-
-            Route::get('/carregadores/novo', [ManagerChargerController::class, 'create'])
-                ->name('chargers.create');
-
-            Route::post('/carregadores', [ManagerChargerController::class, 'store'])
-                ->name('chargers.store');
-
-            Route::get('/carregadores/{charger}/editar', [ManagerChargerController::class, 'edit'])
-                ->name('chargers.edit');
-
-            Route::patch('/carregadores/{charger}', [ManagerChargerController::class, 'update'])
-                ->name('chargers.update');
-
-            Route::get('/demanda', [DemandPricingController::class, 'index'])
-                ->name('demand.index');
-
-            Route::post('/demanda/{peak}/decisao', [DemandPricingController::class, 'decide'])
-                ->name('demand.decide');
-
-            Route::get('/dashboard', [ManagerController::class, 'dashboard'])
-                ->name('dashboard');
-
-            Route::get('/dashboard/export', [ManagerController::class, 'exportSessions'])
-                ->name('dashboard.export');
-
-            Route::get('/assistente', [ChatbotController::class, 'page'])
-                ->name('chatbot.page');
-
-            Route::post('/chatbot', [ChatbotController::class, 'chat'])
-                ->name('chatbot');
-
-            Route::delete('/chatbot', [ChatbotController::class, 'clear'])
-                ->name('chatbot.clear');
         });
 
     /*
@@ -356,7 +356,7 @@ Route::post('/webhook/mercadopago', LegacyPaymentWebhookController::class)
 */
 
 Route::prefix('stripe')->name('stripe.')->group(function () {
-    Route::post('/checkout', [CheckoutController::class, 'checkout'])->name('create');
+    Route::post('/checkout', [CheckoutController::class, 'stripeCheckout'])->name('create');
     Route::get('/sucesso', [CheckoutController::class, 'success'])->name('success');
     Route::get('/erro', [CheckoutController::class, 'cancel'])->name('cancel');
     Route::post('/webhook', [CheckoutController::class, 'webhook'])->name('webhook');

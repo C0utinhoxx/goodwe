@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChargerController;
-use App\Http\Controllers\Api\ChargingSessionController;
 use App\Http\Controllers\Api\DemandReadingController;
 use App\Http\Controllers\Api\FirestoreUserController;
 use App\Http\Controllers\Api\WalletController;
@@ -44,7 +43,7 @@ Route::middleware(['auth:sanctum', 'portal.user'])->group(function () {
     Route::post('/chargers/{charger:code}/reserve', [ReservationController::class, 'store'])->name('api.reservations.store');
     Route::post('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('api.reservations.cancel');
     Route::get('/reservations/{reservation}', [ReservationController::class, 'status'])->name('api.reservations.status');
-    Route::post('/sessions/{session}/pay', [ChargingSessionController::class, 'pay'])->name('api.sessions.pay');
+    Route::post('/sessions/{session}/pay', [WebChargingSessionController::class, 'pay'])->name('api.sessions.pay');
 
     Route::prefix('chargers')->name('api.chargers.')->group(function () {
         Route::post('/{charger}/schedule', [ChargerController::class, 'schedule'])->name('schedule');
