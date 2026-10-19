@@ -22,9 +22,10 @@
             ['name'=>'Carregadores','route'=>'manager.chargers.index','active'=>'manager.chargers.*','icon'=>'plug-zap','description'=>'Equipamentos da sua loja','children'=>[
                 ['name'=>'Adicionar carregador','route'=>'manager.chargers.create'],
             ]],
-            ['name'=>'Demanda e tarifas','route'=>'manager.demand.index','active'=>'manager.demand.*','icon'=>'chart-no-axes-column','description'=>'Preços e decisões','children'=>[
+            ['name'=>'Demanda e tarifas','route'=>'manager.demand.index','active'=>'manager.demand.*|manager.demand-control.*','icon'=>'chart-no-axes-column','description'=>'Preços e decisões','children'=>[
                 ['name'=>'Resumo de tarifas','route'=>'manager.demand.index','hash'=>'resumo-tarifas'],
                 ['name'=>'Histórico de alterações','route'=>'manager.demand.index','hash'=>'historico-tarifas'],
+                ['name'=>'Controle de consumo','route'=>'manager.demand-control.index'],
             ]],
         ];
         $links[] = ['name'=>'Meu Estabelecimento','route'=>$establishmentRoute,'active'=>'manager.establishment.*','icon'=>'store','description'=>'Dados e configurações','children'=>[

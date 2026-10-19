@@ -46,7 +46,7 @@ class MercadoPagoWebhookTest extends TestCase
 
         $user->refresh();
         $this->assertEquals(100, (float) $user->balance);
-        $this->assertEquals(10, $user->points);
+        $this->assertEquals(5, $user->points);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -54,7 +54,7 @@ class MercadoPagoWebhookTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('point_movements', [
-            'user_id' => $user->id, 'transaction_id' => $transaction->id, 'type' => 'deposit', 'amount' => 10,
+            'user_id' => $user->id, 'transaction_id' => $transaction->id, 'type' => 'deposit', 'amount' => 5,
         ]);
     }
 
@@ -110,7 +110,7 @@ class MercadoPagoWebhookTest extends TestCase
 
         $user->refresh();
         $this->assertEquals(100, (float) $user->balance);
-        $this->assertEquals(10, $user->points);
+        $this->assertEquals(5, $user->points);
     }
 
     public function test_webhook_is_accessible_without_authentication(): void

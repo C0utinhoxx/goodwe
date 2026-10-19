@@ -168,7 +168,7 @@
     "wallet.description": "Description",
     "wallet.available_balance_label": "Available balance",
     "wallet.total_points_label": "Total points",
-    "wallet.points_accumulated_info": "Points accumulated automatically with every deposit and charge (10% back).",
+    "wallet.points_accumulated_info": "Points accumulated automatically with every deposit and charge (5% back).",
     "nav.gestor": "Manager",
     "manager.dashboard": "Manager Dashboard",
     "manager.total_sessions": "Historical sessions",

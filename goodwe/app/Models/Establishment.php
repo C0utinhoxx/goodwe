@@ -21,11 +21,13 @@ class Establishment extends Model
         'cost_per_kwh',
         'image', 'reservation_tolerance_minutes', 'no_show_penalty_points',
         'cnpj', 'pricing_mode', 'surge_percentage', 'peak_tariff', 'active_peak_id',
+        'max_power_kw', 'max_current_a',
     ];
 
     protected $casts = [
         'cost_per_kwh' => 'decimal:4', 'reservation_tolerance_minutes' => 'integer', 'no_show_penalty_points' => 'decimal:2',
         'surge_percentage' => 'decimal:2', 'peak_tariff' => 'decimal:4',
+        'max_power_kw' => 'decimal:2', 'max_current_a' => 'decimal:2',
     ];
 
     public const TYPE_RESIDENCIAL = 'residencial';
@@ -69,5 +71,18 @@ class Establishment extends Model
     public function chargingSessions(): HasMany
     {
         return $this->hasMany(ChargingSession::class);
+    }
+
+    public function demandReadings(): HasMany
+    {
+        return $this->hasMany(DemandReading::class);
+    }
+
+    /**
+     * Indica se o estabelecimento possui limite de demanda elétrica configurado.
+     */
+    public function hasDemandLimit(): bool
+    {
+        return $this->max_power_kw !== null || $this->max_current_a !== null;
     }
 }

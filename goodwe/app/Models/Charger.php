@@ -42,6 +42,11 @@ class Charger extends Model
         return $this->hasMany(ChargingSession::class);
     }
 
+    public function demandReadings(): HasMany
+    {
+        return $this->hasMany(DemandReading::class);
+    }
+
     public function status(): string
     {
         if ($this->activation_status !== null && $this->activation_status !== 'active') {
@@ -62,9 +67,17 @@ class Charger extends Model
         return $this->status() === 'available';
     }
 
+    /**
+     * Tarifa efetiva do carregador (R$/kWh).
+     *
+     * A tarifa é atrelada a cada carregador: quando o equipamento possui um
+     * valor próprio (`tariff_override`), ele prevalece. Caso contrário, o
+     * carregador herda a tarifa vigente do estabelecimento (que já considera
+     * o reajuste de pico ativo, quando houver).
+     */
     public function currentTariff(): ?string
     {
-        return $this->establishment?->currentTariff();
+        return $this->tariff_override ?? $this->establishment?->currentTariff();
     }
 
     public function canReserve(): bool

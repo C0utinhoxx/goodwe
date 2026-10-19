@@ -14,6 +14,14 @@ class ManagerChargerRequest extends FormRequest
         return $this->user()?->isGestor() && (! $charger || $charger->establishment_id === $this->user()->establishment->id);
     }
 
+    protected function prepareForValidation(): void
+    {
+        // Um campo de tarifa vazio significa "sem tarifa própria" (herda do estabelecimento).
+        if ($this->has('tariff_override') && $this->input('tariff_override') === '') {
+            $this->merge(['tariff_override' => null]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -24,8 +32,9 @@ class ManagerChargerRequest extends FormRequest
             'connector' => ['required', 'string', 'max:255'],
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'tariff_override' => ['nullable', 'regex:/^[0-9]{1,4}(?:\.[0-9]{1,4})?$/D', 'numeric', 'gte:0'],
             'establishment_id' => ['prohibited'], 'physical_status' => ['prohibited'], 'activation_status' => ['prohibited'],
-            'physical_status_updated_at' => ['prohibited'], 'tariff_override' => ['prohibited'], 'active_reservation_id' => ['prohibited'], 'active_session_id' => ['prohibited'],
+            'physical_status_updated_at' => ['prohibited'], 'active_reservation_id' => ['prohibited'], 'active_session_id' => ['prohibited'],
         ];
     }
 
@@ -36,6 +45,6 @@ class ManagerChargerRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['name' => 'nome', 'cnpj' => 'CNPJ', 'address' => 'endereço', 'phone' => 'telefone', 'type' => 'tipo de estabelecimento', 'operating_hours' => 'horário de funcionamento', 'cost_per_kwh' => 'tarifa-base', 'pricing_mode' => 'modo de tarifação', 'surge_percentage' => 'percentual de reajuste', 'reservation_tolerance_minutes' => 'tempo de tolerância', 'no_show_penalty_points' => 'penalidade em pontos', 'code' => 'identificador do equipamento', 'location' => 'localização', 'power_kw' => 'potência', 'connector' => 'conector'];
+        return ['name' => 'nome', 'cnpj' => 'CNPJ', 'address' => 'endereço', 'phone' => 'telefone', 'type' => 'tipo de estabelecimento', 'operating_hours' => 'horário de funcionamento', 'cost_per_kwh' => 'tarifa-base', 'tariff_override' => 'tarifa do carregador', 'pricing_mode' => 'modo de tarifação', 'surge_percentage' => 'percentual de reajuste', 'reservation_tolerance_minutes' => 'tempo de tolerância', 'no_show_penalty_points' => 'penalidade em pontos', 'code' => 'identificador do equipamento', 'location' => 'localização', 'power_kw' => 'potência', 'connector' => 'conector'];
     }
 }

@@ -16,6 +16,6 @@
                 <div class="pt-mt"><p class="pt-form-note">Para testar o fluxo, adicione o valor acima à sua carteira sem cobrança. O crédito também gera os pontos correspondentes.</p><button type="submit" form="wallet-test-deposit" class="pt-button pt-button-outline pt-mt" data-copy-amount>Adicionar crédito de teste</button></div>
             @endif
         </section>
-        <aside class="pt-right-stack"><div class="pt-wallet-side"><span>SEU SALDO ATUAL</span><strong>R$ {{ number_format($user->balance ?? 0, 2, ',', '.') }}</strong><p>O saldo funciona como crédito pré-pago.</p></div><section class="pt-info-panel"><span class="pt-info-icon"><i data-lucide="gift"></i></span><div><strong>Depósitos e pontos</strong><p>Cada depósito confirmado gera 10% do valor em pontos. R$ 85,50 gera 8,55 pontos.</p><a href="{{ route('points.index') }}">Consultar programa</a></div></section></aside>
+        <aside class="pt-right-stack"><div class="pt-wallet-side"><span>SEU SALDO ATUAL</span><strong>R$ {{ number_format($user->balance ?? 0, 2, ',', '.') }}</strong><p>O saldo funciona como crédito pré-pago.</p></div><section class="pt-info-panel"><span class="pt-info-icon"><i data-lucide="gift"></i></span><div><strong>Depósitos e pontos</strong><p>Cada depósito confirmado gera 5% do valor em pontos. R$ 85,50 gera 4,28 pontos.</p><a href="{{ route('points.index') }}">Consultar programa</a></div></section></aside>
     </div>
 </x-user-layout>

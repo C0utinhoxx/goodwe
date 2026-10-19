@@ -63,7 +63,7 @@ class WebChargingTest extends TestCase
     public function test_start_from_regular_reservation_uses_current_wallet_points_coupon_payment_and_history(): void
     {
         $charger = $this->charger();
-        $user = User::factory()->create(['balance' => 220, 'points' => 0]);
+        $user = User::factory()->create(['balance' => 220, 'points' => 5]);
         $this->actingAs($user);
         $this->get(route('user.home'))->assertOk()->assertDontSee('Entrar no modo demonstração')->assertDontSee('Modo demonstração');
         $this->get(route('wallet.deposit.form'))->assertOk()->assertSee('Continuar com Stripe')->assertSee('Adicionar crédito de teste');
@@ -220,7 +220,7 @@ class WebChargingTest extends TestCase
         $this->get(route('wallet.history'))->assertOk()->assertDontSee('OLD-DEMO-TRANSACTION');
         $this->deposit(100);
         $this->assertEquals(320, $user->refresh()->balance);
-        $this->assertEquals(10, $user->points);
+        $this->assertEquals(5, $user->points);
         $this->assertEquals(75, $user->getAttribute('demo_balance'));
         $this->assertEquals(10, $user->getAttribute('demo_points'));
     }

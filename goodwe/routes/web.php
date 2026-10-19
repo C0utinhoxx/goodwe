@@ -5,6 +5,7 @@ use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChargingSessionController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\DemandControlController;
 use App\Http\Controllers\DemandPricingController;
 use App\Http\Controllers\EstablishmentController;
 use App\Http\Controllers\HomeController;
@@ -238,6 +239,11 @@ Route::middleware('auth')->group(function () {
                     ->name('establishment.edit');
                 Route::patch('/estabelecimento', [EstablishmentController::class, 'update'])
                     ->name('establishment.update');
+
+                Route::get('/demanda/consumo', [DemandControlController::class, 'index'])
+                    ->name('demand-control.index');
+                Route::post('/demanda/consumo/sincronizar', [DemandControlController::class, 'syncFromFirestore'])
+                    ->name('demand-control.sync');
             });
 
             Route::get('/carregadores', [ManagerChargerController::class, 'index'])

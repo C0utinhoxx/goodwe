@@ -64,10 +64,11 @@ return new class extends Migration
             foreach (DB::table('users')->orderBy('id')->get() as $user) {
                 $balance = 0;
                 foreach (DB::table('transactions')->where('user_id', $user->id)->where('type', 'deposit')->where('status', 'approved')->orderBy('id')->get() as $deposit) {
-                    $points = DecimalAmount::percentage(DecimalAmount::units($deposit->amount), 10);
+                    $percent = (int) config('loyalty.deposit_percent', 5);
+                    $points = DecimalAmount::percentage(DecimalAmount::units($deposit->amount), $percent);
                     $balance += $points;
                     DB::table('transactions')->where('id', $deposit->id)->update(['credited_at' => $deposit->updated_at ?? now()]);
-                    DB::table('point_movements')->insert(['user_id' => $user->id, 'transaction_id' => $deposit->id, 'type' => 'deposit', 'amount' => DecimalAmount::decimal($points), 'balance_after' => DecimalAmount::decimal($balance), 'description' => 'Depósito confirmado: conversão para a regra de 10%', 'event_key' => 'deposit:'.$deposit->id, 'metadata' => json_encode(['legacy_conversion' => true]), 'created_at' => $deposit->created_at ?? now(), 'updated_at' => now()]);
+                    DB::table('point_movements')->insert(['user_id' => $user->id, 'transaction_id' => $deposit->id, 'type' => 'deposit', 'amount' => DecimalAmount::decimal($points), 'balance_after' => DecimalAmount::decimal($balance), 'description' => 'Depósito confirmado: conversão para a regra de '.$percent.'%', 'event_key' => 'deposit:'.$deposit->id, 'metadata' => json_encode(['legacy_conversion' => true]), 'created_at' => $deposit->created_at ?? now(), 'updated_at' => now()]);
                 }
                 DB::table('users')->where('id', $user->id)->update(['points' => DecimalAmount::decimal($balance)]);
                 DB::table('point_movements')->insert(['user_id' => $user->id, 'type' => 'adjustment', 'amount' => 0, 'balance_after' => DecimalAmount::decimal($balance), 'description' => 'Conversão do programa antigo: saldo recalculado por depósitos confirmados', 'event_key' => 'legacy-conversion:'.$user->id, 'metadata' => json_encode(['previous_points' => $user->points, 'recalculated_points' => DecimalAmount::decimal($balance), 'wallet_unchanged' => true]), 'created_at' => now(), 'updated_at' => now()]);

@@ -16,13 +16,16 @@
             </div>
         </section>
         <section id="configurar-tarifas" class="gw-card rounded-xl border border-gray-200 bg-white p-5 sm:p-7 dark:border-[#343843] dark:bg-[#1a1a1a]">
-            <h2 class="mb-2 text-lg font-semibold"><span class="gw-section-number">02</span>Tarifa e demanda</h2><p class="mb-5 text-sm text-gray-500 dark:text-gray-400">Defina o valor do kWh e como os reajustes por demanda serão aprovados. A tarifa é a mesma para todos os seus carregadores.</p>
+            <h2 class="mb-2 text-lg font-semibold"><span class="gw-section-number">02</span>Tarifa e demanda</h2><p class="mb-5 text-sm text-gray-500 dark:text-gray-400">Defina o valor do kWh e como os reajustes por demanda serão aprovados. Esta é a tarifa-base herdada pelos carregadores que não possuem tarifa própria.</p>
             @if($establishment)<p class="mb-5 rounded-lg bg-gray-50 p-4 text-sm dark:bg-[#181b22]">Tarifa vigente: <strong>R$ {{ number_format((float)$establishment->currentTariff(),4,',','.') }}/kWh</strong></p>@endif
             <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <x-manager-field name="cost_per_kwh" label="Tarifa-base (R$/kWh)" type="number" :value="$establishment?->cost_per_kwh" min="0.0001" max="9999.9999" step="0.0001" />
                 <label class="gw-field flex min-w-0 flex-col gap-2 text-sm font-medium">Modo de tarifação<select name="pricing_mode" required class="w-full min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-3 py-3 dark:border-[#343843] dark:bg-[#181b22]"><option value="">Selecione</option><option value="manual" @selected(old('pricing_mode',$establishment?->pricing_mode)==='manual')>Manual — aprovar cada reajuste</option><option value="automatic" @selected(old('pricing_mode',$establishment?->pricing_mode)==='automatic')>Automático — aplicar o percentual configurado</option></select>@error('pricing_mode')<span class="text-[#c62828] dark:text-red-300">{{ $message }}</span>@enderror</label>
                 <x-manager-field name="surge_percentage" label="Reajuste em períodos de pico (%)" type="number" :value="$establishment?->surge_percentage" min="0" max="99999.99" step="0.01" />
+                <x-manager-field name="max_power_kw" label="Potência máxima da instalação (kW)" type="number" :value="$establishment?->max_power_kw" :required="false" min="0" max="999999.99" step="0.01" />
+                <x-manager-field name="max_current_a" label="Corrente máxima da instalação (A)" type="number" :value="$establishment?->max_current_a" :required="false" min="0" max="999999.99" step="0.01" />
             </div>
+            <p class="mt-5 text-sm text-gray-500 dark:text-gray-400">Os limites elétricos são opcionais: quando preenchidos, novas recargas são bloqueadas se a demanda ativa agregada dos totens em recarga mais o carregador solicitado ultrapassar a capacidade. Deixe em branco para não impor limite.</p>
             <p class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-200">A detecção de picos depende da definição dos critérios de demanda e da integração do detector. A escolha do modo automático não inicia reajustes por conta própria.</p>
         </section>
         <section id="regras-reserva" class="gw-card rounded-xl border border-gray-200 bg-white p-5 sm:p-7 dark:border-[#343843] dark:bg-[#1a1a1a]">
