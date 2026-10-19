@@ -1,0 +1,258 @@
+/* Mapa de carregadores (Leaflet) — mesma experiência do app NFC, adaptada
+   ao tema do portal PowerTag (variáveis --pt-* do interface/portal). */
+
+.pt-map-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.pt-map-card .pt-card-heading {
+    padding: 20px 22px 0;
+    margin-bottom: 14px;
+}
+
+.pt-map-shell {
+    position: relative;
+    width: 100%;
+    height: clamp(340px, 52vh, 560px);
+    border-top: 1px solid var(--pt-border);
+    background: var(--pt-bg);
+}
+
+.pt-map-canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    z-index: 1;
+}
+
+/* Leaflet herda o tema escuro do portal quando aplicável. */
+.dark .leaflet-tile-pane {
+    filter: brightness(.92) invert(.92) contrast(.88) hue-rotate(180deg) saturate(.55) brightness(.92);
+}
+
+.leaflet-container {
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    background: var(--pt-bg);
+}
+
+.leaflet-control-zoom a {
+    background: var(--pt-paper) !important;
+    color: var(--pt-text) !important;
+    border-color: var(--pt-border) !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+    background: var(--pt-paper) !important;
+    color: var(--pt-text) !important;
+    box-shadow: var(--pt-shadow);
+}
+
+/* Indicador de carregamento centralizado. */
+.pt-map-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: color-mix(in srgb, var(--pt-paper) 82%, transparent);
+    backdrop-filter: blur(3px);
+    font-size: 13px;
+    color: var(--pt-muted);
+    text-align: center;
+    padding: 16px;
+}
+
+.pt-map-loading.is-active {
+    display: flex;
+}
+
+.pt-map-spinner {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border: 2px solid var(--pt-border);
+    border-top-color: var(--pt-accent);
+    border-radius: 50%;
+    animation: pt-map-spin .8s linear infinite;
+}
+
+@keyframes pt-map-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Contador de estações no canto superior direito. */
+.pt-map-count {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+    display: none;
+    max-width: calc(100% - 24px);
+    padding: 8px 12px;
+    border: 1px solid var(--pt-border);
+    border-radius: 8px;
+    background: var(--pt-paper);
+    box-shadow: var(--pt-shadow);
+    font-size: 12px;
+    color: var(--pt-muted);
+}
+
+.pt-map-count.is-active {
+    display: block;
+}
+
+.pt-map-count strong {
+    color: var(--pt-accent);
+}
+
+/* Marcadores. */
+.pt-map-marker {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    display: block;
+}
+
+.pt-map-marker-dot {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+    color: #fff;
+}
+
+.pt-map-marker-dot svg {
+    width: 16px;
+    height: 16px;
+}
+
+.pt-map-user-marker {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--pt-accent);
+    border: 3px solid #fff;
+    box-shadow: 0 2px 12px rgba(229, 57, 53, .45);
+}
+
+/* Popup do carregador. */
+.pt-map-popup {
+    min-width: 200px;
+}
+
+.pt-map-popup h3 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--pt-text);
+}
+
+.pt-map-popup p {
+    margin: 0 0 2px;
+    font-size: 12px;
+    color: var(--pt-muted);
+}
+
+.pt-map-popup-type {
+    display: inline-block;
+    margin: 6px 0;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--pt-accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 550;
+}
+
+.pt-map-popup-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: var(--pt-accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    transition: filter .2s;
+}
+
+.pt-map-popup-btn:hover {
+    filter: brightness(1.08);
+}
+
+/* Painel de rota. */
+.pt-map-route {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 1000;
+    display: none;
+}
+
+.pt-map-route.is-active {
+    display: block;
+}
+
+.pt-map-route-box {
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    border: 1px solid var(--pt-border);
+    border-radius: 12px;
+    background: var(--pt-paper);
+    box-shadow: var(--pt-shadow);
+}
+
+.pt-map-route-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--pt-text);
+}
+
+.pt-map-route-detail {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--pt-muted);
+}
+
+.pt-map-route-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--pt-accent);
+}
+
+.pt-map-route-cancel {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--pt-border);
+    border-radius: 10px;
+    background: var(--pt-paper);
+    color: var(--pt-text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+@media (max-width: 760px) {
+    .pt-map-shell {
+        height: 52vh;
+        min-height: 300px;
+    }
+}

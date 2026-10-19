@@ -31,16 +31,16 @@
         })();
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('styles')
 </head>
 <body class="pt-body portal-ui min-h-screen antialiased">
     <a href="#main-content" class="gw-skip-link">Pular para o conteúdo</a>
     @php
         $links = [
             ['name'=>__('portal.home'),'route'=>'user.home','active'=>'user.home','icon'=>'house','description'=>'Resumo da sua conta'],
-            ['name'=>__('nav.chargers'),'route'=>'chargers.index','active'=>['chargers.*','reservations.*','charging-sessions.*'],'icon'=>'zap','description'=>'Estações e reservas','children'=>[
-                ['name'=>'Minhas reservas','route'=>'chargers.index','hash'=>'minhas-reservas'],
-            ]],
-            ['name'=>__('nav.recharge'),'route'=>'totens.index','active'=>['totens.*'],'icon'=>'battery-charging','description'=>__('nav.recharge_hint')],
+            // A listagem de carregadores ficou restrita ao painel do gestor. O
+            // usuário encontra estações pelo mapa da tela "Recarga" (totens.index).
+            ['name'=>__('nav.recharge'),'route'=>'totens.index','active'=>['totens.*','chargers.*','reservations.*','charging-sessions.*'],'icon'=>'battery-charging','description'=>__('nav.recharge_hint')],
             ['name'=>__('nav.wallet'),'route'=>'wallet.index','active'=>'wallet.*','icon'=>'wallet','description'=>'Saldo e movimentações','children'=>[
                 ['name'=>'Adicionar saldo','route'=>'wallet.deposit.form'],
                 ['name'=>'Histórico financeiro','route'=>'wallet.history'],
@@ -82,6 +82,7 @@
     <x-user-chat-widget />
     <script src="{{ asset('js/theme.js') }}"></script>
 <script src="{{ asset('js/pwa.js') }}"></script>
+@stack('scripts')
 </body>
 </html>
 
