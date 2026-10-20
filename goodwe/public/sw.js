@@ -22,7 +22,10 @@
  * O activate apaga todos os caches antigos automaticamente.
  */
 
-const CACHE_VERSION = 'v1';
+// v2: charger-map.js/css e o Leaflet self-hosted (public/vendor/leaflet)
+// mudaram — sem isto o stale-while-revalidate continuaria servindo a versao
+// antiga do mapa cacheada na primeira visita apos o deploy.
+const CACHE_VERSION = 'v2';
 const CACHE_PREFIX = 'goodwe-pwa-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
