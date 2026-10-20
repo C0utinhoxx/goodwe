@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Establishment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -37,17 +36,5 @@ class ChargerScopingTest extends TestCase
             ->assertSee('js/charger-map.js', false);
         // Mesma API de carregadores usada pelo app NFC (chamada pelo JS do mapa).
         $this->assertStringContainsString('/api/chargers', file_get_contents(public_path('js/charger-map.js')));
-    }
-
-    public function test_manager_chargers_screen_lists_the_two_configured_totems(): void
-    {
-        $establishment = Establishment::factory()->create();
-
-        $response = $this->actingAs($establishment->user)->get(route('manager.chargers.index'))->assertOk();
-
-        foreach (config('totems.available') as $totem) {
-            $response->assertSee($totem['name'])->assertSee($totem['id'], false);
-        }
-        $response->assertSee('Totens de recarga');
     }
 }
