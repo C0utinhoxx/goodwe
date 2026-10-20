@@ -29,11 +29,13 @@ class ChargerScopingTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('totens.index'))->assertOk();
 
-        // Leaflet + container do mapa.
-        $response->assertSee('leaflet@1.9.4', false)
+        // Leaflet hospedado localmente (sem dependência de CDN externo) + container do mapa.
+        $response->assertSee('vendor/leaflet/1.9.4/leaflet.css', false)
+            ->assertSee('vendor/leaflet/1.9.4/leaflet.js', false)
             ->assertSee('id="pt-map-canvas"', false)
             ->assertSee('css/charger-map.css', false)
             ->assertSee('js/charger-map.js', false);
+        $this->assertStringNotContainsString('unpkg.com', $response->getContent());
         // Mesma API de carregadores usada pelo app NFC (chamada pelo JS do mapa).
         $this->assertStringContainsString('/api/chargers', file_get_contents(public_path('js/charger-map.js')));
     }

@@ -77,12 +77,12 @@
     @endif
 
     @push('styles')
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+        <link rel="stylesheet" href="{{ asset('vendor/leaflet/1.9.4/leaflet.css') }}">
         <link rel="stylesheet" href="{{ asset('css/charger-map.css') }}">
     @endpush
 
     @push('scripts')
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+        <script src="{{ asset('vendor/leaflet/1.9.4/leaflet.js') }}"></script>
         <script src="{{ asset('js/charger-map.js') }}" defer></script>
     @endpush
 </x-user-layout>

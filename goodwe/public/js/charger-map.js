@@ -288,9 +288,25 @@
     }
 
     function initMap() {
-        if (map || typeof L === 'undefined') return;
+        var container = el('pt-map-canvas');
 
-        map = L.map('pt-map-canvas', {
+        // Sem Leaflet (CDN/asset fora do ar) mostramos o motivo em vez de
+        // deixar a área do mapa simplesmente vazia e sem nenhum erro.
+        if (typeof L === 'undefined') {
+            showLoading(false);
+            showCount('Não foi possível carregar o mapa. Recarregue a página.');
+            if (container) {
+                container.innerHTML = '<div class="pt-map-fallback">'
+                    + '<strong>Mapa indisponível</strong>'
+                    + '<p>A biblioteca de mapas não foi carregada. Verifique sua conexão e recarregue a página.</p>'
+                    + '</div>';
+            }
+            return;
+        }
+
+        if (map || !container) return;
+
+        map = L.map(container, {
             center: [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng],
             zoom: 13,
             zoomControl: true,
@@ -326,6 +342,16 @@
         } else {
             usePosition(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng, 'Localização padrão');
         }
+
+        // O container pode ainda estar sendo layoutado quando o Leaflet é
+        // instanciado; sem isto os tiles saem fora de escala ou a área fica
+        // cinza até um zoom manual.
+        map.whenReady(function () {
+            map.invalidateSize();
+        });
+        window.addEventListener('load', function () {
+            if (map) map.invalidateSize();
+        });
     }
 
     // Delegação de cliques: botões "Ver rota" (popup) e "Cancelar rota".
