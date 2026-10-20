@@ -1,26 +1,6 @@
 <x-manager-legacy-layout>
     <x-slot name="header"><div><p class="mb-2 text-sm font-semibold text-[#c62828] dark:text-red-300">OPERAÇÃO</p><h1 class="text-3xl font-semibold">Carregadores</h1><p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Equipamentos de {{ $establishment->name }}</p></div></x-slot>
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4"><p class="text-sm text-gray-500 dark:text-gray-400">Tarifa vigente para todos os equipamentos: <strong class="text-gray-900 dark:text-white">R$ {{ number_format((float)$establishment->currentTariff(),4,',','.') }}/kWh</strong></p><a href="{{ route('manager.chargers.create') }}" class="gw-button gw-button-primary rounded-lg bg-[#c62828] px-5 py-3 text-sm font-semibold text-white">Adicionar carregador</a></div>
-
-    {{-- Totens de recarga fixos da operação (config/totems.php) — os mesmos
-         que o usuário vê na tela "Recarga". --}}
-    <div class="mb-8">
-        <h2 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Totens de recarga</h2>
-        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Totens operados pela sua loja.</p>
-        <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-            @foreach (config('totems.available', []) as $totem)
-                <article class="gw-card min-w-0 rounded-xl border border-gray-200 bg-white p-5 dark:border-[#343843] dark:bg-[#1a1a1a]">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <h3 class="break-words text-lg font-semibold">{{ $totem['name'] }}</h3>
-                        <span class="pt-status neutral font-mono">{{ $totem['id'] }}</span>
-                    </div>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $totem['location'] }}</p>
-                    <p class="mt-3 rounded-lg bg-gray-50 p-3 text-sm dark:bg-[#181b22]">Totem de recarga remota — acompanhe o controle pelo canal "Recarga" do painel.</p>
-                </article>
-            @endforeach
-        </div>
-    </div>
-
     <form method="GET" action="{{ route('manager.chargers.index') }}" class="gw-list-search"><label class="gw-field">Buscar equipamento<input type="search" name="search" value="{{ $search }}" maxlength="100" placeholder="Nome, código, localização ou conector" autocomplete="off"></label><button type="submit" class="gw-button gw-button-primary"><i data-lucide="search" aria-hidden="true"></i>Buscar</button>@if($search !== '')<a href="{{ route('manager.chargers.index') }}" class="gw-button gw-button-secondary">Limpar busca</a>@endif</form>
     <p class="gw-list-summary">{{ $chargers->total() }} equipamento(s) {{ $search !== '' ? 'encontrado(s) na sua loja' : 'cadastrado(s)' }}</p>
     <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">@forelse($chargers as $charger)<article class="gw-card min-w-0 rounded-xl border border-gray-200 bg-white p-5 dark:border-[#343843] dark:bg-[#1a1a1a]"><div class="flex flex-wrap items-start justify-between gap-3"><h2 class="break-words text-lg font-semibold">{{ $charger->name }}</h2><span class="pt-status {{ match($charger->status()) { 'available'=>'success', 'reserved'=>'reserved', 'in_use'=>'in-use', default=>'neutral' } }}">{{ __('auth.charger_status_'.$charger->status()) }}</span></div><p class="mt-3 break-all font-mono text-sm text-gray-500 dark:text-gray-400">{{ $charger->code }}</p><p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $charger->location }}</p><p class="mt-4 text-sm">{{ number_format((float)$charger->power_kw,2,',','.') }} kW · {{ $charger->connector }}</p><p class="mt-3 rounded-lg bg-gray-50 p-3 text-sm dark:bg-[#181b22]">{{ $charger->activation_status==='pending' ? 'Ativação física pendente' : ($charger->activation_status==='active' ? 'Ativação confirmada' : 'Cadastro legado — estado preservado') }}</p><a href="{{ route('manager.chargers.edit',$charger) }}" class="gw-button gw-button-secondary mt-5 w-full">Editar informações</a></article>@empty<div class="rounded-xl border border-dashed border-gray-300 p-10 text-center md:col-span-2 xl:col-span-3 dark:border-[#343843]"><h2 class="text-lg font-semibold">{{ $search !== '' ? 'Nenhum equipamento corresponde à busca' : 'Nenhum carregador cadastrado' }}</h2><p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $search !== '' ? 'Tente outro nome, código, localização ou conector.' : 'Adicione os equipamentos do seu estabelecimento para organizar a operação.' }}</p></div>@endforelse</div><div class="mt-6">{{ $chargers->links() }}</div>
