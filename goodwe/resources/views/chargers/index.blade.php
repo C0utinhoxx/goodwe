@@ -24,10 +24,10 @@
 
     <x-flash-messages />
 
-<section class="pt-card pt-filter-panel pt-mt">
-        <div class="pt-filter-top"><div class="pt-filter-search"><i data-lucide="search"></i><label for="charger-search" class="sr-only">Buscar carregador</label><input id="charger-search" type="search" placeholder="Nome, estabelecimento ou localização..." data-charger-search></div><label class="pt-select-label">Status <select data-charger-status><option value="all">Todos</option><option value="available">Disponíveis</option><option value="reserved">Reservados</option><option value="in_use">Em uso</option><option value="unavailable">Indisponíveis</option></select></label><label class="pt-select-label">Potência <select data-charger-power><option value="all">Todas</option>@foreach($chargers->pluck('power_kw')->unique()->sort() as $power)<option value="{{ (float) $power }}">{{ (float) $power }} kW</option>@endforeach</select></label></div>
-        <div class="pt-filter-foot"><span aria-live="polite"><strong data-charger-count>{{ $chargers->count() }}</strong> carregadores cadastrados</span><span>Disponibilidade e regras conferidas novamente ao confirmar.</span><button type="button" class="pt-text-link" data-charger-reset>Limpar filtros</button></div>
-    </section>
+<form class="pt-card pt-filter-panel pt-mt" method="GET" action="{{ route('chargers.index') }}" data-charger-filters>
+        <div class="pt-filter-top"><div class="pt-filter-search"><i data-lucide="search"></i><label for="charger-search" class="sr-only">Buscar carregador</label><input id="charger-search" name="q" type="search" value="{{ $filters['q'] }}" placeholder="Nome, estabelecimento ou localização..." data-charger-search></div><label class="pt-select-label">Status <select name="status" data-charger-status>@foreach(['all' => 'Todos', 'available' => 'Disponíveis', 'reserved' => 'Reservados', 'in_use' => 'Em uso', 'unavailable' => 'Indisponíveis'] as $value => $label)<option value="{{ $value }}" @selected($filters['status'] === $value)>{{ $label }}</option>@endforeach</select></label><label class="pt-select-label">Potência <select name="power" data-charger-power><option value="all">Todas</option>@foreach($powerOptions as $power)<option value="{{ (float) $power }}" @selected($filters['power'] === (float) $power)>{{ (float) $power }} kW</option>@endforeach</select></label><button type="submit" class="pt-button pt-button-outline">Filtrar</button></div>
+        <div class="pt-filter-foot"><span aria-live="polite"><strong data-charger-count>{{ $chargers->total() }}</strong> carregadores encontrados</span><span>Disponibilidade e regras conferidas novamente ao confirmar.</span><button type="button" class="pt-text-link" data-charger-reset>Limpar filtros</button></div>
+    </form>
     <section class="pt-chargers-grid" data-chargers-list>
         @foreach($chargers as $charger)
             @php($state = $charger->status())
@@ -41,7 +41,16 @@
 
         @endforeach
     </section>
-    @if($chargers->isEmpty())<section class="pt-card pt-mt"><div class="pt-empty"><i data-lucide="plug-zap"></i><strong>Nenhum carregador cadastrado para reservas</strong><p>Os estabelecimentos ainda precisam disponibilizar seus equipamentos e configurar as regras de reserva.</p></div></section>@endif
+    @if($chargers->isEmpty())
+        <section class="pt-card pt-mt"><div class="pt-empty"><i data-lucide="plug-zap"></i>
+            @if($filters['q'] !== '' || $filters['status'] !== 'all' || $filters['power'] !== null)
+                <strong>Nenhum carregador corresponde aos filtros selecionados</strong><p>Ajuste a busca, o status ou a potência para ver outros equipamentos.</p>
+            @else
+                <strong>Nenhum carregador cadastrado para reservas</strong><p>Os estabelecimentos ainda precisam disponibilizar seus equipamentos e configurar as regras de reserva.</p>
+            @endif
+        </div></section>
+    @endif
+    @if($chargers->hasPages())<div class="pt-mt">{{ $chargers->links() }}</div>@endif
     <div class="pt-empty" data-charger-empty hidden>Nenhum carregador corresponde aos filtros selecionados.</div>
 
     <section class="pt-card pt-mt" id="minhas-reservas">

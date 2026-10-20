@@ -27,4 +27,24 @@ return [
             'location' => 'Estacionamento',
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache das leituras do Firestore
+    |--------------------------------------------------------------------------
+    |
+    | `status_cache_seconds` cobre o endpoint consultado pelo polling da tela
+    | de recarga (a cada 2s): um valor baixo colapsa chamadas repetidas do
+    | mesmo totem sem atrasar a troca de estado percebida pelo usuário.
+    |
+    | `user_cache_seconds` cobre o documento da TAG lido na abertura da tela
+    | (saldo/status inicial), invalidado a cada escrita.
+    |
+    | Valores menores ou iguais a zero desativam o cache.
+    |
+    */
+
+    'status_cache_seconds' => (int) env('TOTEMS_STATUS_CACHE_SECONDS', 1),
+
+    'user_cache_seconds' => (int) env('TOTEMS_USER_CACHE_SECONDS', 10),
 ];

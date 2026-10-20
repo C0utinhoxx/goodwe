@@ -125,9 +125,7 @@ class UserChatbotController extends Controller
 
         $transactions = $this->walletService
 
-            ->getHistory($user)
-
-            ->take(10);
+            ->getHistory($user, 10);
 
         $transactionsText = $transactions->isEmpty()
 

@@ -132,9 +132,22 @@ class FirestoreService
         $this->firestore->collection($collection)->document($documentId)->set($data, ['merge' => true]);
     }
 
-    public function listCollection(string $collection): array
+    /**
+     * Lista os documentos de uma coleção.
+     *
+     * @param  int|null  $limit  Quantidade máxima de documentos lidos; sem
+     *                           limite a coleção inteira é percorrida via REST.
+     * @return array<int, array<string, mixed>>
+     */
+    public function listCollection(string $collection, ?int $limit = null): array
     {
-        $documents = $this->firestore->collection($collection)->documents();
+        $query = $this->firestore->collection($collection);
+
+        if ($limit !== null && $limit > 0) {
+            $query = $query->limit($limit);
+        }
+
+        $documents = $query->documents();
         $results = [];
 
         foreach ($documents as $document) {

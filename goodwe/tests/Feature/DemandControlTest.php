@@ -10,6 +10,7 @@ use App\Services\EstablishmentService;
 use App\Services\FirestoreService;
 use App\Services\MeteredChargingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\Fakes\FakeFirestoreService;
@@ -207,6 +208,44 @@ class DemandControlTest extends TestCase
         $this->assertSame(70.0, $status['total_active_current_a']);
         $this->assertSame(-2.0, $status['power_headroom_kw']);
         $this->assertSame(1, $status['active_sessions_count']);
+    }
+
+    public function test_status_uses_a_bounded_number_of_queries_instead_of_n_plus_one(): void
+    {
+        $store = $this->store();
+        $service = app(DemandControlService::class);
+        $driver = $this->driver();
+
+        foreach (range(1, 4) as $index) {
+            $charger = $this->charger($store, ['name' => "Carregador {$index}"]);
+            $this->beginChargingSession($store, $charger, $driver);
+            $service->recordReading($store, $charger, [
+                'external_id' => "reading-{$index}",
+                'active_power_kw' => 10,
+                'current_a' => 20,
+                'recorded_at' => now(),
+            ]);
+        }
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        $status = $service->status($store);
+
+        $this->assertCount(4, $status['active_sessions']);
+        $this->assertCount(4, $status['readings']);
+        $this->assertSame(40.0, $status['total_active_power_kw']);
+        // Sessões + eager loading de carregadores/usuários + uma única consulta
+        // de leituras. Antes, cada sessão e cada leitura disparava uma consulta
+        // própria (charger?->name e user?->name), além de a consulta de sessões
+        // ser repetida dentro de activeReadings().
+        $this->assertLessThanOrEqual(5, count($queries));
+        $this->assertCount(1, array_filter(
+            $queries,
+            fn (string $sql): bool => str_contains($sql, 'demand_readings')
+        ));
     }
 
     public function test_estimated_current_uses_three_phase_math(): void

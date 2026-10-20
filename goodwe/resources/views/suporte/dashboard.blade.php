@@ -102,6 +102,8 @@
             ],
         ];
 
+        // O filtro de status e as consultas de tickets/totais são resolvidos
+        // no SupportDashboardController; aqui ficam apenas os rótulos.
         if (! array_key_exists($pagina ?? '', $paginas)) {
             $pagina = null; // Visão Geral
         }
@@ -113,30 +115,7 @@
                'status' => null]
             : $paginas[$pagina];
 
-        $totais = [
-            'todos' => \App\Models\AtendimentoHumano::count(),
-            'aguardando' => \App\Models\AtendimentoHumano::where('status', 'aguardando')->count(),
-            'em_atendimento' => \App\Models\AtendimentoHumano::where('status', 'em_atendimento')->count(),
-            'resolvido' => \App\Models\AtendimentoHumano::where('status', 'resolvido')->count(),
-        ];
-
-        $consulta = \Illuminate\Support\Facades\DB::table('atendimento_humanos')
-            ->leftJoin('users', 'users.id', '=', 'atendimento_humanos.user_id')
-            ->select(
-                'atendimento_humanos.*',
-                'users.name as usuario_nome',
-                'users.is_admin as solicitante_gestor'
-            );
-
-        if ($configuracao['status'] !== null) {
-            $consulta->where('atendimento_humanos.status', $configuracao['status']);
-        }
-
-        $tickets = $consulta
-            ->orderByDesc('atendimento_humanos.created_at')
-            ->paginate(10)
-            ->withQueryString();
-
+        // $tickets e $totais são resolvidos no SupportDashboardController.
         $quantidadeAtual = $ehVisaoGeral
             ? $totais['todos']
             : $totais[$pagina];

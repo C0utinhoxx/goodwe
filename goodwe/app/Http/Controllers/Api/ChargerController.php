@@ -20,16 +20,29 @@ class ChargerController extends Controller
         private ChargingPaymentService $payments,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $chargers = array_map(
             fn (ChargingPoint $charger) => $this->transform($charger),
             ChargingSimulator::all(),
         );
 
+        // Limite por requisição: a rota pública podia devolver a base inteira
+        // de carregadores (uma linha com tarifa/status por equipamento) a cada
+        // chamada. Busca uma linha a mais para sinalizar se há mais páginas.
+        $perPage = min(max($request->integer('per_page', 500), 1), 1000);
+        $registered = Charger::where('is_demo', false)
+            ->with('establishment')
+            ->orderBy('name')
+            ->limit($perPage + 1)
+            ->get();
+        $hasMoreRegistered = $registered->count() > $perPage;
+
         return response()->json([
             'chargers' => $chargers,
-            'registered_chargers' => Charger::where('is_demo', false)->with('establishment')->orderBy('name')->get()->map(fn (Charger $c) => ['id' => $c->code, 'name' => $c->name, 'establishment' => $c->establishment->name, 'location' => $c->location, 'power_kw' => (float) $c->power_kw, 'status' => $c->status(), 'tariff_per_kwh' => $c->currentTariff(), 'can_reserve' => $c->canReserve(), 'source' => 'registered']),
+            'registered_chargers' => $registered->take($perPage)->map(fn (Charger $c) => ['id' => $c->code, 'name' => $c->name, 'establishment' => $c->establishment->name, 'location' => $c->location, 'power_kw' => (float) $c->power_kw, 'status' => $c->status(), 'tariff_per_kwh' => $c->currentTariff(), 'can_reserve' => $c->canReserve(), 'source' => 'registered']),
+            'registered_chargers_per_page' => $perPage,
+            'registered_chargers_has_more' => $hasMoreRegistered,
         ]);
     }
 

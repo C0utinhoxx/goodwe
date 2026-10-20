@@ -18,12 +18,18 @@ class WalletController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $history = $this->walletService->getHistory($user);
+        // Busca uma página a mais para sinalizar ao app se ainda há histórico,
+        // sem transferir a carteira inteira em uma única resposta.
+        $perPage = min(max($request->integer('per_page', 50), 1), 200);
+        $history = $this->walletService->getHistory($user, $perPage + 1);
+        $hasMore = $history->count() > $perPage;
 
         return response()->json([
             'balance' => (float) $user->balance,
             'points' => (float) $user->points,
-            'history' => $history->map(fn (Transaction $t) => $this->transformTransaction($t)),
+            'history' => $history->take($perPage)->values()->map(fn (Transaction $t) => $this->transformTransaction($t)),
+            'per_page' => $perPage,
+            'has_more' => $hasMore,
         ]);
     }
 

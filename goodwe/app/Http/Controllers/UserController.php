@@ -18,7 +18,6 @@ use Illuminate\View\View;
 
 class UserController extends Controller
 {
-
     /*
     |--------------------------------------------------------------------------
     | Tela de login
@@ -260,8 +259,15 @@ class UserController extends Controller
             return redirect()->route('support.dashboard');
         }
 
-        $reservations->expireDue();
-        $chargers = Charger::where('is_demo', false)->get();
+        $reservations->expireDueOnRequests();
+
+        // Disponibilidade e total saem de uma única agregação: antes a home
+        // carregava todos os modelos de carregador só para contar no PHP.
+        $chargerStats = Charger::query()
+            ->where('is_demo', false)
+            ->selectRaw('COUNT(*) as total_chargers')
+            ->selectRaw('COALESCE(SUM(CASE WHEN '.Charger::STATUS_SQL." = 'available' THEN 1 ELSE 0 END), 0) as available_chargers")
+            ->first();
 
         return view('user.home-usuario', [
             'sessions' => $user->chargingSessions()->where('is_demo', false)->with(['establishment', 'coupon'])->latest()->take(5)->get(),
@@ -269,8 +275,8 @@ class UserController extends Controller
             'activeReservations' => $user->reservations()->where('is_demo', false)->with(['charger', 'establishment'])->where('status', 'active')->latest()->get(),
             'recentTransactions' => $user->transactions()->where('is_demo', false)->latest()->take(5)->get(),
             'totalSessions' => $user->chargingSessions()->where('is_demo', false)->where('status', ChargingSession::STATUS_COMPLETED)->count(),
-            'availableChargers' => collect($chargers)->filter(fn ($charger) => $charger->isAvailable())->count(),
-            'totalChargers' => count($chargers),
+            'availableChargers' => (int) $chargerStats->available_chargers,
+            'totalChargers' => (int) $chargerStats->total_chargers,
         ]);
     }
 

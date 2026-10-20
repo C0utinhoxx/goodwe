@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChargerController;
+use App\Http\Controllers\Api\ChargingSessionController as ApiChargingSessionController;
 use App\Http\Controllers\Api\DemandReadingController;
 use App\Http\Controllers\Api\FirestoreUserController;
 use App\Http\Controllers\Api\WalletController;
@@ -63,6 +64,6 @@ Route::middleware(['auth:sanctum', 'portal.user'])->group(function () {
         Route::post('/users', [FirestoreUserController::class, 'store'])->name('users.store');
         Route::put('/users/{tagUid}', [FirestoreUserController::class, 'update'])->name('users.update');
         Route::post('/users/{tagUid}/comando', [FirestoreUserController::class, 'setCommand'])->name('users.command');
-        Route::get('/charging-sessions', [WebChargingSessionController::class, 'index'])->name('charging-sessions.index');
+        Route::get('/charging-sessions', [ApiChargingSessionController::class, 'index'])->name('charging-sessions.index');
     });
 });

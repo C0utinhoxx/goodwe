@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
@@ -38,13 +39,17 @@ class AuthController extends Controller
     {
         $credentials = [...$request->safe()->only(['email', 'password']), 'is_admin' => false];
 
-        if (! Auth::guard('web')->validate($credentials)) {
+        // Uma única consulta localiza o usuário: o Auth::validate() somado ao
+        // firstOrFail() baixava o mesmo registro duas vezes a cada login.
+        $user = User::where('email', $credentials['email'])
+            ->where('is_admin', false)
+            ->first();
+
+        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
             return response()->json([
                 'message' => __('auth.failed'),
             ], 401);
         }
-
-        $user = User::where('email', $credentials['email'])->where('is_admin', false)->firstOrFail();
 
         $user->tokens()->where('name', 'nfc-charger-app')->delete();
 

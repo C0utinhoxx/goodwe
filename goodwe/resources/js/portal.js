@@ -1,29 +1,23 @@
 function setupPortal() {
-    const search = document.querySelector('[data-charger-search]');
-    const status = document.querySelector('[data-charger-status]');
-    const power = document.querySelector('[data-charger-power]');
-    const filterStations = () => {
-        let count = 0;
-        document.querySelectorAll('[data-charger-card]').forEach(card => {
-            const match = card.dataset.search.includes((search?.value || '').trim().toLocaleLowerCase()) &&
-                (!status || status.value === 'all' || card.dataset.status === status.value) &&
-                (!power || power.value === 'all' || card.dataset.power === power.value);
-            card.hidden = !match;
-            if (match) count++;
+    const filters = document.querySelector('[data-charger-filters]');
+    if (filters) {
+        // Busca e filtros são resolvidos no servidor (a lista é paginada);
+        // o JS só envia o formulário, com atraso na digitação da busca.
+        const search = filters.querySelector('[data-charger-search]');
+        const selects = [
+            filters.querySelector('[data-charger-status]'),
+            filters.querySelector('[data-charger-power]'),
+        ];
+        let searchTimer;
+        search?.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => filters.submit(), 400);
         });
-        const total = document.querySelector('[data-charger-count]');
-        if (total) total.textContent = count;
-        const empty = document.querySelector('[data-charger-empty]');
-        if (empty) empty.hidden = count > 0;
-    };
-    [search, status, power].forEach(input => input?.addEventListener('input', filterStations));
-    document.querySelector('[data-charger-reset]')?.addEventListener('click', () => {
-        if (search) search.value = '';
-        if (status) status.value = 'all';
-        if (power) power.value = 'all';
-        filterStations();
-        search?.focus();
-    });
+        selects.forEach(select => select?.addEventListener('change', () => filters.submit()));
+        filters.querySelector('[data-charger-reset]')?.addEventListener('click', () => {
+            window.location.href = filters.action;
+        });
+    }
 
     const updateEstimate = dialog => {
         const estimate = dialog.querySelector('[data-estimate]');

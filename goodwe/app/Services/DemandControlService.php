@@ -8,6 +8,7 @@ use App\Models\DemandReading;
 use App\Models\Establishment;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -46,9 +47,7 @@ class DemandControlService
             throw ValidationException::withMessages(['recorded_at' => 'A leitura não pode estar no futuro.']);
         }
 
-        $powerKw = $this->normalizeNonNegative($data['active_power_kw'] ?? 0, 'active_power_kw');
-        $currentA = $this->normalizeNonNegative($data['current_a'] ?? null, 'current_a')
-            ?? round(self::estimateCurrentA($powerKw, $data['voltage_v'] ?? null), 3);
+        ['power_kw' => $powerKw, 'current_a' => $currentA] = $this->normalizeReportedPowerAndCurrent($data);
 
         return DB::transaction(function () use ($establishment, $charger, $data, $externalId, $recordedAt, $powerKw, $currentA) {
             $existing = DemandReading::where('establishment_id', $establishment->id)
@@ -56,14 +55,7 @@ class DemandControlService
                 ->lockForUpdate()
                 ->first();
             if ($existing) {
-                // Compara numericamente: o banco persiste decimal(3) e o valor
-                // recebido é normalizado para float, então a comparação textual
-                // divergiria ("10.500" !== "10.5").
-                $diverges = abs((float) $existing->active_power_kw - $powerKw) > 0.0005
-                    || abs((float) $existing->current_a - $currentA) > 0.0005;
-                if ($diverges) {
-                    throw ValidationException::withMessages(['external_id' => 'Leitura repetida com dados divergentes.']);
-                }
+                $this->assertReadingDoesNotDiverge($existing, $powerKw, $currentA);
 
                 return $existing;
             }
@@ -83,15 +75,18 @@ class DemandControlService
     }
 
     /**
-     * Lê os documentos dos totens no Firestore e registra uma leitura para
-     * cada carregador que reportar consumo. O FirestoreService é resolvido de
-     * forma tardia para não exigir credenciais do Firebase em fluxos que não
-     * sincronizam.
+     * Lê os documentos dos totens no Firestore e registra as leituras
+     * reportadas em um único lote.
+     *
+     * O Firestore é consultado uma vez por carregador (chamadas externas, uma
+     * após a outra), mas o banco é tocado com uma única transação: uma busca
+     * das leituras já existentes + um único INSERT do lote — em vez de uma
+     * transação por carregador como fazia a versão sequencial.
      */
     public function syncReadingsFromFirestore(Establishment $establishment): int
     {
         $firestore = app(FirestoreService::class);
-        $count = 0;
+        $entries = [];
 
         foreach ($establishment->chargers()->where('is_demo', false)->get() as $charger) {
             $totem = $firestore->getDocumentData('totems', $charger->code);
@@ -109,34 +104,91 @@ class DemandControlService
                 ? Carbon::parse($totem['medido_em'])
                 : now();
 
-            $this->recordReading($establishment, $charger, [
-                'external_id' => 'firestore:'.$charger->code.':'.$recordedAt->getTimestamp(),
+            $normalized = $this->normalizeReportedPowerAndCurrent([
                 'active_power_kw' => $powerKw ?? 0,
                 'current_a' => $currentA,
                 'voltage_v' => $totem['tensao_v'] ?? $totem['voltage_v'] ?? null,
-                'recorded_at' => $recordedAt,
-                'source' => DemandReading::SOURCE_FIRESTORE,
             ]);
 
-            $count++;
+            $entries[] = [
+                'charger' => $charger,
+                'external_id' => 'firestore:'.$charger->code.':'.$recordedAt->getTimestamp(),
+                'power_kw' => $normalized['power_kw'],
+                'current_a' => $normalized['current_a'],
+                'voltage_v' => $totem['tensao_v'] ?? $totem['voltage_v'] ?? null,
+                'recorded_at' => $recordedAt,
+            ];
         }
 
-        return $count;
+        if ($entries === []) {
+            return 0;
+        }
+
+        return DB::transaction(fn (): int => $this->storeReadingsBatch($establishment, $entries), 5);
     }
 
     /**
-     * Sessões em recarga (EM_ANDAMENTO) do estabelecimento.
+     * Grava o lote de leituras de forma idempotente: leituras repetidas (mesmo
+     * `external_id`) são reaproveitadas quando os valores batem e rejeitadas
+     * quando divergem.
+     *
+     * @param  array<int, array{charger: Charger, external_id: string, power_kw: float, current_a: float, voltage_v: mixed, recorded_at: CarbonInterface}>  $entries
+     */
+    private function storeReadingsBatch(Establishment $establishment, array $entries): int
+    {
+        $existing = DemandReading::where('establishment_id', $establishment->id)
+            ->whereIn('external_id', array_column($entries, 'external_id'))
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('external_id');
+
+        $rows = [];
+        foreach ($entries as $entry) {
+            $duplicate = $existing->get($entry['external_id']);
+            if ($duplicate !== null) {
+                $this->assertReadingDoesNotDiverge($duplicate, $entry['power_kw'], $entry['current_a']);
+
+                continue;
+            }
+
+            $rows[] = [
+                'establishment_id' => $establishment->id,
+                'charger_id' => $entry['charger']->id,
+                'external_id' => $entry['external_id'],
+                'active_power_kw' => $entry['power_kw'],
+                'current_a' => $entry['current_a'],
+                'voltage_v' => $entry['voltage_v'],
+                'recorded_at' => $entry['recorded_at'],
+                'source' => DemandReading::SOURCE_FIRESTORE,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if ($rows !== []) {
+            DemandReading::insert($rows);
+        }
+
+        return count($entries);
+    }
+
+    /**
+     * Leituras em recarga (EM_ANDAMENTO) do estabelecimento.
      */
     public function activeSessions(Establishment $establishment): Collection
     {
         return ChargingSession::where('establishment_id', $establishment->id)
             ->whereIn('charging_state', self::ACTIVE_CHARGING_STATES)
-            ->with('charger')
+            ->with(['charger:id,name', 'user:id,name'])
             ->get();
     }
 
     /**
      * Leitura mais recente de cada carregador dentro da janela de vigência.
+     *
+     * A seleção da leitura mais recente por carregador acontece no banco
+     * (GROUP BY + junção), evitando carregar todas as leituras da janela para
+     * deduplicar em PHP.
      *
      * @return Collection<int, DemandReading>
      */
@@ -144,9 +196,21 @@ class DemandControlService
     {
         $since ??= now()->subMinutes((int) config('demand.readings_window_minutes', 2));
 
-        return DemandReading::where('establishment_id', $establishment->id)
+        $latestPerCharger = DemandReading::query()
+            ->selectRaw('charger_id, MAX(recorded_at) as latest_recorded_at')
+            ->where('establishment_id', $establishment->id)
             ->where('recorded_at', '>=', $since)
-            ->orderByDesc('recorded_at')
+            ->whereNotNull('charger_id')
+            ->groupBy('charger_id');
+
+        return DemandReading::query()
+            ->joinSub($latestPerCharger, 'latest_reading', function (JoinClause $join): void {
+                $join->on('latest_reading.charger_id', '=', 'demand_readings.charger_id')
+                    ->on('latest_reading.latest_recorded_at', '=', 'demand_readings.recorded_at');
+            })
+            ->where('demand_readings.establishment_id', $establishment->id)
+            ->select('demand_readings.*')
+            ->with('charger:id,name')
             ->get()
             ->unique('charger_id')
             ->values();
@@ -155,17 +219,18 @@ class DemandControlService
     /**
      * Leituras vigentes dos carregadores que estão efetivamente em recarga.
      *
+     * @param  Collection<int, ChargingSession>|null  $activeSessions  Sessões já carregadas pelo chamador, para não consultar duas vezes.
      * @return Collection<int, DemandReading>
      */
-    public function activeReadings(Establishment $establishment): Collection
+    public function activeReadings(Establishment $establishment, ?Collection $activeSessions = null): Collection
     {
-        $activeChargerIds = $this->activeSessions($establishment)
+        $activeChargerIds = ($activeSessions ?? $this->activeSessions($establishment))
             ->pluck('charger_id')
             ->filter()
             ->all();
 
         return $this->latestReadingsByCharger($establishment)
-            ->filter(fn (DemandReading $reading) => $reading->charger_id !== null && in_array($reading->charger_id, $activeChargerIds, true))
+            ->filter(fn (DemandReading $reading) => in_array($reading->charger_id, $activeChargerIds, true))
             ->values();
     }
 
@@ -218,8 +283,10 @@ class DemandControlService
      */
     public function status(Establishment $establishment): array
     {
-        $activeReadings = $this->activeReadings($establishment);
+        // Uma única consulta de sessões alimenta as leituras ativas, o
+        // contador e a listagem — antes cada bloco repetia a mesma consulta.
         $sessions = $this->activeSessions($establishment);
+        $activeReadings = $this->activeReadings($establishment, $sessions);
 
         $totalPowerKw = round((float) $activeReadings->sum(fn (DemandReading $reading) => (float) $reading->active_power_kw), 3);
         $totalCurrentA = round((float) $activeReadings->sum(fn (DemandReading $reading) => (float) $reading->current_a), 3);
@@ -289,5 +356,36 @@ class DemandControlService
         }
 
         return round($numeric, 3);
+    }
+
+    /**
+     * Normaliza os valores elétricos reportados por um totem.
+     *
+     * @return array{power_kw: float, current_a: float}
+     */
+    private function normalizeReportedPowerAndCurrent(array $data): array
+    {
+        $powerKw = $this->normalizeNonNegative($data['active_power_kw'] ?? 0, 'active_power_kw');
+        $currentA = $this->normalizeNonNegative($data['current_a'] ?? null, 'current_a')
+            ?? round(self::estimateCurrentA($powerKw ?? 0.0, $data['voltage_v'] ?? null), 3);
+
+        return ['power_kw' => $powerKw ?? 0.0, 'current_a' => $currentA ?? 0.0];
+    }
+
+    /**
+     * Rejeita o reenvio de uma leitura já registrada com conteúdo divergente.
+     *
+     * A comparação é numérica: o banco persiste decimal(3) e o valor recebido
+     * é normalizado para float, então a comparação textual divergiria
+     * ("10.500" !== "10.5").
+     */
+    private function assertReadingDoesNotDiverge(DemandReading $reading, float $powerKw, float $currentA): void
+    {
+        $diverges = abs((float) $reading->active_power_kw - $powerKw) > 0.0005
+            || abs((float) $reading->current_a - $currentA) > 0.0005;
+
+        if ($diverges) {
+            throw ValidationException::withMessages(['external_id' => 'Leitura repetida com dados divergentes.']);
+        }
     }
 }
