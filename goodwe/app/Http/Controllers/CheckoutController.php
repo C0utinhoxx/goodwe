@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\PaymentGatewayInterface;
 use App\Http\Requests\StoreCheckoutRequest;
 use App\Models\Transaction;
 use App\Services\WalletService;
@@ -16,9 +17,38 @@ class CheckoutController extends Controller
 {
     public function __construct(
         private readonly WalletService $walletService,
+        private readonly PaymentGatewayInterface $gateway,
     ) {}
 
+    /**
+     * Checkout legado (contrato PaymentGatewayInterface). Mantido para os
+     * fluxos que ainda apontam para a rota nomeada `checkout`.
+     */
     public function checkout(StoreCheckoutRequest $request)
+    {
+        $amount = round((float) $request->validated('amount'), 2);
+        $user = $request->user();
+
+        $transaction = Transaction::create([
+            'user_id' => $user->id,
+            'type' => Transaction::TYPE_DEPOSIT,
+            'amount' => $amount,
+            'description' => "Deposito via MercadoPago de R$ {$amount}",
+            'status' => Transaction::STATUS_PENDING,
+        ]);
+
+        $preference = $this->gateway->createPreference($user, $amount, (string) $transaction->id);
+
+        $transaction->update(['reference' => $preference['id']]);
+
+        return redirect()->to($preference['init_point']);
+    }
+
+    /**
+     * Checkout Stripe (rota `stripe.create`). Integracao ainda em andamento no
+     * frontend; o botao correspondente permanece desabilitado ate a liberacao.
+     */
+    public function stripeCheckout(StoreCheckoutRequest $request)
     {
         $amount = round((float) $request->validated('amount'), 2);
         $user = $request->user();

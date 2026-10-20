@@ -3,24 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\AtendimentoHumano;
-
 use App\Services\ChargingSimulator;
-
 use App\Services\WalletService;
-
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\Http;
-
 use Illuminate\Support\Facades\Log;
-
 use Illuminate\Support\Str;
 
 class UserChatbotController extends Controller
-
 {
-
     public function __construct(
 
         private WalletService $walletService,
@@ -28,7 +20,6 @@ class UserChatbotController extends Controller
     ) {}
 
     public function page()
-
     {
 
         return view('user.chatbot', [
@@ -50,7 +41,6 @@ class UserChatbotController extends Controller
     }
 
     public function chat(Request $request)
-
     {
 
         $request->validate([
@@ -186,8 +176,7 @@ class UserChatbotController extends Controller
                     "Descrição: {$description}";
 
             })
-
-            ->implode("\n");
+                ->implode("\n");
 
         /*
 
@@ -248,8 +237,7 @@ class UserChatbotController extends Controller
                     "Status: {$status}";
 
             })
-
-            ->implode("\n");
+                ->implode("\n");
 
         /*
 
@@ -593,66 +581,76 @@ PROMPT;
 
             $data = $response->json();
             $triagem = null;
+            $textoBruto = null;
 
             foreach ($data['output'] ?? [] as $item) {
                 foreach ($item['content'] ?? [] as $content) {
                     if (($content['type'] ?? '') === 'output_text') {
-                        $triagem = json_decode($content['text'] ?? '', true);
+                        $textoBruto = $content['text'] ?? '';
+                        $triagem = json_decode($textoBruto, true);
                         break 2;
                     }
                 }
             }
 
             if (! is_array($triagem)) {
-                throw new \RuntimeException('A IA não retornou triagem válida.');
-            }
-
-            $escopo = $triagem['escopo'] ?? null;
-            $decisao = $triagem['decisao'] ?? null;
-            $respostaIA = trim((string) ($triagem['resposta'] ?? ''));
-
-            if ($escopo === 'fora_escopo') {
-                // Nunca criar ticket para assuntos externos à plataforma.
-                $answer = match ($locale) {
-                    'en' => 'I can help with GoodWe accounts, wallet, payments, charging sessions and chargers. Please ask about the platform.',
-                    'es' => 'Puedo ayudarte con cuentas, cartera, pagos, recargas y cargadores de GoodWe. Pregúntame sobre la plataforma.',
-                    default => 'Posso ajudar com a plataforma GoodWe: conta, carteira, pagamentos, recargas e carregadores. Faça uma pergunta relacionada a esses serviços.',
-                };
-            } elseif ($escopo === 'indefinido') {
-                // O pedido não descreve uma dúvida específica da plataforma.
-                $answer = match ($locale) {
-                    'en' => 'What GoodWe issue do you need help with? Please describe what happened.',
-                    'es' => '¿Con qué problema de GoodWe necesitas ayuda? Describe lo que ocurrió.',
-                    default => 'Qual dúvida ou problema da GoodWe você precisa resolver? Descreva o que aconteceu para eu tentar ajudar.',
-                };
-            } elseif ($escopo === 'goodwe' && $decisao === 'escalar') {
-                // ÚNICO caminho de abertura automática:
-                // assunto dentro da GoodWe + impossível resolver com segurança.
-                $answer = $this->criarAtendimento(
-                    $user,
-                    $message,
-                    'Encaminhado pelo chatbot após triagem',
-                    $locale
-                );
-            } elseif ($escopo === 'goodwe' && in_array($decisao, [
-                'responder', 'pedir_detalhes',
-            ], true)) {
-                // Fora da decisão "escalar", não oferecer abertura de tickets.
-                // Defesa adicional para quando o texto livre da IA contrariar a triagem.
-                if (preg_match('/(?:abrir|criar|registrar|gerar) (?:um |uma )?(?:ticket|chamado|solicita[cç][aã]o de atendimento)/iu', $respostaIA)) {
-                    $respostaIA = '';
+                // Fallback: se a IA devolveu texto simples (não JSON de triagem),
+                // devolve o texto ao usuário sem criar ticket. Seguro porque não
+                // aciona nenhuma ação — apenas responde.
+                $fallback = is_string($textoBruto) ? trim($textoBruto) : '';
+                if ($fallback !== '') {
+                    $answer = $fallback;
+                } else {
+                    throw new \RuntimeException('A IA não retornou triagem válida.');
                 }
-
-                $answer = $respostaIA !== ''
-                    ? $respostaIA
-                    : match ($locale) {
-                        'en' => 'Could you provide a little more detail about your GoodWe question?',
-                        'es' => '¿Puedes dar más detalles sobre tu consulta de GoodWe?',
-                        default => 'Pode me dar mais detalhes sobre sua dúvida na GoodWe?',
-                    };
             } else {
-                // Não confiar em combinações inconsistentes vindas da IA.
-                throw new \RuntimeException('Classificação de triagem inconsistente.');
+                $escopo = $triagem['escopo'] ?? null;
+                $decisao = $triagem['decisao'] ?? null;
+                $respostaIA = trim((string) ($triagem['resposta'] ?? ''));
+
+                if ($escopo === 'fora_escopo') {
+                    // Nunca criar ticket para assuntos externos à plataforma.
+                    $answer = match ($locale) {
+                        'en' => 'I can help with GoodWe accounts, wallet, payments, charging sessions and chargers. Please ask about the platform.',
+                        'es' => 'Puedo ayudarte con cuentas, cartera, pagos, recargas y cargadores de GoodWe. Pregúntame sobre la plataforma.',
+                        default => 'Posso ajudar com a plataforma GoodWe: conta, carteira, pagamentos, recargas e carregadores. Faça uma pergunta relacionada a esses serviços.',
+                    };
+                } elseif ($escopo === 'indefinido') {
+                    // O pedido não descreve uma dúvida específica da plataforma.
+                    $answer = match ($locale) {
+                        'en' => 'What GoodWe issue do you need help with? Please describe what happened.',
+                        'es' => '¿Con qué problema de GoodWe necesitas ayuda? Describe lo que ocurrió.',
+                        default => 'Qual dúvida ou problema da GoodWe você precisa resolver? Descreva o que aconteceu para eu tentar ajudar.',
+                    };
+                } elseif ($escopo === 'goodwe' && $decisao === 'escalar') {
+                    // ÚNICO caminho de abertura automática:
+                    // assunto dentro da GoodWe + impossível resolver com segurança.
+                    $answer = $this->criarAtendimento(
+                        $user,
+                        $message,
+                        'Encaminhado pelo chatbot após triagem',
+                        $locale
+                    );
+                } elseif ($escopo === 'goodwe' && in_array($decisao, [
+                    'responder', 'pedir_detalhes',
+                ], true)) {
+                    // Fora da decisão "escalar", não oferecer abertura de tickets.
+                    // Defesa adicional para quando o texto livre da IA contrariar a triagem.
+                    if (preg_match('/(?:abrir|criar|registrar|gerar) (?:um |uma )?(?:ticket|chamado|solicita[cç][aã]o de atendimento)/iu', $respostaIA)) {
+                        $respostaIA = '';
+                    }
+
+                    $answer = $respostaIA !== ''
+                        ? $respostaIA
+                        : match ($locale) {
+                            'en' => 'Could you provide a little more detail about your GoodWe question?',
+                            'es' => '¿Puedes dar más detalles sobre tu consulta de GoodWe?',
+                            default => 'Pode me dar mais detalhes sobre sua dúvida na GoodWe?',
+                        };
+                } else {
+                    // Não confiar em combinações inconsistentes vindas da IA.
+                    throw new \RuntimeException('Classificação de triagem inconsistente.');
+                }
             }
 
         } catch (\Throwable $e) {
@@ -876,7 +874,6 @@ PROMPT;
     }
 
     private function safeText($value): string
-
     {
 
         if (
@@ -904,7 +901,6 @@ PROMPT;
     }
 
     public function clear(Request $request)
-
     {
 
         $request->session()->forget(
@@ -920,5 +916,4 @@ PROMPT;
         ]);
 
     }
-
 }

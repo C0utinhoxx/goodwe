@@ -42,7 +42,7 @@ class ManagerChargerController extends Controller
     public function store(ManagerChargerRequest $request): RedirectResponse
     {
         try {
-            $request->user()->establishment->chargers()->create([...$request->safe()->only(['code', 'name', 'location', 'power_kw', 'connector', 'lat', 'lng']), 'activation_status' => 'pending', 'physical_status' => 'unavailable']);
+            $request->user()->establishment->chargers()->create([...$request->safe()->only(['code', 'name', 'location', 'power_kw', 'connector', 'lat', 'lng', 'tariff_override']), 'activation_status' => 'pending', 'physical_status' => 'unavailable']);
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['code' => 'Este identificador já está cadastrado. Não é possível assumir um equipamento de outro cadastro.']);
         }
@@ -59,7 +59,7 @@ class ManagerChargerController extends Controller
 
     public function update(ManagerChargerRequest $request, Charger $charger): RedirectResponse
     {
-        $charger->update($request->safe()->only(['name', 'location', 'power_kw', 'connector', 'lat', 'lng']));
+        $charger->update($request->safe()->only(['name', 'location', 'power_kw', 'connector', 'lat', 'lng', 'tariff_override']));
 
         return redirect()->route('manager.chargers.index')->with('success', 'Informações administrativas do carregador atualizadas.');
     }

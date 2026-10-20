@@ -10,10 +10,20 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ isset($pageTitle) ? $pageTitle.' · ' : '' }}PowerTag</title>
-    <link rel="icon" href="{{ asset('imagens/goodwe-logo.png') }}" type="image/x-icon">
+    <link rel="icon" href="{{ asset('imagens/goodwe-logo.png') }}" type="image/png">
+
+    <!-- PWA -->
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#0f1117">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GoodWe">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
     <script>
         (() => {
             const theme = localStorage.getItem('theme');
@@ -21,16 +31,16 @@
         })();
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('styles')
 </head>
 <body class="pt-body portal-ui min-h-screen antialiased">
     <a href="#main-content" class="gw-skip-link">Pular para o conteúdo</a>
     @php
         $links = [
             ['name'=>__('portal.home'),'route'=>'user.home','active'=>'user.home','icon'=>'house','description'=>'Resumo da sua conta'],
-            ['name'=>__('nav.chargers'),'route'=>'chargers.index','active'=>['chargers.*','reservations.*','charging-sessions.*'],'icon'=>'zap','description'=>'Estações e reservas','children'=>[
-                ['name'=>'Minhas reservas','route'=>'chargers.index','hash'=>'minhas-reservas'],
-            ]],
-            ['name'=>__('nav.recharge'),'route'=>'totens.index','active'=>['totens.*'],'icon'=>'battery-charging','description'=>__('nav.recharge_hint')],
+            // A listagem de carregadores ficou restrita ao painel do gestor. O
+            // usuário encontra estações pelo mapa da tela "Recarga" (totens.index).
+            ['name'=>__('nav.recharge'),'route'=>'totens.index','active'=>['totens.*','chargers.*','reservations.*','charging-sessions.*'],'icon'=>'battery-charging','description'=>__('nav.recharge_hint')],
             ['name'=>__('nav.wallet'),'route'=>'wallet.index','active'=>'wallet.*','icon'=>'wallet','description'=>'Saldo e movimentações','children'=>[
                 ['name'=>'Adicionar saldo','route'=>'wallet.deposit.form'],
                 ['name'=>'Histórico financeiro','route'=>'wallet.history'],
@@ -71,6 +81,8 @@
     <x-portal-commands />
     <x-user-chat-widget />
     <script src="{{ asset('js/theme.js') }}"></script>
+<script src="{{ asset('js/pwa.js') }}"></script>
+@stack('scripts')
 </body>
 </html>
 

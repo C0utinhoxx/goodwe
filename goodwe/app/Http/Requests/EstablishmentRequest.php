@@ -21,6 +21,13 @@ class EstablishmentRequest extends FormRequest
         if (is_string($this->input('cnpj'))) {
             $this->merge(['cnpj' => Cnpj::normalize($this->input('cnpj'))]);
         }
+
+        // Limites elétricos vazios significam "sem limite configurado".
+        foreach (['max_power_kw', 'max_current_a'] as $limit) {
+            if ($this->has($limit) && $this->input($limit) === '') {
+                $this->merge([$limit => null]);
+            }
+        }
     }
 
     public function rules(): array
@@ -39,6 +46,8 @@ class EstablishmentRequest extends FormRequest
             'surge_percentage' => ['required', 'regex:/^[0-9]{1,5}(?:\.[0-9]{1,2})?$/D'],
             'reservation_tolerance_minutes' => ['required', 'integer', 'min:1', 'max:'.max(1, intdiv(2147483647 - now()->timestamp, 60))],
             'no_show_penalty_points' => ['required', 'regex:/^[0-9]{1,10}(?:\.[0-9]{1,2})?$/D'],
+            'max_power_kw' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'max_current_a' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             'user_id' => ['prohibited'], 'establishment_id' => ['prohibited'], 'active_peak_id' => ['prohibited'], 'peak_tariff' => ['prohibited'],
         ];
     }
@@ -68,6 +77,6 @@ class EstablishmentRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['name' => 'nome', 'cnpj' => 'CNPJ', 'address' => 'endereço', 'phone' => 'telefone', 'type' => 'tipo de estabelecimento', 'operating_hours' => 'horário de funcionamento', 'cost_per_kwh' => 'tarifa-base', 'pricing_mode' => 'modo de tarifação', 'surge_percentage' => 'percentual de reajuste', 'reservation_tolerance_minutes' => 'tempo de tolerância', 'no_show_penalty_points' => 'penalidade em pontos', 'code' => 'identificador do equipamento', 'location' => 'localização', 'power_kw' => 'potência', 'connector' => 'conector'];
+        return ['name' => 'nome', 'cnpj' => 'CNPJ', 'address' => 'endereço', 'phone' => 'telefone', 'type' => 'tipo de estabelecimento', 'operating_hours' => 'horário de funcionamento', 'cost_per_kwh' => 'tarifa-base', 'max_power_kw' => 'potência máxima', 'max_current_a' => 'corrente máxima', 'pricing_mode' => 'modo de tarifação', 'surge_percentage' => 'percentual de reajuste', 'reservation_tolerance_minutes' => 'tempo de tolerância', 'no_show_penalty_points' => 'penalidade em pontos', 'code' => 'identificador do equipamento', 'location' => 'localização', 'power_kw' => 'potência', 'connector' => 'conector'];
     }
 }

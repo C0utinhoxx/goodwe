@@ -1,5 +1,5 @@
 <x-user-layout>
-    <x-slot name="pageTitle">Carregadores</x-slot>
+    <x-slot name="pageTitle">{{ __('chargers.title') }}</x-slot>
 
     <x-slot name="header">
         <div class="flex items-center justify-between gap-4">

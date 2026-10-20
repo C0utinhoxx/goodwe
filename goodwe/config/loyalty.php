@@ -1,7 +1,8 @@
 <?php
 
 return [
-    'deposit_percent' => 10,
+    // Percentual do valor depositado convertido em pontos de fidelidade.
+    'deposit_percent' => 5,
     'coupons' => [
         'bronze' => ['name' => 'Bronze', 'points' => '10.00', 'percent' => 5],
         'prata' => ['name' => 'Prata', 'points' => '25.00', 'percent' => 10],

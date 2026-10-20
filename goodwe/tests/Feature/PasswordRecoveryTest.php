@@ -50,7 +50,10 @@ class PasswordRecoveryTest extends TestCase
     {
         $user = User::factory()->create(['phone' => '11987654321']);
 
-        $this->withSession(['password_recovery_user_id' => $user->id]);
+        $this->withSession([
+            'password_recovery_user_id' => $user->id,
+            'password_recovery_verified' => true,
+        ]);
 
         $response = $this->post(route('user.password.update'), [
             'password' => 'nova123',

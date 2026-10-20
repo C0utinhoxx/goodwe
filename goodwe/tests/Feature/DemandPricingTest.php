@@ -133,7 +133,8 @@ class DemandPricingTest extends TestCase
         $this->assertSame('applied', $first->decision);
         $this->assertSame('2.1900', $store->fresh()->currentTariff());
         $this->assertSame('2.1900', $a->fresh()->currentTariff());
-        $this->assertSame('2.1900', $b->fresh()->currentTariff());
+        // O carregador com tarifa própria não é afetado pelo reajuste do estabelecimento.
+        $this->assertSame('99.0000', $b->fresh()->currentTariff());
         $this->assertDatabaseCount('demand_peaks', 1);
         $this->assertSame(1, TariffEvent::where('type', 'automatic_adjustment')->count());
         $this->expectInvalid(fn () => $this->begin($store, 'overlapping'));
@@ -277,10 +278,10 @@ class DemandPricingTest extends TestCase
         $beforeSession = $meter->startConfirmed($driver, $beforeCharger, 'before', $before->id);
         $afterSession = $meter->startConfirmed($driver, $afterCharger, 'after');
         $this->assertSame('1.9000', $beforeSession->tariff_per_kwh);
-        $this->assertSame('2.1900',$duringSession->fresh()->tariff_per_kwh);
-        $this->assertSame('1.9000',$afterSession->tariff_per_kwh);
-        $this->assertSame('100.00',$driver->fresh()->balance);
-        $this->assertSame('25.00',$driver->fresh()->points);
+        $this->assertSame('2.1900', $duringSession->fresh()->tariff_per_kwh);
+        $this->assertSame('1.9000', $afterSession->tariff_per_kwh);
+        $this->assertSame('100.00', $driver->fresh()->balance);
+        $this->assertSame('25.00', $driver->fresh()->points);
     }
 
     public function test_alert_history_is_scoped_and_cannot_be_selected_through_query_parameters(): void
@@ -288,6 +289,6 @@ class DemandPricingTest extends TestCase
         $own = $this->store();
         $other = $this->store();
         $this->begin($other);
-        $this->actingAs($own->user)->get(route('manager.demand.index',['establishment_id' => $other->id]))->assertOk()->assertDontSee('Pico de demanda registrado')->assertViewHas('events',fn ($events) => $events->count() === 0);
+        $this->actingAs($own->user)->get(route('manager.demand.index', ['establishment_id' => $other->id]))->assertOk()->assertDontSee('Pico de demanda registrado')->assertViewHas('events', fn ($events) => $events->count() === 0);
     }
 }

@@ -23,7 +23,7 @@ class LoyaltyTest extends TestCase
 
     public static function deposits(): array
     {
-        return [[100, '10.00'], [85.50, '8.55'], [1.05, '0.11']];
+        return [[100, '5.00'], [85.50, '4.28'], [1.05, '0.05']];
     }
 
     #[DataProvider('deposits')]
@@ -187,7 +187,7 @@ class LoyaltyTest extends TestCase
         $deposit = $wallet->deposit($user, 85.50);
         $wallet->refundDeposit($deposit, '20.00');
         $this->assertSame('65.50', $user->refresh()->balance);
-        $this->assertSame('6.55', $user->points);
+        $this->assertSame('3.28', $user->points);
         $wallet->refundDeposit($deposit, '85.50');
         $wallet->refundDeposit($deposit, '85.50');
         $this->assertSame('0.00', $user->refresh()->balance);
@@ -200,12 +200,12 @@ class LoyaltyTest extends TestCase
     {
         $user = User::factory()->create();
         $wallet = app(WalletService::class);
-        $deposit = $wallet->deposit($user, 100);
+        $deposit = $wallet->deposit($user, 200);
         app(LoyaltyService::class)->redeem($user, 'bronze', (string) Str::uuid());
-        $wallet->refundDeposit($deposit, '100.00');
-        $wallet->refundDeposit($deposit, '100.00');
+        $wallet->refundDeposit($deposit, '200.00');
+        $wallet->refundDeposit($deposit, '200.00');
         $this->assertTrue($deposit->refresh()->refund_review_required);
-        $this->assertSame('100.00', $user->refresh()->balance);
+        $this->assertSame('200.00', $user->refresh()->balance);
         $this->assertSame('0.00', $user->points);
         $this->assertSame('0.00', $deposit->refunded_amount);
         $this->assertDatabaseCount('point_movements', 3);

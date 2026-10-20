@@ -1,3 +1,33 @@
+/* PWA Fullscreen App Mode — no borders, full viewport coverage */
+html.pt-fullscreen, html.pt-fullscreen body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+}
+html.pt-fullscreen .pt-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+}
+html.pt-fullscreen .pt-content {
+    height: calc(100dvh - 80px);
+    overflow-y: auto;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+html.pt-fullscreen .pt-sidebar {
+    height: 100dvh;
+    padding-top: calc(24px + env(safe-area-inset-top));
+}
+html.pt-fullscreen .pt-topbar {
+    padding-top: env(safe-area-inset-top);
+    height: calc(80px + env(safe-area-inset-top));
+}
+html.pt-fullscreen .pt-footer {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    margin-top: 0;
+}
+
 /* User portal components; shared navigation and design tokens live in interface.css. */
 /* Match the GoodWe login and manager palette; semantic status colors stay distinct. */
 .pt-body { --pt-bg:#fdfdfc; --pt-paper:#fff; --pt-text:#1b1b18; --pt-muted:#706f6c; --pt-border:#e3e3e0; --pt-brand:#e53935; --pt-accent:#c62828; --pt-accent-dark:#b71c1c; --pt-button:#d32f2f; --pt-soft:#fff1f0; --pt-success:#168047; --pt-shadow:0 8px 32px rgba(27,27,24,.035); }

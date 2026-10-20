@@ -152,17 +152,48 @@ class ManagerAdministrationTest extends TestCase
         $this->assertDatabaseCount('chargers', 1);
     }
 
-    public function test_charger_editor_cannot_change_identity_activation_physical_status_or_tariff(): void
+    public function test_charger_editor_cannot_change_identity_activation_or_physical_status(): void
     {
         $own = $this->store();
         $charger = Charger::factory()->for($own)->create();
-        $this->actingAs($own->user)->patchJson(route('manager.chargers.update', $charger), array_merge($this->chargerPayload(), ['physical_status' => 'available', 'activation_status' => 'active', 'establishment_id' => $own->id, 'tariff_override' => '0.01']))->assertUnprocessable()->assertJsonValidationErrors(['code', 'physical_status', 'activation_status', 'establishment_id', 'tariff_override']);
-        $this->assertNull($charger->fresh()->tariff_override);
+        $this->actingAs($own->user)->patchJson(route('manager.chargers.update', $charger), array_merge($this->chargerPayload(), ['physical_status' => 'available', 'activation_status' => 'active', 'establishment_id' => $own->id]))->assertUnprocessable()->assertJsonValidationErrors(['code', 'physical_status', 'activation_status', 'establishment_id']);
         $data = $this->chargerPayload(['name' => 'Nome atualizado']);
         unset($data['code']);
         $this->patch(route('manager.chargers.update', $charger), $data)->assertRedirect(route('manager.chargers.index'));
         $this->assertSame('Nome atualizado', $charger->fresh()->name);
         $this->assertSame($charger->code, $charger->fresh()->code);
+    }
+
+    public function test_charger_tariff_is_tied_to_each_charger_and_falls_back_to_establishment(): void
+    {
+        $own = $this->store();
+        $charger = Charger::factory()->for($own)->create();
+
+        // Sem tarifa própria, o carregador herda a tarifa-base do estabelecimento.
+        $this->assertSame('1.9000', $charger->currentTariff());
+
+        // O gestor define uma tarifa própria para o carregador.
+        $payload = $this->chargerPayload(['tariff_override' => '2.5000']);
+        unset($payload['code']);
+        $this->actingAs($own->user)->patch(route('manager.chargers.update', $charger), $payload)->assertRedirect(route('manager.chargers.index'));
+        $this->assertSame('2.5000', $charger->fresh()->tariff_override);
+        $this->assertSame('2.5000', $charger->fresh()->currentTariff());
+
+        // A tarifa própria é a que vale para reservas e sessões.
+        $driver = User::factory()->create(['balance' => 100]);
+        $reserve = app(ReservationService::class)->reserve($driver, $charger->fresh(), (string) Str::uuid());
+        $this->assertSame('2.5000', $reserve->tariff_per_kwh);
+        app(ReservationService::class)->cancel($driver, $reserve);
+        $session = app(MeteredChargingService::class)->startConfirmed($driver, $charger->fresh(), 'tariff-direct');
+        $this->assertSame('2.5000', $session->tariff_per_kwh);
+
+        // Deixar o campo vazio remove a tarifa própria e volta a herdar do estabelecimento.
+        $clear = $this->chargerPayload();
+        unset($clear['code']);
+        $clear['tariff_override'] = '';
+        $this->patch(route('manager.chargers.update', $charger), $clear)->assertRedirect(route('manager.chargers.index'));
+        $this->assertNull($charger->fresh()->tariff_override);
+        $this->assertSame('1.9000', $charger->fresh()->currentTariff());
     }
 
     public function test_charger_search_covers_all_fields_without_crossing_the_establishment_boundary(): void
@@ -222,20 +253,23 @@ class ManagerAdministrationTest extends TestCase
         $this->postJson(route('manager.chargers.store'), $this->chargerPayload())->assertForbidden();
     }
 
-    public function test_portal_and_api_show_the_unique_tariff_even_with_a_legacy_override(): void
+    public function test_portal_and_api_show_the_per_charger_tariff_with_establishment_fallback(): void
     {
         $store = $this->store();
         $a = Charger::factory()->for($store)->create(['tariff_override' => '9.0000']);
         $b = Charger::factory()->for($store)->create(['tariff_override' => '7.0000']);
-        $this->assertSame('1.9000', $a->currentTariff());
-        $this->assertSame('1.9000', $b->currentTariff());
+        $c = Charger::factory()->for($store)->create();
+        $this->assertSame('9.0000', $a->currentTariff());
+        $this->assertSame('7.0000', $b->currentTariff());
+        $this->assertSame('1.9000', $c->currentTariff());
         $driver = User::factory()->create(['balance' => 100]);
-        $this->actingAs($driver)->get(route('chargers.index'))->assertOk()->assertSee('1,9000');
-        $registered = $this->getJson('/api/chargers')->assertOk()->json('registered_chargers');
-        $this->assertSame('1.9000', collect($registered)->firstWhere('id', $a->code)['tariff_per_kwh']);
+        $this->actingAs($driver)->get(route('chargers.index'))->assertOk()->assertSee('9,0000')->assertSee('1,9000');
+        $registered = collect($this->getJson('/api/chargers')->assertOk()->json('registered_chargers'));
+        $this->assertSame('9.0000', $registered->firstWhere('id', $a->code)['tariff_per_kwh']);
+        $this->assertSame('1.9000', $registered->firstWhere('id', $c->code)['tariff_per_kwh']);
         $reserve = app(ReservationService::class)->reserve($driver, $a, (string) Str::uuid());
-        $session = app(MeteredChargingService::class)->startConfirmed($driver, $b, 'without-reservation');
-        $this->assertSame('1.9000', $reserve->tariff_per_kwh);
+        $session = app(MeteredChargingService::class)->startConfirmed($driver, $c, 'without-reservation');
+        $this->assertSame('9.0000', $reserve->tariff_per_kwh);
         $this->assertSame('1.9000', $session->tariff_per_kwh);
         $this->assertSame('9.0000', $a->fresh()->tariff_override);
     }

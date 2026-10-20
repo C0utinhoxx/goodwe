@@ -168,7 +168,7 @@
     "wallet.description": "Descricao",
     "wallet.available_balance_label": "Saldo disponivel",
     "wallet.total_points_label": "Total de pontos",
-    "wallet.points_accumulated_info": "Pontos acumulados automaticamente a cada deposito e recarga (10% de volta).",
+    "wallet.points_accumulated_info": "Pontos acumulados automaticamente a cada deposito e recarga (5% de volta).",
     "nav.gestor": "Gestor",
     "manager.dashboard": "Painel do Gestor",
     "manager.total_sessions": "Total historico de sessoes",

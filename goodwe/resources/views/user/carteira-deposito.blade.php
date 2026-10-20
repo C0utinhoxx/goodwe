@@ -7,15 +7,23 @@
             @if(app()->environment(['local', 'testing']))
                 <form id="wallet-test-deposit" method="POST" action="{{ route('wallet.deposit.store') }}">@csrf<input type="hidden" name="idempotency_key" value="{{ Illuminate\Support\Str::uuid() }}"><input type="hidden" name="amount" value="{{ old('amount', 50) }}" data-amount-mirror></form>
             @endif
-            <form id="stripe-checkout" method="POST" action="{{ route('stripe.create') }}">@csrf</form>
-            <label class="pt-field">Valor do depósito (R$)<input id="deposit-amount" type="number" name="amount" form="stripe-checkout" min="1" max="10000" step="0.01" value="{{ old('amount', 50) }}" required aria-describedby="deposit-help"></label>
+            @if(config('services.stripe.secret'))
+                <form id="stripe-checkout" method="POST" action="{{ route('stripe.create') }}">@csrf</form>
+            @endif
+            <label class="pt-field">Valor do depósito (R$)<input id="deposit-amount" type="number" name="amount" @if(config('services.stripe.secret')) form="stripe-checkout" @elseif(app()->environment(['local', 'testing'])) form="wallet-test-deposit" @endif min="1" max="10000" step="0.01" value="{{ old('amount', 50) }}" required aria-describedby="deposit-help"></label>
             <div class="pt-amount-presets">@foreach([20,50,100,200] as $amount)<button type="button" data-set-amount="{{ $amount }}">R$ {{ $amount }}</button>@endforeach</div>
-            <p class="pt-form-note" id="deposit-help">O pagamento será realizado pelo checkout da Stripe. O saldo será creditado somente após a confirmação do pagamento.</p>
-            <div class="pt-form-actions"><a href="{{ route('wallet.index') }}" class="pt-button pt-button-outline">Voltar</a><button type="submit" form="stripe-checkout" class="pt-button pt-button-primary">Continuar com Stripe <i data-lucide="arrow-right"></i></button></div>
+            @if(config('services.stripe.secret'))
+                <p class="pt-form-note" id="deposit-help">O pagamento será realizado pelo checkout da Stripe. O saldo será creditado somente após a confirmação do pagamento.</p>
+                <div class="pt-form-actions"><a href="{{ route('wallet.index') }}" class="pt-button pt-button-outline">Voltar</a><button type="submit" form="stripe-checkout" class="pt-button pt-button-primary">Continuar com Stripe <i data-lucide="arrow-right"></i></button></div>
+            @else
+                <p class="pt-form-note" id="stripe-status">Stripe em integração: os depósitos com cartão serão liberados em breve. Enquanto isso, use o crédito de teste abaixo.</p>
+                <p class="pt-form-note" id="deposit-help">Assim que a Stripe for ativada, o saldo será creditado somente após a confirmação do pagamento.</p>
+                <div class="pt-form-actions"><a href="{{ route('wallet.index') }}" class="pt-button pt-button-outline">Voltar</a><button type="button" disabled aria-describedby="stripe-status" class="pt-button pt-button-primary">Continuar com Stripe <i data-lucide="arrow-right"></i></button></div>
+            @endif
             @if(app()->environment(['local', 'testing']))
                 <div class="pt-mt"><p class="pt-form-note">Para testar o fluxo, adicione o valor acima à sua carteira sem cobrança. O crédito também gera os pontos correspondentes.</p><button type="submit" form="wallet-test-deposit" class="pt-button pt-button-outline pt-mt" data-copy-amount>Adicionar crédito de teste</button></div>
             @endif
         </section>
-        <aside class="pt-right-stack"><div class="pt-wallet-side"><span>SEU SALDO ATUAL</span><strong>R$ {{ number_format($user->balance ?? 0, 2, ',', '.') }}</strong><p>O saldo funciona como crédito pré-pago.</p></div><section class="pt-info-panel"><span class="pt-info-icon"><i data-lucide="gift"></i></span><div><strong>Depósitos e pontos</strong><p>Cada depósito confirmado gera 10% do valor em pontos. R$ 85,50 gera 8,55 pontos.</p><a href="{{ route('points.index') }}">Consultar programa</a></div></section></aside>
+        <aside class="pt-right-stack"><div class="pt-wallet-side"><span>SEU SALDO ATUAL</span><strong>R$ {{ number_format($user->balance ?? 0, 2, ',', '.') }}</strong><p>O saldo funciona como crédito pré-pago.</p></div><section class="pt-info-panel"><span class="pt-info-icon"><i data-lucide="gift"></i></span><div><strong>Depósitos e pontos</strong><p>Cada depósito confirmado gera 5% do valor em pontos. R$ 85,50 gera 4,28 pontos.</p><a href="{{ route('points.index') }}">Consultar programa</a></div></section></aside>
     </div>
 </x-user-layout>

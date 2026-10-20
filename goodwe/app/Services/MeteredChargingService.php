@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 /** Receives normalized, authenticated confirmations from the future IoT adapter, never from web forms. */
 class MeteredChargingService
 {
-    public function __construct(private ReservationService $reservations) {}
+    public function __construct(private ReservationService $reservations, private DemandControlService $demand) {}
 
     /** Checks eligibility before the future adapter authorizes energy; this does not start a session or hold cash. */
     public function assertCanAuthorize(User $user, Charger $charger, ?int $reservationId = null): void
@@ -39,7 +39,8 @@ class MeteredChargingService
             if (! $reservation && $locked->active_reservation_id) {
                 throw ValidationException::withMessages(['reservation' => 'Este equipamento já está reservado.']);
             }
-            EnergyBilling::amount('0', $reservation?->tariff_per_kwh ?? $establishment->currentTariff());
+            EnergyBilling::amount('0', $reservation?->tariff_per_kwh ?? $locked->currentTariff());
+            $this->demand->assertCanStartSession($establishment, $locked);
         }, 5);
     }
 
@@ -76,8 +77,9 @@ class MeteredChargingService
             if (! $reservation && $lockedCharger->active_reservation_id) {
                 throw ValidationException::withMessages(['reservation' => 'Carregador reservado por outra operação.']);
             }
-            $tariff = $reservation?->tariff_per_kwh ?? $establishment->currentTariff();
+            $tariff = $reservation?->tariff_per_kwh ?? $lockedCharger->currentTariff();
             EnergyBilling::amount('0', $tariff);
+            $this->demand->assertCanStartSession($establishment, $lockedCharger);
             $session = ChargingSession::create([
                 'user_id' => $user->id,
                 'charger_id' => $charger->id,

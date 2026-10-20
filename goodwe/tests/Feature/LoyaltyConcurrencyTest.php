@@ -141,7 +141,7 @@ PHP;
         $this->assertTrue($results[0]['ok']);
         $this->assertTrue($results[1]['ok']);
         $this->assertSame('100.00', $user->refresh()->balance);
-        $this->assertSame('10.00', $user->points);
+        $this->assertSame('5.00', $user->points);
         $this->assertDatabaseCount('point_movements', 1);
     }
 
@@ -169,7 +169,7 @@ PHP;
             Transaction::create(['user_id' => $user->id, 'type' => $type, 'amount' => $amount, 'status' => $status, 'description' => 'Registro legado preservado']);
         }
         $migration->up();
-        $this->assertSame('18.55', $user->refresh()->points);
+        $this->assertSame('9.28', $user->refresh()->points);
         $this->assertSame('432.10', $user->balance);
         $this->assertDatabaseCount('transactions', 7);
         $this->assertDatabaseCount('point_movements', 3);
@@ -177,7 +177,7 @@ PHP;
         $this->assertEquals(9990, $conversion->metadata['previous_points']);
         $deposit = $user->transactions()->where('type', 'deposit')->where('status', 'approved')->first();
         app(WalletService::class)->creditApprovedDeposit($deposit, 'legacy-payment');
-        $this->assertSame('18.55', $user->refresh()->points);
+        $this->assertSame('9.28', $user->refresh()->points);
         $this->assertSame('432.10', $user->balance);
     }
 }

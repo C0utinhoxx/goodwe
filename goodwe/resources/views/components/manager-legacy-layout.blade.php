@@ -2,8 +2,18 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <!-- PWA -->
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#0f1117">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GoodWe">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
     @php
         $setup = request()->routeIs('manager.establishment.setup');
         $establishmentRoute = $setup ? 'manager.establishment.setup' : 'manager.establishment.edit';
@@ -12,9 +22,10 @@
             ['name'=>'Carregadores','route'=>'manager.chargers.index','active'=>'manager.chargers.*','icon'=>'plug-zap','description'=>'Equipamentos da sua loja','children'=>[
                 ['name'=>'Adicionar carregador','route'=>'manager.chargers.create'],
             ]],
-            ['name'=>'Demanda e tarifas','route'=>'manager.demand.index','active'=>'manager.demand.*','icon'=>'chart-no-axes-column','description'=>'Preços e decisões','children'=>[
+            ['name'=>'Demanda e tarifas','route'=>'manager.demand.index','active'=>'manager.demand.*|manager.demand-control.*','icon'=>'chart-no-axes-column','description'=>'Preços e decisões','children'=>[
                 ['name'=>'Resumo de tarifas','route'=>'manager.demand.index','hash'=>'resumo-tarifas'],
                 ['name'=>'Histórico de alterações','route'=>'manager.demand.index','hash'=>'historico-tarifas'],
+                ['name'=>'Controle de consumo','route'=>'manager.demand-control.index'],
             ]],
         ];
         $links[] = ['name'=>'Meu Estabelecimento','route'=>$establishmentRoute,'active'=>'manager.establishment.*','icon'=>'store','description'=>'Dados e configurações','children'=>[
@@ -62,5 +73,6 @@
         </div>
     </dialog>
     <script src="{{ asset('js/theme.js') }}"></script>
+<script src="{{ asset('js/pwa.js') }}"></script>
 </body>
 </html>
