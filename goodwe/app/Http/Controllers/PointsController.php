@@ -15,7 +15,13 @@ class PointsController extends Controller
     public function index(Request $request): View|JsonResponse
     {
         $user = $request->user();
-        $data = ['user' => $user, 'earned' => $user->pointMovements()->where('is_demo', false)->where('type', 'deposit')->sum('amount'), 'spent' => -$user->pointMovements()->where('is_demo', false)->where('type', 'redemption')->sum('amount'), 'catalog' => config('loyalty.coupons'), 'coupons' => $user->coupons()->where('is_demo', false)->latest()->paginate(9, ['*'], 'coupons_page'), 'movements' => $user->pointMovements()->where('is_demo', false)->latest('id')->paginate(15, ['*'], 'points_page')];
+        // Os dois totais vêm de uma única agregação em vez de duas passadas
+        // completas pela tabela de movimentações.
+        $totals = $user->pointMovements()->where('is_demo', false)
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) as total_earned")
+            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'redemption' THEN amount ELSE 0 END), 0) as total_spent")
+            ->first();
+        $data = ['user' => $user, 'earned' => (float) $totals->total_earned, 'spent' => -(float) $totals->total_spent, 'catalog' => config('loyalty.coupons'), 'coupons' => $user->coupons()->where('is_demo', false)->latest()->paginate(9, ['*'], 'coupons_page'), 'movements' => $user->pointMovements()->where('is_demo', false)->latest('id')->paginate(15, ['*'], 'points_page')];
 
         return $request->expectsJson() ? response()->json($data) : view('user.pontos', $data);
     }

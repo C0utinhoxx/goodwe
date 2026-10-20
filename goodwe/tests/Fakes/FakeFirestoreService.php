@@ -44,6 +44,21 @@ class FakeFirestoreService extends FirestoreService
         $this->documents["{$collection}/{$documentId}"] = $data;
     }
 
+    public function listCollection(string $collection, ?int $limit = null): array
+    {
+        $ids = array_keys(array_filter(
+            $this->documents,
+            fn (string $key): bool => str_starts_with($key, "{$collection}/"),
+            ARRAY_FILTER_USE_KEY
+        ));
+
+        if ($limit !== null && $limit > 0) {
+            $ids = array_slice($ids, 0, $limit);
+        }
+
+        return array_map(fn (string $key): array => $this->documents[$key], $ids);
+    }
+
     public function hasWrite(string $collection, string $documentId, array $expected): bool
     {
         foreach ($this->writes as $write) {

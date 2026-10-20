@@ -401,6 +401,45 @@ class TotemChargingTest extends TestCase
         ]);
     }
 
+    public function test_status_is_cached_until_totem_writes_invalidate_it(): void
+    {
+        $user = User::factory()->create();
+        config()->set('totems.status_cache_seconds', 60);
+
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'iniciar',
+            'pin_gerado' => '9999',
+            'tarifa_kwh' => 2.5,
+        ]);
+
+        $this->actingAs($user)->getJson(route('totens.status', 'TOT-01'))
+            ->assertOk()
+            ->assertJsonPath('comando_web', 'iniciar');
+
+        // Mudança no Firestore ainda dentro do TTL: o polling segue no cache.
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'parar',
+            'pin_gerado' => '9999',
+            'tarifa_kwh' => 2.5,
+        ]);
+
+        $this->actingAs($user)->getJson(route('totens.status', 'TOT-01'))
+            ->assertJsonPath('comando_web', 'iniciar');
+
+        // Um comando enviado pela web grava no totem e invalida o cache.
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'iniciar',
+            'pin_gerado' => '9999',
+            'tarifa_kwh' => 2.5,
+        ]);
+        $this->actingAs($user)->postJson(route('totens.pin', 'TOT-01'), ['pin' => '5678'])
+            ->assertOk();
+        $this->assertSame('5678', $this->firestore->documents['totems/TOT-01']['pin_digitado']);
+
+        $this->actingAs($user)->getJson(route('totens.status', 'TOT-01'))
+            ->assertJsonPath('comando_web', 'iniciar');
+    }
+
     public function test_status_reports_firestore_failure(): void
     {
         $user = User::factory()->create();

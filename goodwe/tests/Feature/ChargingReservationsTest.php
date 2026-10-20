@@ -155,6 +155,35 @@ class ChargingReservationsTest extends TestCase
         $this->assertSame('2.2000', $new->tariff_per_kwh);
     }
 
+    public function test_portal_visits_expire_reservations_at_most_once_per_throttle_window(): void
+    {
+        config(['reservations.expire_guard_seconds' => 3600]);
+
+        $user = User::factory()->create(['points' => 0]);
+        $service = app(ReservationService::class);
+        $charger = Charger::factory()->create();
+
+        $first = $service->reserve($user, $charger, (string) Str::uuid());
+        $this->travel(16)->minutes();
+
+        // A primeira visita do portal expira a reserva vencida.
+        $this->actingAs($user)->get(route('user.home'))->assertOk();
+        $this->assertSame('expired', $first->refresh()->status);
+
+        // Dentro do intervalo a varredura não se repete a cada página carregada.
+        $second = $service->reserve($user, $charger, (string) Str::uuid());
+        $this->travel(16)->minutes();
+
+        $this->actingAs($user)->get(route('user.home'))->assertOk();
+        $this->assertSame('active', $second->refresh()->status);
+
+        // Expirado o intervalo, a visita volta a expirar as vencidas.
+        $this->travel(3601)->seconds();
+
+        $this->actingAs($user)->get(route('user.home'))->assertOk();
+        $this->assertSame('expired', $second->refresh()->status);
+    }
+
     public function test_registered_equipment_cannot_be_started_or_released_by_legacy_simulator_endpoints(): void
     {
         $charger = Charger::factory()->create();

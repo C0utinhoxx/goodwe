@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChargingSession;
+use App\Models\Establishment;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,6 +19,9 @@ class ManagerController extends Controller
     {
         $user = $request->user();
         $establishment = $user->establishment;
+        // O componente de resumo de preços lê o pico ativo do estabelecimento;
+        // sem carregar aqui a view dispara uma consulta extras por request.
+        $establishment->loadMissing('activePeak');
 
         $period = (int) $request->integer('period', 30);
         if (! in_array($period, [7, 30, 90], true)) {
@@ -25,61 +32,44 @@ class ManagerController extends Controller
         // sessoes, mas so compoem os indicadores quando o ambiente permite.
         $includeTestSessions = app()->environment(['local', 'testing']);
 
-        $establishmentSessions = ChargingSession::query()
-            ->where('establishment_id', $establishment->id);
+        $periodSince = now()->subDays($period - 1)->startOfDay();
+        $periodUntil = now()->endOfDay();
 
-        // Agregados financeiros e de consumo ignoram recargas de teste fora de
-        // ambientes de desenvolvimento.
-        $aggregateSessions = (clone $establishmentSessions);
-        if (! $includeTestSessions) {
-            $aggregateSessions->whereNull('simulation');
-        }
+        // Indicadores agregados são os custosos (varrem todas as sessões do
+        // estabelecimento); ficam em cache por um minuto, separados por
+        // período, por dia e por o ambiente compor ou não as recargas de teste.
+        $buildMetrics = fn (): array => $this->dashboardMetrics(
+            $establishment,
+            [$periodSince, $periodUntil],
+            $includeTestSessions
+        );
+        $cacheSeconds = (int) config('manager.dashboard_cache_seconds', 60);
+        $metricsKey = sprintf(
+            'manager:dashboard:%d:%s:%d:%s',
+            $establishment->id,
+            now()->toDateString(),
+            $period,
+            $includeTestSessions ? 'with-test' : 'real-only'
+        );
+        $metrics = $cacheSeconds > 0
+            ? Cache::remember($metricsKey, $cacheSeconds, $buildMetrics)
+            : $buildMetrics();
 
-        // Receita = somente pagamentos confirmados (transacao aprovada ou
-        // registro legado sem status de pagamento pendente).
-        $revenueExpression = "CASE WHEN status = 'completed' AND (transaction_id IS NOT NULL OR payment_status IS NULL OR payment_status <> 'pending') THEN amount_charged ELSE 0 END";
-        // Consumo = medida real quando registrada; senao, energia estimada de
-        // sessoes concluidas.
-        $energyExpression = "CASE WHEN measured_energy_kwh IS NOT NULL THEN measured_energy_kwh WHEN status = 'completed' THEN energy_kwh ELSE 0 END";
-
-        $historicalTotals = (clone $aggregateSessions)
-            ->selectRaw('COUNT(*) as sessions_count')
-            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
-            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_energy")
-            ->first();
-
+        $historicalTotals = $metrics['historicalTotals'];
         $totalSessions = (int) $historicalTotals->sessions_count;
+        $totalUsers = (int) $historicalTotals->users_count;
         $totalRevenue = (float) $historicalTotals->total_revenue;
         $totalEnergy = (float) $historicalTotals->total_energy;
         $avgCostPerKwh = $totalEnergy > 0 ? $totalRevenue / $totalEnergy : 0;
-        $totalUsers = (clone $aggregateSessions)->distinct()->count('user_id');
 
-        $periodSince = now()->subDays($period - 1)->startOfDay();
-        $periodUntil = now()->endOfDay();
-        $periodSessions = (clone $aggregateSessions)
-            ->whereBetween('created_at', [$periodSince, $periodUntil]);
-
-        $periodTotals = (clone $periodSessions)
-            ->selectRaw('COUNT(*) as sessions_count')
-            ->selectRaw('COUNT(DISTINCT user_id) as active_users')
-            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
-            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_energy")
-            ->first();
-
+        $periodTotals = $metrics['periodTotals'];
         $periodSessionsCount = (int) $periodTotals->sessions_count;
         $periodRevenue = (float) $periodTotals->total_revenue;
         $periodEnergy = (float) $periodTotals->total_energy;
         $periodActiveUsers = (int) $periodTotals->active_users;
         $hasPeriodData = $periodSessionsCount > 0;
 
-        $dailyUsage = (clone $periodSessions)
-            ->select(DB::raw('DATE(created_at) as date'))
-            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_kwh")
-            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get();
-
+        $dailyUsage = $metrics['dailyUsage'];
         $hasCompletedData = $dailyUsage->isNotEmpty();
         $dailyUsageByDate = $dailyUsage->keyBy('date');
         $periodDates = collect(range(0, $period - 1))
@@ -92,22 +82,11 @@ class ManagerController extends Controller
             fn (Carbon $date) => (float) ($dailyUsageByDate->get($date->toDateString())?->total_revenue ?? 0)
         );
 
-        $chargerDistribution = (clone $periodSessions)
-            ->select('charger_name', DB::raw('COUNT(*) as total'))
-            ->groupBy('charger_name')
-            ->orderByDesc('total')
-            ->get();
+        $chargerDistribution = $metrics['chargerDistribution'];
 
-        $statusTotals = (clone $periodSessions)
-            ->select('status', DB::raw('COUNT(*) as total'))
-            ->groupBy('status')
-            ->pluck('total', 'status');
+        $statusTotals = $metrics['statusTotals'];
 
         $detectorConfigured = (bool) config('demand.detector');
-
-        // As recargas de teste (simulacao pelo portal) aparecem na lista de
-        // sessoes, mas so compoem os indicadores quando o ambiente permite.
-        $includeTestSessions = app()->environment(['local', 'testing']);
 
         $chargerCounts = ['total' => 0, 'available' => 0, 'reserved' => 0, 'in_use' => 0, 'unavailable' => 0];
         foreach ($establishment->chargers as $charger) {
@@ -124,7 +103,8 @@ class ManagerController extends Controller
             'total' => (int) ($statusTotals[$status] ?? 0),
         ]);
 
-        $topUsers = (clone $periodSessions)
+        $topUsers = $this->scopedSessionQuery($establishment, $includeTestSessions)
+            ->whereBetween('created_at', [$periodSince, $periodUntil])
             ->select('user_id', DB::raw('COUNT(*) as sessions_count'))
             ->selectRaw(
                 'COALESCE(SUM(CASE WHEN status = ? THEN energy_kwh ELSE 0 END), 0) as total_kwh',
@@ -141,7 +121,8 @@ class ManagerController extends Controller
             ->with('user:id,name,email')
             ->get();
 
-        $recentSessions = (clone $establishmentSessions)
+        $recentSessions = ChargingSession::query()
+            ->where('establishment_id', $establishment->id)
             ->with('user:id,name')
             ->latest()
             ->take(10)
@@ -187,6 +168,85 @@ class ManagerController extends Controller
         ));
     }
 
+    /**
+     * Sessões do estabelecimento, com ou sem as recargas de teste do portal.
+     */
+    private function scopedSessionQuery(Establishment $establishment, bool $includeTestSessions): Builder
+    {
+        return ChargingSession::query()
+            ->where('establishment_id', $establishment->id)
+            ->when(! $includeTestSessions, fn ($query) => $query->whereNull('simulation'));
+    }
+
+    /**
+     * Indicadores agregados do painel (histórico, período, uso diário,
+     * distribuição por carregador e por status).
+     *
+     * Todas as consultas varrem as sessões do estabelecimento — a parte
+     * custosa do dashboard — por isso o chamador cacheia o resultado.
+     *
+     * @param  array{0: Carbon, 1: Carbon}  $periodRange
+     * @return array{historicalTotals: object, periodTotals: object, dailyUsage: Collection, chargerDistribution: Collection, statusTotals: Collection}
+     */
+    private function dashboardMetrics(Establishment $establishment, array $periodRange, bool $includeTestSessions): array
+    {
+        [$periodSince, $periodUntil] = $periodRange;
+
+        $aggregateSessions = $this->scopedSessionQuery($establishment, $includeTestSessions);
+
+        // Receita = somente pagamentos confirmados (transacao aprovada ou
+        // registro legado sem status de pagamento pendente).
+        $revenueExpression = "CASE WHEN status = 'completed' AND (transaction_id IS NOT NULL OR payment_status IS NULL OR payment_status <> 'pending') THEN amount_charged ELSE 0 END";
+        // Consumo = medida real quando registrada; senao, energia estimada de
+        // sessoes concluidas.
+        $energyExpression = "CASE WHEN measured_energy_kwh IS NOT NULL THEN measured_energy_kwh WHEN status = 'completed' THEN energy_kwh ELSE 0 END";
+
+        // Histórico e usuários distintos em uma única varredura.
+        $historicalTotals = (clone $aggregateSessions)
+            ->selectRaw('COUNT(*) as sessions_count')
+            ->selectRaw('COUNT(DISTINCT user_id) as users_count')
+            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
+            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_energy")
+            ->first();
+
+        $periodSessions = (clone $aggregateSessions)
+            ->whereBetween('created_at', [$periodSince, $periodUntil]);
+
+        $periodTotals = (clone $periodSessions)
+            ->selectRaw('COUNT(*) as sessions_count')
+            ->selectRaw('COUNT(DISTINCT user_id) as active_users')
+            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
+            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_energy")
+            ->first();
+
+        $dailyUsage = (clone $periodSessions)
+            ->select(DB::raw('DATE(created_at) as date'))
+            ->selectRaw("COALESCE(SUM({$energyExpression}), 0) as total_kwh")
+            ->selectRaw("COALESCE(SUM({$revenueExpression}), 0) as total_revenue")
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        $chargerDistribution = (clone $periodSessions)
+            ->select('charger_name', DB::raw('COUNT(*) as total'))
+            ->groupBy('charger_name')
+            ->orderByDesc('total')
+            ->get();
+
+        $statusTotals = (clone $periodSessions)
+            ->select('status', DB::raw('COUNT(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return compact(
+            'historicalTotals',
+            'periodTotals',
+            'dailyUsage',
+            'chargerDistribution',
+            'statusTotals'
+        );
+    }
+
     public function exportSessions(Request $request): StreamedResponse
     {
         $period = (int) $request->integer('period', 30);
@@ -201,14 +261,13 @@ class ManagerController extends Controller
         // incluem simulacoes, com a coluna Origem sinalizando cada linha.
         $includeTestSessions = app()->environment(['local', 'testing']);
 
-        $sessions = $establishment
-            ? ChargingSession::with('user:id,name,email')
+        $sessionsQuery = $establishment
+            ? ChargingSession::query()
+                ->with('user:id,name,email')
                 ->where('establishment_id', $establishment->id)
                 ->when(! $includeTestSessions, fn ($query) => $query->whereNull('simulation'))
                 ->whereBetween('created_at', [$periodSince, now()->endOfDay()])
-                ->latest()
-                ->get()
-            : collect();
+            : null;
 
         $filename = 'sessoes-goodwe-'.now()->format('Y-m-d-His').'.csv';
 
@@ -217,12 +276,14 @@ class ManagerController extends Controller
             'Content-Disposition' => "attachment; filename=\"$filename\"",
         ];
 
-        $callback = function () use ($sessions): void {
+        $callback = function () use ($sessionsQuery): void {
             $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, ['Data', 'Usuario', 'Email', 'Carregador', 'Origem', 'Energia (kWh)', 'Valor (R$)', 'Metodo', 'Status'], ',', '"', '\\');
 
-            foreach ($sessions as $session) {
+            // Blocos de 500 linhas, da mais recente para a mais antiga: o uso
+            // de memória fica constante mesmo exportando meses de sessões.
+            foreach ($sessionsQuery?->lazyByIdDesc(500) ?? [] as $session) {
                 fputcsv($handle, [
                     $session->created_at->format('d/m/Y H:i'),
                     $session->user->name ?? '-',

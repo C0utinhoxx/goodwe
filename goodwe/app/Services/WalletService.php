@@ -189,9 +189,18 @@ class WalletService
         return $coupon;
     }
 
-    public function getHistory(User $user): Collection
+    /**
+     * Histórico de transações do usuário, opcionalmente limitado.
+     *
+     * Sem limite a consulta cresce sem parar com o uso da carteira; os
+     * consumidores (API e assistente) sempre pedem uma janela fixa.
+     */
+    public function getHistory(User $user, ?int $limit = null): Collection
     {
-        return $user->transactions()->where('is_demo', false)->latest()->get();
+        return $user->transactions()->where('is_demo', false)
+            ->latest()
+            ->when($limit !== null, fn ($query) => $query->take($limit))
+            ->get();
     }
 
     public function getRecentSessions(User $user): Collection

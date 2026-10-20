@@ -11,6 +11,21 @@ class Charger extends Model
 {
     use HasFactory;
 
+    /**
+     * Expressão SQL que reproduz a regra de `status()`, para filtrar e
+     * agregar no banco sem carregar os modelos.
+     *
+     * Mantida em sincronia com o método pelo teste
+     * `ChargerStatusTest::test_sql_status_expression_matches_the_php_helper`.
+     */
+    public const STATUS_SQL = "(CASE
+        WHEN activation_status IS NOT NULL AND activation_status <> 'active' THEN 'unavailable'
+        WHEN physical_status IS NULL OR physical_status NOT IN ('available', 'in_use') THEN 'unavailable'
+        WHEN active_session_id IS NOT NULL OR physical_status = 'in_use' THEN 'in_use'
+        WHEN active_reservation_id IS NOT NULL THEN 'reserved'
+        ELSE 'available'
+    END)";
+
     protected $fillable = ['establishment_id', 'code', 'name', 'location', 'power_kw', 'connector', 'physical_status', 'physical_status_updated_at', 'tariff_override', 'lat', 'lng', 'active_reservation_id', 'active_session_id', 'activation_status'];
 
     protected $attributes = ['physical_status' => 'unavailable', 'activation_status' => 'pending'];

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\FirestoreService;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,7 +57,7 @@ class TotemChargingController extends Controller
         $tagUid = $this->tagUid($user);
 
         try {
-            $firestoreUser = $this->firestore->getDocumentData('users', $tagUid) ?? [];
+            $firestoreUser = $this->userDocumentData($tagUid) ?? [];
         } catch (Throwable $e) {
             // Se o Firestore estiver indisponível, a tela ainda abre com os
             // dados locais do usuário para não bloquear o fluxo de recarga.
@@ -194,7 +195,7 @@ class TotemChargingController extends Controller
     public function status(string $totemId): JsonResponse
     {
         try {
-            $totem = $this->firestore->getDocumentData('totems', $totemId) ?? [];
+            $totem = $this->totemStatus($totemId);
 
             return response()->json([
                 'success' => true,
@@ -261,9 +262,59 @@ class TotemChargingController extends Controller
         );
     }
 
+    /**
+     * Dados do totem usados pelo polling do front-end.
+     *
+     * A tela consulta este endpoint a cada `POLLING_INTERVAL` (2s); um cache
+     * curtíssimo colapsa chamadas repetidas (várias abas/dispositivos no mesmo
+     * totem) sem atrasar a troca de estado percebida pelo usuário. O cache é
+     * invalidado em cada escrita (iniciar/parar/PIN).
+     *
+     * @return array<string, mixed>
+     */
+    private function totemStatus(string $totemId): array
+    {
+        return $this->rememberLocally(
+            "totems:status:{$totemId}",
+            (int) config('totems.status_cache_seconds', 1),
+            fn (): array => $this->firestore->getDocumentData('totems', $totemId) ?? []
+        );
+    }
+
+    /**
+     * Documento da TAG do usuário no Firestore, com cache curto.
+     *
+     * É lido apenas na renderização da tela (saldo/status inicial); o estado
+     * em tempo real vem do endpoint de status em polling.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function userDocumentData(string $tagUid): ?array
+    {
+        return $this->rememberLocally(
+            "users:document:{$tagUid}",
+            (int) config('totems.user_cache_seconds', 10),
+            fn (): ?array => $this->firestore->getDocumentData('users', $tagUid)
+        );
+    }
+
+    /**
+     * Lê com cache opcional: TTL menor ou igual a zero desliga o cache.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $read
+     * @return T
+     */
+    private function rememberLocally(string $key, int $seconds, Closure $read): mixed
+    {
+        return $seconds > 0 ? Cache::remember($key, $seconds, $read) : $read();
+    }
+
     private function forgetTotemData(string $totemId): void
     {
         Cache::forget("totems:document:{$totemId}");
+        Cache::forget("totems:status:{$totemId}");
     }
 
     /**
@@ -291,7 +342,7 @@ class TotemChargingController extends Controller
      */
     private function syncSaldo(User $user, string $tagUid): float
     {
-        $firestoreUser = $this->firestore->getDocumentData('users', $tagUid);
+        $firestoreUser = $this->userDocumentData($tagUid);
         $carteira = (float) $user->balance;
 
         if ($firestoreUser === null) {
@@ -302,6 +353,7 @@ class TotemChargingController extends Controller
                 'status_tag' => 'ativo',
                 'comando_web' => 'espera',
             ]);
+            Cache::forget("users:document:{$tagUid}");
 
             return $carteira;
         }
@@ -313,6 +365,7 @@ class TotemChargingController extends Controller
             $this->firestore->setDocumentMerge('users', $tagUid, [
                 'saldo_pontos' => $saldo,
             ]);
+            Cache::forget("users:document:{$tagUid}");
         }
 
         return $saldo;

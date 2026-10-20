@@ -92,6 +92,33 @@ class ManagerDashboardTest extends TestCase
     /**
      * @return array{User, Establishment}
      */
+    public function test_dashboard_aggregate_metrics_are_cached_until_the_ttl_expires(): void
+    {
+        Carbon::setTestNow('2026-09-25 12:00:00');
+        config()->set('manager.dashboard_cache_seconds', 60);
+
+        [$manager, $establishment] = $this->createManagerWithEstablishment();
+        $user = User::factory()->create();
+        $this->createSession($establishment, $user, 'Torre Norte', ChargingSession::STATUS_COMPLETED, 10, 15, now()->subDay());
+
+        $this->actingAs($manager)->get(route('manager.dashboard'))
+            ->assertOk()
+            ->assertViewHas('totalSessions', 1);
+
+        // Sessões criadas durante a vigência do cache não alteram os indicadores.
+        $this->createSession($establishment, $user, 'Torre Sul', ChargingSession::STATUS_COMPLETED, 20, 30, now()->subDay());
+
+        $this->actingAs($manager)->get(route('manager.dashboard'))
+            ->assertViewHas('totalSessions', 1);
+
+        // Expirado o TTL, os agregados são recalculados.
+        $this->travel(61)->seconds();
+
+        $this->actingAs($manager)->get(route('manager.dashboard'))
+            ->assertViewHas('totalSessions', 2)
+            ->assertViewHas('totalEnergy', fn ($energy) => abs((float) $energy - 30.0) < 0.00001);
+    }
+
     private function createManagerWithEstablishment(): array
     {
         $manager = User::factory()->create(['is_admin' => true]);

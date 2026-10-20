@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -43,6 +44,32 @@ class AuthApiTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('user.email', $user->email);
         $this->assertNotEmpty($response->json('token'));
+    }
+
+    public function test_login_locates_the_user_with_a_single_lookup(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'single-query@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'secret123',
+        ])->assertOk();
+
+        // A validação `exists` responde por um count(*) próprio; o controller
+        // deve baixar a linha do usuário uma única única vez — antes o
+        // Auth::validate() somado ao firstOrFail() faziam duas.
+        $this->assertCount(1, array_filter(
+            $queries,
+            fn (string $sql): bool => str_starts_with($sql, 'select * from "users"')
+        ));
     }
 
     public function test_login_fails_with_invalid_credentials(): void

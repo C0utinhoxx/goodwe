@@ -13,6 +13,9 @@ use Illuminate\Support\Str;
 
 class ChatbotController extends Controller
 {
+    /** Máximo de usuários do estabelecimento listados no contexto do assistente. */
+    private const MAX_PROMPT_USERS = 50;
+
     public function page(Request $request)
     {
         return view('manager.chatbot', [
@@ -44,26 +47,23 @@ class ChatbotController extends Controller
             return response()->json(['answer' => $answer]);
         }
 
-        $sessions = ChargingSession::where(
-            'establishment_id',
-            $establishment->id
-        );
-        $totalSessions = $sessions->clone()->count();
-        $completedSessions = $sessions->clone()
-            ->where('status', ChargingSession::STATUS_COMPLETED)
-            ->count();
-        $pendingSessions = $sessions->clone()
-            ->where('status', ChargingSession::STATUS_PENDING)
-            ->count();
-        $cancelledSessions = $sessions->clone()
-            ->where('status', ChargingSession::STATUS_CANCELLED)
-            ->count();
-        $totalRevenue = (float) $sessions->clone()
-            ->where('status', ChargingSession::STATUS_COMPLETED)
-            ->sum('amount_charged');
-        $totalEnergy = (float) $sessions->clone()
-            ->where('status', ChargingSession::STATUS_COMPLETED)
-            ->sum('energy_kwh');
+        // Um único agregado substitui seis varreduras separadas da tabela
+        // (contagens por status + somatórios), que rodavam a cada mensagem.
+        $totals = ChargingSession::where('establishment_id', $establishment->id)
+            ->selectRaw('COUNT(*) as total_sessions')
+            ->selectRaw('COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) as completed_sessions', [ChargingSession::STATUS_COMPLETED])
+            ->selectRaw('COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) as pending_sessions', [ChargingSession::STATUS_PENDING])
+            ->selectRaw('COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) as cancelled_sessions', [ChargingSession::STATUS_CANCELLED])
+            ->selectRaw('COALESCE(SUM(CASE WHEN status = ? THEN amount_charged ELSE 0 END), 0) as total_revenue', [ChargingSession::STATUS_COMPLETED])
+            ->selectRaw('COALESCE(SUM(CASE WHEN status = ? THEN energy_kwh ELSE 0 END), 0) as total_energy', [ChargingSession::STATUS_COMPLETED])
+            ->first();
+
+        $totalSessions = (int) $totals->total_sessions;
+        $completedSessions = (int) $totals->completed_sessions;
+        $pendingSessions = (int) $totals->pending_sessions;
+        $cancelledSessions = (int) $totals->cancelled_sessions;
+        $totalRevenue = (float) $totals->total_revenue;
+        $totalEnergy = (float) $totals->total_energy;
         $recentSessions = ChargingSession::where(
             'establishment_id',
             $establishment->id
@@ -106,6 +106,9 @@ class ChatbotController extends Controller
                         ->where('establishment_id', $establishment->id));
             })
             ->orderBy('name')
+            // Janela fixa: a lista inteira de usuários não cabe no contexto
+            // enviado ao assistente nem em uma única consulta por mensagem.
+            ->limit(self::MAX_PROMPT_USERS)
             ->get();
 
         $usersText = $users->isEmpty()

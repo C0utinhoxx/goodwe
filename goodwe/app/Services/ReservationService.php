@@ -8,11 +8,15 @@ use App\Models\ChargingReservation;
 use App\Models\Establishment;
 use App\Models\PointMovement;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ReservationService
 {
+    /** Guard que evita varrer reservas vencidas a cada requisição do portal. */
+    private const EXPIRE_DUE_GUARD_KEY = 'reservations:expire-due-guard';
+
     public function reserve(User $user, Charger $charger, string $key): ChargingReservation
     {
         abort_if($charger->is_demo, 404);
@@ -134,6 +138,30 @@ class ReservationService
         }
 
         return $count;
+    }
+
+    /**
+     * Expiração disparada pelo caminho de requisição do portal (home e lista
+     * de carregadores).
+     *
+     * Varredura completa a cada visita fica cara conforme a base cresce e o
+     * agendador (`charging:expire-reservations`) nem sempre roda em produção;
+     * por isso a varredura acontece no máximo uma vez por período, mantendo a
+     * expiração "por página" sem repetir o custo em cada carregamento.
+     */
+    public function expireDueOnRequests(?int $throttleSeconds = null): int
+    {
+        $throttleSeconds ??= (int) config('reservations.expire_guard_seconds', 30);
+
+        if ($throttleSeconds <= 0) {
+            return $this->expireDue();
+        }
+
+        if (! Cache::add(self::EXPIRE_DUE_GUARD_KEY, 1, $throttleSeconds)) {
+            return 0;
+        }
+
+        return $this->expireDue();
     }
 
     private function event(ChargingReservation $reservation, string $type, array $metadata): void
