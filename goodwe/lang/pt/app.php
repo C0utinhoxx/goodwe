@@ -1,11 +1,9 @@
 <?php
 
 return [
-    'name' => 'GoodWe',
-    'subtitle' => 'Carregamento inteligente de veículos elétricos',
+    'name' => 'ChargeGrid Intelligence',
+    'subtitle' => 'Simulação de recarga',
     'logout' => 'Sair',
-    'login' => 'Entrar',
-    'register' => 'Cadastrar',
-    'footer_tagline' => 'Energia inteligente, conectando pessoas.',
-    'footer_copyright' => '© PowerTag · Challenge GoodWe',
+    'footer_tagline' => 'Smart Energy for a Better Future',
+    'footer_copyright' => 'EQUIPE2 1CCPX GOODWE © 2026. Todos os direitos reservados.',
 ];

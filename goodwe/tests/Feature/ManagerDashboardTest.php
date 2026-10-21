@@ -86,7 +86,7 @@ class ManagerDashboardTest extends TestCase
         $response->assertViewHas('chargerDistribution', fn ($rows) => $rows->isEmpty());
         $response->assertViewHas('statusDistribution', fn ($rows) => $rows->sum('total') === 0);
         $response->assertViewHas('topUsers', fn ($rows) => $rows->isEmpty());
-        $response->assertSeeText('Nenhum dado disponivel neste periodo.');
+        $response->assertSeeText('Nenhum dado disponível neste período.');
     }
 
     /**
