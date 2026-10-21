@@ -38,8 +38,8 @@ return [
     'key' => env('OPENAI_API_KEY') ?: config('openai_shared.key'),
 ],
 'stripe' => [
-    'secret' => env('STRIPE_SECRET'),
-    'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    'secret' => trim((string) env('STRIPE_SECRET')),
+    'webhook_secret' => trim((string) env('STRIPE_WEBHOOK_SECRET')),
 ],
 
 ];
