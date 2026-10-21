@@ -35,15 +35,38 @@ class TotemTariffService
 
         $updated = 0;
 
+        // First, sync chargers that have establishment relationship
         foreach ($chargers as $charger) {
-            // Evita uma consulta por carregador: a tarifa herdada vem do
-            // estabelecimento que acabou de ser salvo.
-            $charger->setRelation('establishment', $establishment);
+            $charger->load('establishment');
 
             if ($this->syncCharger($charger)) {
                 $updated++;
             }
         }
+
+        // Then, sync ALL totems in Firebase to ensure they all have
+        // the establishment's current tariff, even if they don't have
+        // a corresponding charger model in the database.
+        $allTotems = $this->firestore->listCollection('totems', 1000);
+        foreach ($allTotems as $totem) {
+            $totemId = $totem['id'] ?? null;
+
+            if ($totemId === null) {
+                continue;
+            }
+
+            // Get the tariff from the establishment (cost_per_kwh or peak_tariff)
+            $tariff = $establishment->currentTariff();
+
+            if ($tariff !== null && (float) $tariff > 0) {
+                $this->firestore->setDocumentMerge('totems', $totemId, [
+                    'tarifa_kwh' => (float) $tariff,
+                ]);
+                $updated++;
+            }
+        }
+
+        info("TotemTariffService: Sync completed, {$updated} totems updated");
 
         return $updated;
     }
@@ -53,26 +76,36 @@ class TotemTariffService
      */
     public function syncCharger(Charger $charger): bool
     {
+        // A relação do estabelecimento já foi carregada em syncEstablishment
+        // Mas carregar novamente para garantir dados atualizados
+        $charger->load('establishment');
+
         $tariff = $charger->currentTariff();
 
         if ($tariff === null || (float) $tariff <= 0) {
+            // Log para debug: tarifa inválida, não sincroniza
+            info("TotemTariffService: Tarifa inválida para charger {$charger->code}: {$tariff}");
             return false;
         }
 
         try {
-            $this->firestore->setDocumentMerge('totems', $charger->code, [
+            $result = $this->firestore->setDocumentMerge('totems', $charger->code, [
                 'tarifa_kwh' => (float) $tariff,
             ]);
 
+            // Log de sucesso para debug
+            info("TotemTariffService: Sincronizada tarifa {$tariff} para charger {$charger->code}");
+
+            // Invalidar cache após sincronização bem-sucedida
+            $this->forgetCache($charger->code);
+
             return true;
         } catch (Throwable $e) {
+            // Log detalhado do erro
             report($e);
+            error("TotemTariffService: Erro ao sincronizar tarifa para charger {$charger->code}: " . $e->getMessage());
 
             return false;
-        } finally {
-            // A tela de recarga lê o documento com cache curto: sem a
-            // invalidação o novo valor só apareceria depois do TTL.
-            $this->forgetCache($charger->code);
         }
     }
 
