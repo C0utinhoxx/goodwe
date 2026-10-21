@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Charger;
+use App\Models\ChargingSession;
+use App\Models\Establishment;
 use App\Models\User;
 use App\Services\FirestoreService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,6 +41,10 @@ class TotemChargingTest extends TestCase
         $response->assertOk();
         $response->assertSee(__('totens.title'));
         $response->assertSee(__('totens.open_recharge'));
+        $response->assertSee('Lab Goodwe 01');
+        $response->assertSee('Lab Goodwe 02');
+        $response->assertDontSee('Totem 01');
+        $response->assertDontSee('Totem 02');
         $response->assertSee('totem_01', false);
         $response->assertSee('totem_02', false);
         $response->assertSee(route('totens.carregar', 'totem_01'), false);
@@ -468,5 +475,157 @@ class TotemChargingTest extends TestCase
         $response->assertSee('aguardando_pin', false);
         $response->assertSee('STATUS_URL', false);
         $response->assertSee('PIN_URL', false);
+    }
+
+    public function test_iniciar_registers_the_recharge_in_the_managers_dashboard(): void
+    {
+        $manager = User::factory()->create(['is_admin' => true]);
+        $establishment = Establishment::factory()->for($manager)->create();
+        Charger::factory()->for($establishment)->create([
+            'code' => 'totem_01',
+            'name' => 'Lab Goodwe 01',
+        ]);
+
+        $user = User::factory()->create(['balance' => 30]);
+        $this->firestore->seed('totems', 'totem_01', ['tarifa_kwh' => 1.9]);
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'))
+            ->assertSessionHas('success');
+
+        // A recarga existe no banco, vinculada ao estabelecimento do gestor...
+        $session = ChargingSession::where('user_id', $user->id)->firstOrFail();
+        $this->assertSame($establishment->id, $session->establishment_id);
+        $this->assertSame('Lab Goodwe 01', $session->charger_name);
+        $this->assertSame('pending_pin', $session->charging_state);
+        $this->assertSame(ChargingSession::STATUS_PENDING, $session->status);
+        // ...e o espelho não interfere no canal do equipamento.
+        $this->assertSame('iniciar', $this->firestore->documents['totems/totem_01']['comando_web']);
+
+        $this->actingAs($manager)
+            ->get(route('manager.dashboard'))
+            ->assertOk()
+            ->assertSee('Lab Goodwe 01')
+            ->assertViewHas('periodSessionsCount', 1);
+    }
+
+    public function test_polling_promotes_the_recharge_to_charging_state(): void
+    {
+        $user = User::factory()->create(['balance' => 30]);
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'));
+        $this->assertSame('pending_pin', ChargingSession::firstOrFail()->charging_state);
+
+        // O ESP valida o PIN e passa a "carregando": o polling acompanha.
+        $this->firestore->seed('totems', 'totem_01', ['comando_web' => 'carregando']);
+        $this->actingAs($user)->getJson(route('totens.status', 'totem_01'))->assertOk();
+
+        $session = ChargingSession::firstOrFail();
+        $this->assertSame('charging', $session->charging_state);
+        $this->assertSame(ChargingSession::STATUS_PENDING, $session->status);
+    }
+
+    public function test_parar_closes_the_recharge_with_the_totem_measurements(): void
+    {
+        $manager = User::factory()->create(['is_admin' => true]);
+        $establishment = Establishment::factory()->for($manager)->create();
+        Charger::factory()->for($establishment)->create(['code' => 'totem_01', 'name' => 'Lab Goodwe 01']);
+
+        $user = User::factory()->create(['balance' => 30]);
+        $this->firestore->seed('totems', 'totem_01', ['tarifa_kwh' => 1.9]);
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'));
+
+        // O totem reporta a medição final ao encerrar.
+        $this->firestore->seed('totems', 'totem_01', [
+            'comando_web' => 'carregando',
+            'energia_kwh' => 12.5,
+            'valor_total' => 23.75,
+        ]);
+
+        $this->actingAs($user)->post(route('totens.parar', 'totem_01'))
+            ->assertSessionHas('success');
+
+        $session = ChargingSession::firstOrFail();
+        $this->assertSame('ended', $session->charging_state);
+        $this->assertSame(ChargingSession::STATUS_COMPLETED, $session->status);
+        $this->assertSame('12.5000', $session->measured_energy_kwh);
+        $this->assertSame('23.75', $session->amount_charged);
+        $this->assertSame('23.75', $session->original_amount);
+        $this->assertNotNull($session->ended_at);
+
+        $this->actingAs($manager)
+            ->get(route('manager.dashboard'))
+            ->assertOk()
+            ->assertViewHas('periodEnergy', 12.5)
+            ->assertViewHas('chargerDistribution', fn ($rows) => (int) $rows->sum('total') === 1);
+    }
+
+    public function test_parar_falls_back_to_the_totem_tariff_when_no_measurement_is_reported(): void
+    {
+        $user = User::factory()->create(['balance' => 30]);
+        $this->firestore->seed('totems', 'totem_01', ['tarifa_kwh' => 2]);
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'));
+        $this->firestore->seed('totems', 'totem_01', ['comando_web' => 'carregando', 'energia_kwh' => 10]);
+
+        $this->actingAs($user)->post(route('totens.parar', 'totem_01'));
+
+        // 10 kWh x R$ 2,00 (tarifa registrada na abertura da sessão).
+        $session = ChargingSession::firstOrFail();
+        $this->assertSame('10.0000', $session->measured_energy_kwh);
+        $this->assertSame('20.00', $session->amount_charged);
+    }
+
+    public function test_totem_recharge_without_a_registered_charger_stays_out_of_the_manager_views(): void
+    {
+        $manager = User::factory()->create(['is_admin' => true]);
+        $establishment = Establishment::factory()->for($manager)->create();
+
+        $user = User::factory()->create(['balance' => 30]);
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'))->assertSessionHas('success');
+
+        $session = ChargingSession::firstOrFail();
+        $this->assertNull($session->establishment_id);
+        $this->assertNull($session->charger_id);
+        $this->assertSame('Lab Goodwe 01', $session->charger_name);
+
+        $this->actingAs($manager)
+            ->get(route('manager.dashboard'))
+            ->assertOk()
+            ->assertViewHas('periodSessionsCount', 0)
+            ->assertDontSee('Lab Goodwe 01');
+    }
+
+    public function test_iniciar_reuses_the_open_recharge_instead_of_duplicating_it(): void
+    {
+        $user = User::factory()->create(['balance' => 30]);
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'));
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'));
+
+        $this->assertSame(1, ChargingSession::where('user_id', $user->id)->count());
+    }
+
+    public function test_parar_without_an_open_recharge_does_not_create_a_session(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('totens.parar', 'totem_01'))
+            ->assertSessionHas('success');
+
+        $this->assertSame(0, ChargingSession::count());
+    }
+
+    public function test_recharge_is_still_recorded_when_the_session_has_no_measurement(): void
+    {
+        $user = User::factory()->create(['balance' => 30]);
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'));
+        $this->actingAs($user)->post(route('totens.parar', 'totem_01'));
+
+        $session = ChargingSession::firstOrFail();
+        $this->assertSame('ended', $session->charging_state);
+        $this->assertSame('0.0000', $session->measured_energy_kwh);
+        $this->assertSame('0.00', $session->amount_charged);
     }
 }

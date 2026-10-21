@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\FirestoreService;
+use App\Services\TotemSessionService;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -27,7 +28,8 @@ class TotemChargingController extends Controller
     private const DEFAULT_TARIFF = 5.50;
 
     public function __construct(
-        private readonly FirestoreService $firestore
+        private readonly FirestoreService $firestore,
+        private readonly TotemSessionService $sessions
     ) {}
 
     /**
@@ -142,6 +144,10 @@ class TotemChargingController extends Controller
 
             $this->forgetTotemData($totemId);
 
+            // Espelha a recarga no banco: é o registro que compõe o dashboard
+            // do gestor (o comando no Firestore é só o canal do equipamento).
+            $this->sessions->start($user, $totemId, $tarifaKwh);
+
             return redirect()->route('totens.carregar', $totemId)
                 ->with('success', __('totens.started', ['totem' => $totemId]));
         } catch (Throwable $e) {
@@ -196,10 +202,16 @@ class TotemChargingController extends Controller
     {
         try {
             $totem = $this->totemStatus($totemId);
+            $comando = (string) ($totem['comando_web'] ?? '');
+
+            // O avanço do fluxo é observado no polling: quando o ESP confirma o
+            // PIN e passa a "carregando", a sessão espelhada sai de
+            // `pending_pin` para que o painel do gestor mostre a recarga ativa.
+            $this->sessions->syncState(Auth::user(), $totemId, $comando);
 
             return response()->json([
                 'success' => true,
-                'comando_web' => (string) ($totem['comando_web'] ?? ''),
+                'comando_web' => $comando,
                 'pin_gerado' => (string) ($totem['pin_gerado'] ?? ''),
                 'tag_uid' => (string) ($totem['tag_uid'] ?? ''),
                 'tarifa_kwh' => isset($totem['tarifa_kwh'])
@@ -221,7 +233,8 @@ class TotemChargingController extends Controller
      */
     public function parar(string $totemId): RedirectResponse
     {
-        $tagUid = $this->tagUid(Auth::user());
+        $user = Auth::user();
+        $tagUid = $this->tagUid($user);
 
         try {
             // 1) Comando para o ESP: canal que ele consome em tempo real
@@ -235,6 +248,10 @@ class TotemChargingController extends Controller
             ]);
 
             $this->forgetTotemData($totemId);
+
+            // 3) Encerra a sessão no banco com a medição do totem, para que o
+            //    consumo e o valor da recarga cheguem ao painel do gestor.
+            $this->sessions->finish($user, $totemId, $this->totemData($totemId));
 
             return redirect()->route('totens.carregar', $totemId)
                 ->with('success', __('totens.stopped', ['totem' => $totemId]));

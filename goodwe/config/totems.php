@@ -18,12 +18,12 @@ return [
     'available' => [
         [
             'id' => 'totem_01',
-            'name' => 'Totem 01',
+            'name' => 'Lab Goodwe 01',
             'location' => 'Entrada principal',
         ],
         [
             'id' => 'totem_02',
-            'name' => 'Totem 02',
+            'name' => 'Lab Goodwe 02',
             'location' => 'Estacionamento',
         ],
     ],
