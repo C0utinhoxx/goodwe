@@ -15,6 +15,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ManagerController extends Controller
 {
+    /**
+     * Perfil do gestor: os mesmos dados pessoais editados no portal do
+     * usuário, sem exigir estabelecimento cadastrado.
+     */
+    public function profile(): View
+    {
+        return view('manager.profile');
+    }
+
     public function dashboard(Request $request): View
     {
         $user = $request->user();

@@ -2,7 +2,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- PWA -->
@@ -33,7 +33,12 @@
             ['name'=>'Configurar tarifas','route'=>$establishmentRoute,'hash'=>'configurar-tarifas'],
             ['name'=>'Regras de reserva','route'=>$establishmentRoute,'hash'=>'regras-reserva'],
         ]];
-        $currentTitle = collect($links)->first(fn ($link) => request()->routeIs($link['active']))['name'] ?? (request()->routeIs('manager.chatbot.*') ? 'Assistente IA' : 'Painel do gestor');
+        $currentTitle = collect($links)->first(fn ($link) => request()->routeIs($link['active']))['name']
+            ?? match (true) {
+                request()->routeIs('manager.profile') => 'Meu perfil',
+                request()->routeIs('manager.chatbot.*') => 'Assistente IA',
+                default => 'Painel do gestor',
+            };
     @endphp
     <title>{{ $currentTitle }} · PowerTag Gestor</title>
     <link rel="icon" href="{{ asset('favicon.ico') }}" type="image/x-icon">

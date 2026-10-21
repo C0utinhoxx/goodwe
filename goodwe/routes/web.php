@@ -229,6 +229,11 @@ Route::middleware('auth')->group(function () {
         ->name('manager.')
         ->group(function () {
 
+            Route::get('/perfil', [ManagerController::class, 'profile'])
+                ->name('profile');
+            Route::patch('/perfil', [UserController::class, 'updateProfile'])
+                ->name('profile.update');
+
             Route::get('/estabelecimento/cadastro', [EstablishmentController::class, 'create'])
                 ->name('establishment.setup');
             Route::post('/estabelecimento/cadastro', [EstablishmentController::class, 'store'])

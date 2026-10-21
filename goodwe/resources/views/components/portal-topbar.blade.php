@@ -16,6 +16,7 @@
                 <div class="gw-account-heading"><strong>{{ Auth::user()->name }}</strong><small>{{ $manager ? 'Conta de gestor' : 'Conta de usuário' }}</small></div>
                 <nav aria-label="Atalhos da conta">
                     @if($manager)
+                        <a href="{{ route('manager.profile') }}"><i data-lucide="user" aria-hidden="true"></i>Meu perfil</a>
                         <a href="{{ route('manager.establishment.setup') }}"><i data-lucide="store" aria-hidden="true"></i>Meu estabelecimento</a>
                         @unless(request()->routeIs('manager.establishment.setup'))<a href="{{ route('manager.establishment.edit') }}#configurar-tarifas"><i data-lucide="chart-no-axes-column" aria-hidden="true"></i>Configurar tarifas</a>@endunless
                     @else

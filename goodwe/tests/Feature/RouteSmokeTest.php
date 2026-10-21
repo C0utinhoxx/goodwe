@@ -59,6 +59,8 @@ class RouteSmokeTest extends TestCase
             'manager.establishment.store',
             'manager.establishment.edit',
             'manager.establishment.update',
+            'manager.profile',
+            'manager.profile.update',
         ];
 
         $defined = $this->registeredRouteNames();
