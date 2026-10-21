@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\FilterManagerChargersRequest;
 use App\Http\Requests\ManagerChargerRequest;
 use App\Models\Charger;
+use App\Services\TotemTariffService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +15,8 @@ use Illuminate\View\View;
 
 class ManagerChargerController extends Controller
 {
+    public function __construct(private readonly TotemTariffService $totems) {}
+
     public function index(FilterManagerChargersRequest $request): View
     {
         $search = $request->validated('search');
@@ -42,10 +45,14 @@ class ManagerChargerController extends Controller
     public function store(ManagerChargerRequest $request): RedirectResponse
     {
         try {
-            $request->user()->establishment->chargers()->create([...$request->safe()->only(['code', 'name', 'location', 'power_kw', 'connector', 'lat', 'lng', 'tariff_override']), 'activation_status' => 'pending', 'physical_status' => 'unavailable']);
+            $charger = $request->user()->establishment->chargers()->create([...$request->safe()->only(['code', 'name', 'location', 'power_kw', 'connector', 'lat', 'lng', 'tariff_override']), 'activation_status' => 'pending', 'physical_status' => 'unavailable']);
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['code' => 'Este identificador já está cadastrado. Não é possível assumir um equipamento de outro cadastro.']);
         }
+
+        // O totem já pode existir no Firestore: leva a tarifa vigente para lá
+        // antes da primeira recarga.
+        $this->totems->syncCharger($charger);
 
         return redirect()->route('manager.chargers.index')->with('success', 'Carregador cadastrado. A ativação física aguarda comprovação pela integração do equipamento.');
     }
@@ -60,6 +67,10 @@ class ManagerChargerController extends Controller
     public function update(ManagerChargerRequest $request, Charger $charger): RedirectResponse
     {
         $charger->update($request->safe()->only(['name', 'location', 'power_kw', 'connector', 'lat', 'lng', 'tariff_override']));
+
+        if ($charger->wasChanged('tariff_override')) {
+            $this->totems->syncCharger($charger);
+        }
 
         return redirect()->route('manager.chargers.index')->with('success', 'Informações administrativas do carregador atualizadas.');
     }

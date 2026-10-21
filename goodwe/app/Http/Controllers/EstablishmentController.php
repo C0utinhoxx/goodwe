@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\EstablishmentRequest;
 use App\Services\DemandPricingService;
 use App\Services\EstablishmentService;
+use App\Services\TotemTariffService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,9 +23,11 @@ class EstablishmentController extends Controller
         return view('manager.establishment-form', ['establishment' => null]);
     }
 
-    public function store(EstablishmentRequest $request, EstablishmentService $service): RedirectResponse
+    public function store(EstablishmentRequest $request, EstablishmentService $service, TotemTariffService $totems): RedirectResponse
     {
-        $service->create($request->user(), $request->safe()->except(['user_id', 'establishment_id', 'active_peak_id', 'peak_tariff']));
+        $establishment = $service->create($request->user(), $request->safe()->except(['user_id', 'establishment_id', 'active_peak_id', 'peak_tariff']));
+
+        $totems->syncEstablishment($establishment);
 
         return redirect()->route('manager.dashboard')->with('success', 'Estabelecimento cadastrado e vinculado à sua conta.');
     }
@@ -34,9 +37,12 @@ class EstablishmentController extends Controller
         return view('manager.establishment-form', ['establishment' => $request->user()->establishment]);
     }
 
-    public function update(EstablishmentRequest $request, DemandPricingService $service): RedirectResponse
+    public function update(EstablishmentRequest $request, DemandPricingService $service, TotemTariffService $totems): RedirectResponse
     {
-        $service->updateSettings($request->user(), $request->user()->establishment, $request->safe()->except(['user_id', 'establishment_id', 'active_peak_id', 'peak_tariff']));
+        $establishment = $service->updateSettings($request->user(), $request->user()->establishment, $request->safe()->except(['user_id', 'establishment_id', 'active_peak_id', 'peak_tariff']));
+
+        // A tarifa-base/reajuste mudou: o totem passa a cobrar o novo valor.
+        $totems->syncEstablishment($establishment);
 
         return redirect()->route('manager.establishment.edit')->with('success', 'Dados e configurações atualizados. Reservas e sessões anteriores mantêm suas regras.');
     }

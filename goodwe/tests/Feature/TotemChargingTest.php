@@ -628,4 +628,98 @@ class TotemChargingTest extends TestCase
         $this->assertSame('0.0000', $session->measured_energy_kwh);
         $this->assertSame('0.00', $session->amount_charged);
     }
+
+    public function test_manager_tariff_change_is_mirrored_to_the_totem_documents(): void
+    {
+        $manager = User::factory()->create(['is_admin' => true]);
+        $establishment = Establishment::factory()->for($manager)->create([
+            'cnpj' => '11222333000181',
+            'phone' => '11987654321',
+        ]);
+        Charger::factory()->for($establishment)->create(['code' => 'totem_01']);
+        Charger::factory()->for($establishment)->create(['code' => 'totem_02', 'tariff_override' => '2.5000']);
+
+        // A tela de recarga já tinha sido aberta com o valor antigo (cache).
+        $this->firestore->seed('totems', 'totem_01', ['tarifa_kwh' => 1.9]);
+        $this->firestore->seed('totems', 'totem_02', ['tarifa_kwh' => 2.5]);
+        $this->actingAs(User::factory()->create())
+            ->get(route('totens.carregar', 'totem_01'))
+            ->assertSee('1,90', false);
+
+        $this->actingAs($manager)
+            ->patch(route('manager.establishment.update'), $this->establishmentPayload($establishment, ['cost_per_kwh' => '2.2000']))
+            ->assertRedirect(route('manager.establishment.edit'));
+
+        // A tarifa-base nova chega ao totem que a herda...
+        $this->assertSame(2.2, $this->firestore->documents['totems/totem_01']['tarifa_kwh']);
+        // ...e o equipamento com tarifa própria mantém a sua.
+        $this->assertSame(2.5, $this->firestore->documents['totems/totem_02']['tarifa_kwh']);
+
+        // A tela e o polling passam a mostrar o novo valor (cache invalidado).
+        $this->actingAs(User::factory()->create())
+            ->get(route('totens.carregar', 'totem_01'))
+            ->assertSee('2,20', false);
+        $this->actingAs(User::factory()->create())
+            ->getJson(route('totens.status', 'totem_01'))
+            ->assertJsonPath('tarifa_kwh', 2.2);
+    }
+
+    public function test_manager_charger_tariff_override_is_mirrored_only_to_its_own_totem(): void
+    {
+        $manager = User::factory()->create(['is_admin' => true]);
+        $establishment = Establishment::factory()->for($manager)->create();
+        $charger = Charger::factory()->for($establishment)->create(['code' => 'totem_01']);
+        Charger::factory()->for($establishment)->create(['code' => 'totem_02']);
+
+        $this->actingAs($manager)->patch(route('manager.chargers.update', $charger), [
+            'name' => $charger->name,
+            'location' => $charger->location,
+            'power_kw' => (string) $charger->power_kw,
+            'connector' => $charger->connector,
+            'tariff_override' => '3.7500',
+        ])->assertRedirect(route('manager.chargers.index'));
+
+        $this->assertSame(3.75, $this->firestore->documents['totems/totem_01']['tarifa_kwh']);
+        $this->assertArrayNotHasKey('totems/totem_02', $this->firestore->documents);
+    }
+
+    public function test_manager_tariff_change_survives_a_firestore_outage(): void
+    {
+        $manager = User::factory()->create(['is_admin' => true]);
+        $establishment = Establishment::factory()->for($manager)->create([
+            'cnpj' => '11222333000181',
+            'phone' => '11987654321',
+        ]);
+        Charger::factory()->for($establishment)->create(['code' => 'totem_01']);
+
+        $this->firestore->shouldFail = true;
+
+        $this->actingAs($manager)
+            ->patch(route('manager.establishment.update'), $this->establishmentPayload($establishment, ['cost_per_kwh' => '2.2000']))
+            ->assertRedirect(route('manager.establishment.edit'));
+
+        // A tarifa local é a fonte de cobrança; o Firestore é espelho.
+        $this->assertSame('2.2000', $establishment->fresh()->cost_per_kwh);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function establishmentPayload(Establishment $establishment, array $overrides = []): array
+    {
+        return array_merge([
+            'name' => $establishment->name,
+            'cnpj' => $establishment->cnpj,
+            'address' => $establishment->address,
+            'phone' => $establishment->phone,
+            'type' => $establishment->type,
+            'operating_hours' => $establishment->operating_hours,
+            'cost_per_kwh' => (string) $establishment->cost_per_kwh,
+            'pricing_mode' => $establishment->pricing_mode ?? 'manual',
+            'surge_percentage' => (string) ($establishment->surge_percentage ?? '15.00'),
+            'reservation_tolerance_minutes' => $establishment->reservation_tolerance_minutes,
+            'no_show_penalty_points' => (string) $establishment->no_show_penalty_points,
+        ], $overrides);
+    }
 }

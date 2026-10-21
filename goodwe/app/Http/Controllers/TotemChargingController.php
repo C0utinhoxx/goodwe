@@ -69,7 +69,9 @@ class TotemChargingController extends Controller
         }
 
         try {
-            $totem = $this->totemData($totemId);
+            // Lê o documento com o cache curtíssimo do polling: a tarifa
+            // alterada no gestor chega à tela sem esperar o cache longo.
+            $totem = $this->totemStatus($totemId);
         } catch (Throwable $e) {
             report($e);
 
@@ -134,11 +136,12 @@ class TotemChargingController extends Controller
             ]);
 
             // 2) Espelho no documento do totem (status na tela + TAG autenticada)
-            //    Reseta o pin_digitado para garantir que o ESP32 gera um novo PIN
+            //    Reseta o pin_digitado para garantir que o ESP32 gera um novo PIN.
+            //    `tarifa_kwh` não é reescrito aqui: uma edição concorrente no
+            //    gestor poderia ser sobrescrita com o valor antigo lido acima.
             $this->firestore->setDocumentMerge('totems', $totemId, [
                 'comando_web' => 'iniciar',
                 'tag_uid' => $tagUid,
-                'tarifa_kwh' => $tarifaKwh,
                 'pin_digitado' => '',
             ]);
 
@@ -264,9 +267,9 @@ class TotemChargingController extends Controller
     /**
      * Dados do totem (tarifa, localização e espelho de `comando_web`).
      *
-     * A tarifa e os metadados do equipamento mudam raramente; um cache curto
-     * evita uma ida à rede (Firestore via REST) a cada abertura da tela de
-     * recarga. O cache é invalidado nas escritas (iniciar/parar/PIN).
+     * Usado no encerramento da recarga, quando a medição final precisa ser
+     * lida uma única vez. O cache é invalidado nas escritas
+     * (iniciar/parar/PIN e alterações de tarifa do gestor).
      *
      * @return array<string, mixed>
      */

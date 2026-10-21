@@ -113,7 +113,7 @@
             <div class="relative mt-2 flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 dark:bg-[#181b22]">
                 <span class="text-xs text-gray-500 dark:text-[#a0a0a0]">{{ __('totens.tariff') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white">
-                    R$ {{ number_format($tarifaKwh, 2, ',', '.') }}
+                    R$ <span id="tariff-amount">{{ number_format($tarifaKwh, 2, ',', '.') }}</span>
                     <span class="text-xs font-normal text-gray-400">{{ __('totens.per_kwh') }}</span>
                 </span>
             </div>
@@ -132,7 +132,7 @@
                     <button
                         type="submit"
                         @disabled($saldo <= 0)
-                        class="w-full rounded-lg bg-[#e53935] px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-[#c62828] hover:shadow-[0_0_15px_rgba(229,57,53,0.3)] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none dark:disabled:bg-[#343843]"
+                        class="w-full rounded-lg bg-[#e53935] px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#c62828] hover:shadow-[0_4px_15px_rgba(229,57,53,0.4)] active:scale-[0.95] active:shadow-none disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none dark:disabled:bg-[#343843] dark:hover:bg-[#e53935]"
                     >
                         <span class="inline-flex items-center justify-center gap-2">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -154,7 +154,7 @@
                     @csrf
                     <button
                         type="submit"
-                        class="w-full rounded-lg border border-[#e53935] px-5 py-3 text-sm font-semibold text-[#e53935] transition-all hover:bg-[#e53935]/10 active:scale-[0.98]"
+                        class="w-full rounded-lg border border-[#e53935] px-6 py-3 text-sm font-semibold text-[#e53935] transition-all duration-200 hover:bg-[#e53935]/10 hover:shadow-[0_4px_10px_rgba(229,57,53,0.3)] active:scale-[0.95] active:shadow-none"
                     >
                         <span class="inline-flex items-center justify-center gap-2">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -164,11 +164,6 @@
                         </span>
                     </button>
                 </form>
-            </div>
-
-            <div class="mt-5 space-y-1 rounded-md bg-gray-50 px-3 py-3 text-[11px] text-gray-500 dark:bg-[#181b22] dark:text-[#a0a0a0]">
-                <p class="font-mono">{{ __('totens.channel_hint', ['tag' => $tagUid]) }}</p>
-                <p class="font-mono">{{ __('totens.mirror_hint', ['id' => $totemId]) }}</p>
             </div>
         </div>
     </section>
@@ -275,6 +270,7 @@
             const pinError = document.getElementById('pin-error');
             const pinSubmit = document.getElementById('pin-submit');
             const pinCancel = document.getElementById('pin-cancel');
+            const tariffAmount = document.getElementById('tariff-amount');
 
             // Estado interno
             let pollingInterval = null;
@@ -325,6 +321,16 @@
 
                     const data = await response.json();
                     if (!data.success) return;
+
+                    // A tarifa pode mudar no gestor com a tela aberta: o
+                    // polling mantém o valor exibido igual ao `tarifa_kwh`
+                    // gravado no documento do totem.
+                    if (tariffAmount && typeof data.tarifa_kwh === 'number') {
+                        tariffAmount.textContent = data.tarifa_kwh.toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        });
+                    }
 
                     const comando = data.comando_web;
 

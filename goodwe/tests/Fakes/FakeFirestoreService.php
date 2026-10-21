@@ -39,6 +39,19 @@ class FakeFirestoreService extends FirestoreService
         $this->writes[] = ['collection' => $collection, 'id' => $documentId, 'data' => $data];
     }
 
+    public function saveDocument(string $collection, string $documentId, array $data): void
+    {
+        $this->failIfNeeded();
+
+        $this->documents["{$collection}/{$documentId}"] = $data;
+        $this->writes[] = ['collection' => $collection, 'id' => $documentId, 'data' => $data];
+    }
+
+    public function updateDocument(string $collection, string $documentId, array $data): void
+    {
+        $this->setDocumentMerge($collection, $documentId, $data);
+    }
+
     public function seed(string $collection, string $documentId, array $data): void
     {
         $this->documents["{$collection}/{$documentId}"] = $data;
