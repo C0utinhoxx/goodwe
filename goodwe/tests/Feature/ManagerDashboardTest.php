@@ -7,6 +7,7 @@ use App\Models\Establishment;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class ManagerDashboardTest extends TestCase
@@ -117,6 +118,42 @@ class ManagerDashboardTest extends TestCase
         $this->actingAs($manager)->get(route('manager.dashboard'))
             ->assertViewHas('totalSessions', 2)
             ->assertViewHas('totalEnergy', fn ($energy) => abs((float) $energy - 30.0) < 0.00001);
+    }
+
+    public function test_cached_dashboard_metrics_contain_only_plain_data_structures(): void
+    {
+        Carbon::setTestNow('2026-09-25 12:00:00');
+        config()->set('manager.dashboard_cache_seconds', 60);
+        config()->set('cache.default', 'database');
+
+        [$manager, $establishment] = $this->createManagerWithEstablishment();
+        $user = User::factory()->create();
+        $this->createSession($establishment, $user, 'Torre Norte', ChargingSession::STATUS_COMPLETED, 10, 15, now()->subDay());
+
+        $this->actingAs($manager)->get(route('manager.dashboard', ['period' => 7]))->assertOk();
+
+        $metrics = Cache::get(sprintf(
+            'manager:dashboard:v2:%d:%s:%d:%s',
+            $establishment->id,
+            now()->toDateString(),
+            7,
+            'with-test'
+        ));
+
+        // O payload do cache precisa ser composto apenas por arrays: com
+        // `serializable_classes => false`, qualquer objeto vira
+        // __PHP_Incomplete_Class ao ser restaurado do cache.
+        $this->assertIsArray($metrics);
+        $this->assertIsArray($metrics['historicalTotals']);
+        $this->assertSame(1, $metrics['historicalTotals']['sessions_count']);
+        $this->assertIsArray($metrics['periodTotals']);
+        $this->assertSame(1, $metrics['periodTotals']['sessions_count']);
+        $this->assertIsArray($metrics['dailyUsage']);
+        $this->assertIsArray($metrics['dailyUsage'][0]);
+        $this->assertIsArray($metrics['chargerDistribution']);
+        $this->assertIsArray($metrics['chargerDistribution'][0]);
+        $this->assertIsArray($metrics['statusTotals']);
+        $this->assertSame(1, $metrics['statusTotals'][ChargingSession::STATUS_COMPLETED]);
     }
 
     private function createManagerWithEstablishment(): array

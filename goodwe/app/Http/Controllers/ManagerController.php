@@ -7,7 +7,6 @@ use App\Models\Establishment;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -53,8 +52,10 @@ class ManagerController extends Controller
             $includeTestSessions
         );
         $cacheSeconds = (int) config('manager.dashboard_cache_seconds', 60);
+        // v2: o cache guarda apenas arrays. A versão anterior serializava
+        // models Eloquent e quebrava o unserialize em produção.
         $metricsKey = sprintf(
-            'manager:dashboard:%d:%s:%d:%s',
+            'manager:dashboard:v2:%d:%s:%d:%s',
             $establishment->id,
             now()->toDateString(),
             $period,
@@ -65,33 +66,33 @@ class ManagerController extends Controller
             : $buildMetrics();
 
         $historicalTotals = $metrics['historicalTotals'];
-        $totalSessions = (int) $historicalTotals->sessions_count;
-        $totalUsers = (int) $historicalTotals->users_count;
-        $totalRevenue = (float) $historicalTotals->total_revenue;
-        $totalEnergy = (float) $historicalTotals->total_energy;
+        $totalSessions = (int) ($historicalTotals['sessions_count'] ?? 0);
+        $totalUsers = (int) ($historicalTotals['users_count'] ?? 0);
+        $totalRevenue = (float) ($historicalTotals['total_revenue'] ?? 0);
+        $totalEnergy = (float) ($historicalTotals['total_energy'] ?? 0);
         $avgCostPerKwh = $totalEnergy > 0 ? $totalRevenue / $totalEnergy : 0;
 
         $periodTotals = $metrics['periodTotals'];
-        $periodSessionsCount = (int) $periodTotals->sessions_count;
-        $periodRevenue = (float) $periodTotals->total_revenue;
-        $periodEnergy = (float) $periodTotals->total_energy;
-        $periodActiveUsers = (int) $periodTotals->active_users;
+        $periodSessionsCount = (int) ($periodTotals['sessions_count'] ?? 0);
+        $periodRevenue = (float) ($periodTotals['total_revenue'] ?? 0);
+        $periodEnergy = (float) ($periodTotals['total_energy'] ?? 0);
+        $periodActiveUsers = (int) ($periodTotals['active_users'] ?? 0);
         $hasPeriodData = $periodSessionsCount > 0;
 
-        $dailyUsage = $metrics['dailyUsage'];
+        $dailyUsage = collect($metrics['dailyUsage']);
         $hasCompletedData = $dailyUsage->isNotEmpty();
         $dailyUsageByDate = $dailyUsage->keyBy('date');
         $periodDates = collect(range(0, $period - 1))
             ->map(fn (int $day) => $periodSince->copy()->addDays($day));
         $dailyLabels = $periodDates->map(fn (Carbon $date) => $date->format('d/m'));
         $dailyKwh = $periodDates->map(
-            fn (Carbon $date) => (float) ($dailyUsageByDate->get($date->toDateString())?->total_kwh ?? 0)
+            fn (Carbon $date) => (float) ($dailyUsageByDate->get($date->toDateString())['total_kwh'] ?? 0)
         );
         $dailyRevenue = $periodDates->map(
-            fn (Carbon $date) => (float) ($dailyUsageByDate->get($date->toDateString())?->total_revenue ?? 0)
+            fn (Carbon $date) => (float) ($dailyUsageByDate->get($date->toDateString())['total_revenue'] ?? 0)
         );
 
-        $chargerDistribution = $metrics['chargerDistribution'];
+        $chargerDistribution = collect($metrics['chargerDistribution']);
 
         $statusTotals = $metrics['statusTotals'];
 
@@ -195,7 +196,7 @@ class ManagerController extends Controller
      * custosa do dashboard — por isso o chamador cacheia o resultado.
      *
      * @param  array{0: Carbon, 1: Carbon}  $periodRange
-     * @return array{historicalTotals: object, periodTotals: object, dailyUsage: Collection, chargerDistribution: Collection, statusTotals: Collection}
+     * @return array{historicalTotals: array<string, mixed>, periodTotals: array<string, mixed>, dailyUsage: array<int, array<string, mixed>>, chargerDistribution: array<int, array<string, mixed>>, statusTotals: array<string, int>}
      */
     private function dashboardMetrics(Establishment $establishment, array $periodRange, bool $includeTestSessions): array
     {
@@ -247,13 +248,20 @@ class ManagerController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        return compact(
-            'historicalTotals',
-            'periodTotals',
-            'dailyUsage',
-            'chargerDistribution',
-            'statusTotals'
-        );
+        // O resultado vai para o cache (database/file/redis) e é serializado.
+        // Como `cache.serializable_classes` é false, nenhum objeto pode ser
+        // restaurado: o payload precisa ser composto somente por arrays.
+        return [
+            'historicalTotals' => $historicalTotals?->toArray() ?? [],
+            'periodTotals' => $periodTotals?->toArray() ?? [],
+            'dailyUsage' => $dailyUsage
+                ->map(fn (ChargingSession $row): array => $row->toArray())
+                ->all(),
+            'chargerDistribution' => $chargerDistribution
+                ->map(fn (ChargingSession $row): array => $row->toArray())
+                ->all(),
+            'statusTotals' => $statusTotals->all(),
+        ];
     }
 
     public function exportSessions(Request $request): StreamedResponse
