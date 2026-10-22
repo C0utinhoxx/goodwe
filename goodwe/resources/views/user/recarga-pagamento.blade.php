@@ -1,6 +1,10 @@
 <x-user-layout>
     <x-slot name="pageTitle">Minha recarga</x-slot>
-    <x-slot name="header"><div><p class="pt-eyebrow">SESSÃO #{{ $session->id }}</p><h1 class="pt-heading">{{ $session->charger_name }}</h1><p class="pt-muted pt-subheading">{{ $session->establishment?->name ?? 'Estabelecimento não informado no registro anterior' }}</p></div></x-slot>
+    {{-- Botão de reserva no canto superior direito da página. Ele abre o
+         diálogo de confirmação com a taxa do dia (base: tarifa × duração
+         média × potência; acréscimo seg–qui menor, sex–dom maior) sem
+         tirar a pessoa do fluxo padrão de pagamento da recarga. --}}
+    <x-slot name="header"><div class="flex items-start justify-between gap-4"><div><p class="pt-eyebrow">SESSÃO #{{ $session->id }}</p><h1 class="pt-heading">{{ $session->charger_name }}</h1><p class="pt-muted pt-subheading">{{ $session->establishment?->name ?? 'Estabelecimento não informado no registro anterior' }}</p></div><button type="button" class="pt-button pt-button-primary shrink-0" data-charger-open="reservar-sessao"><i data-lucide="calendar-plus"></i> Reservar ponto</button></div></x-slot>
     <x-flash-messages />
     <section class="pt-card">
         @if($session->isWebSimulation() && $session->charging_state !== 'ended')
@@ -29,31 +33,23 @@
         <a class="pt-text-link pt-mt" href="{{ route('wallet.history') }}">Consultar histórico <i data-lucide="arrow-right"></i></a>
     </section>
 
-    {{-- ============================================================
-        RESERVA DO PONTO (sempre visível)
-        A pessoa acaba de fazer uma recarga: aqui ela já pode garantir
-        o mesmo equipamento para a próxima. A taxa segue a regra — base
-        (tarifa × duração média × potência) + acréscimo do dia (seg–qui
-        menor, sex–dom maior) — e é exibida antes da confirmação.
-        ============================================================ --}}
-    <section class="pt-card pt-mt" id="reservar-este-carregador">
-        <div class="pt-card-heading"><div><p class="pt-eyebrow">RESERVA IMEDIATA</p><h2>Vai carregar de novo? Reserve este ponto</h2></div></div>
+    {{-- Diálogo de reserva do ponto desta sessão, com a taxa informada
+         antes da confirmação. Sessões legadas sem carregador cadastrado
+         recebem a alternativa de escolher um ponto na lista. --}}
+    <dialog id="reservar-sessao" class="pt-dialog" aria-labelledby="reservar-sessao-title"><div class="pt-dialog-body">
         @if($reserveCharger)
-            <p class="pt-muted">Reserve o {{ $reserveCharger->name }} agora e garanta o ponto com a tarifa travada. Não há agendamento futuro: a reserva vale a partir da confirmação, pelo prazo de tolerância do estabelecimento.</p>
+            <div class="pt-dialog-top"><div><p class="pt-eyebrow">RESERVA IMEDIATA</p><h2 id="reservar-sessao-title">{{ $reserveCharger->name }}</h2><p class="pt-muted">{{ $reserveCharger->establishment->name }} · {{ $reserveCharger->location }}</p></div><button type="button" class="pt-dialog-close" data-dialog-close aria-label="Fechar"><i data-lucide="x"></i></button></div>
+            <dl class="pt-payment-summary"><div><dt>Potência</dt><dd>{{ (float) $reserveCharger->power_kw }} kW</dd></div><div><dt>Tarifa vigente</dt><dd>{{ (float) $reserveCharger->currentTariff() > 0 ? 'R$ '.number_format($reserveCharger->currentTariff(), 4, ',', '.').'/kWh' : 'Não configurada' }}</dd></div>@if($reserveFee['enabled'])<div><dt>Taxa de reserva</dt><dd>R$ {{ number_format((float) $reserveFee['amount'], 2, ',', '.') }}</dd></div><div><dt>Base da taxa</dt><dd>R$ {{ number_format((float) $reserveFee['base_amount'], 2, ',', '.') }} · média de {{ $reserveFee['average_minutes'] }} min × {{ (float) $reserveCharger->power_kw }} kW × tarifa</dd></div><div><dt>Regra por dia</dt><dd>Seg–qui +{{ config('reservations.fee_percent_weekday') }}% · Sex–dom +{{ config('reservations.fee_percent_weekend') }}%</dd></div>@endif<div><dt>Tolerância para comparecer</dt><dd>{{ $reserveCharger->establishment->reservation_tolerance_minutes ? $reserveCharger->establishment->reservation_tolerance_minutes.' minutos' : 'Não configurada' }}</dd></div></dl>
             @if($reserveFee['enabled'])
-                <dl class="pt-payment-summary">
-                    <div><dt>Taxa de reserva</dt><dd>R$ {{ number_format((float) $reserveFee['amount'], 2, ',', '.') }}</dd></div>
-                    <div><dt>Base da taxa</dt><dd>R$ {{ number_format((float) $reserveFee['base_amount'], 2, ',', '.') }} · média de {{ $reserveFee['average_minutes'] }} min × {{ (float) $reserveCharger->power_kw }} kW × tarifa</dd></div>
-                    <div><dt>Regra por dia</dt><dd>Seg–qui +{{ config('reservations.fee_percent_weekday') }}% · Sex–dom +{{ config('reservations.fee_percent_weekend') }}%</dd></div>
-                </dl>
-                <p class="pt-form-note">Hoje aplica-se <strong>+{{ $reserveFee['percent'] }}%</strong>. A taxa é cobrada do seu saldo no ato da confirmação e <strong>não é devolvida</strong> em cancelamento ou ausência.</p>
+                <p class="pt-form-note">Hoje aplica-se <strong>+{{ $reserveFee['percent'] }}%</strong>. A reserva garante este ponto com a tarifa vigente; a taxa de <strong>R$ {{ number_format((float) $reserveFee['amount'], 2, ',', '.') }}</strong> é cobrada do seu saldo no ato da confirmação e <strong>não é devolvida</strong> em cancelamento ou ausência. Não há agendamento futuro nem cobrança da recarga nesta etapa.</p>
             @else
-                <p class="pt-form-note">Nenhuma taxa ativa no momento: se houver cobrança, o valor é informado antes de você confirmar.</p>
+                <p class="pt-form-note">A tarifa será garantida para a recarga vinculada à reserva. Você pode cancelar gratuitamente antes do prazo e do início. Não há agendamento futuro nem cobrança nesta etapa.</p>
             @endif
-            <form method="POST" action="{{ route('reservations.store', $reserveCharger->code) }}">@csrf<input type="hidden" name="idempotency_key" value="{{ Illuminate\Support\Str::uuid() }}"><div class="pt-form-actions"><button type="submit" class="pt-button pt-button-primary">Reservar agora{{ $reserveFee['enabled'] ? ' · R$ '.number_format((float) $reserveFee['amount'], 2, ',', '.') : '' }}</button></div></form>
+            <form method="POST" action="{{ route('reservations.store', $reserveCharger->code) }}">@csrf<input type="hidden" name="idempotency_key" value="{{ Illuminate\Support\Str::uuid() }}"><div class="pt-form-actions"><button type="button" data-dialog-close class="pt-button pt-button-outline">Voltar</button><button type="submit" class="pt-button pt-button-primary">Confirmar reserva{{ $reserveFee['enabled'] ? ' · R$ '.number_format((float) $reserveFee['amount'], 2, ',', '.') : '' }}</button></div></form>
         @else
-            <p class="pt-muted">Este registro anterior não aponta um carregador cadastrado, então a reserva não pode ser feita direto aqui. Escolha um ponto na lista de carregadores.</p>
-            <div class="pt-form-actions"><a href="{{ route('chargers.index') }}" class="pt-button pt-button-outline">Ver carregadores disponíveis</a></div>
+            <div class="pt-dialog-top"><div><p class="pt-eyebrow">RESERVA IMEDIATA</p><h2 id="reservar-sessao-title">Reservar um ponto</h2></div><button type="button" class="pt-dialog-close" data-dialog-close aria-label="Fechar"><i data-lucide="x"></i></button></div>
+            <p class="pt-form-note">Este registro anterior não aponta um carregador cadastrado, então a reserva não pode ser feita direto por aqui. Escolha um ponto na lista de carregadores.</p>
+            <div class="pt-form-actions"><button type="button" data-dialog-close class="pt-button pt-button-outline">Fechar</button><a href="{{ route('chargers.index') }}" class="pt-button pt-button-primary">Ver carregadores disponíveis</a></div>
         @endif
-    </section>
+    </div></dialog>
 </x-user-layout>

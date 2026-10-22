@@ -20,7 +20,7 @@ class ReserveFromPaymentScreenTest extends TestCase
         config(['reservations.fee_enabled' => true]);
     }
 
-    public function test_payment_screen_always_shows_reserve_block_with_the_fee_rule(): void
+    public function test_payment_screen_keeps_the_standard_flow_and_shows_the_reserve_button_top_right(): void
     {
         $this->travelTo('2026-01-05 10:00:00'); // segunda-feira
 
@@ -33,16 +33,22 @@ class ReserveFromPaymentScreenTest extends TestCase
 
         $this->actingAs($user)->get(route('charging-sessions.show', $session))
             ->assertOk()
-            ->assertSee('Vai carregar de novo? Reserve este ponto', false)
+            // Fluxo padrão intacto: pagamento da recarga continua no card principal.
+            ->assertSee('Recarga encerrada · pagamento pendente')
+            ->assertSee('Confirmar pagamento')
+            // Botão no canto superior direito abre o diálogo de reserva.
+            ->assertSee('data-charger-open="reservar-sessao"', false)
+            ->assertSee('Reservar ponto')
+            ->assertSee('id="reservar-sessao"', false)
             ->assertSee('action="'.route('reservations.store', $charger->code).'"', false)
             ->assertSee('R$ 45,98')
             ->assertSee('Seg–qui +10%', false)
             ->assertSee('Sex–dom +20%', false)
-            ->assertSee('Reservar agora · R$ 45,98', false)
+            ->assertSee('Confirmar reserva · R$ 45,98', false)
             ->assertSee('não é devolvida');
     }
 
-    public function test_legacy_session_without_registered_charger_keeps_the_block_with_guidance(): void
+    public function test_legacy_session_without_registered_charger_keeps_the_button_with_guidance(): void
     {
         $user = User::factory()->create(['balance' => 100]);
         $session = ChargingSession::factory()->for($user)->create([
@@ -53,11 +59,12 @@ class ReserveFromPaymentScreenTest extends TestCase
 
         $this->actingAs($user)->get(route('charging-sessions.show', $session))
             ->assertOk()
-            ->assertSee('Vai carregar de novo? Reserve este ponto', false)
+            ->assertSee('data-charger-open="reservar-sessao"', false)
+            ->assertSee('Reservar ponto')
             ->assertSee('Ver carregadores disponíveis');
     }
 
-    public function test_reserve_from_payment_screen_charges_the_fee_and_confirms(): void
+    public function test_reserve_from_the_dialog_charges_the_fee_and_confirms(): void
     {
         $this->travelTo('2026-01-05 10:00:00');
 
@@ -100,7 +107,7 @@ class ReserveFromPaymentScreenTest extends TestCase
         $this->actingAs($user)->get(route('charging-sessions.show', $session))
             ->assertOk()
             ->assertSee('Este carregador não está disponível para reserva.')
-            ->assertSee('Vai carregar de novo? Reserve este ponto', false);
+            ->assertSee('Reservar ponto');
 
         $this->assertDatabaseCount('charging_reservations', 0);
         $this->assertSame('100.00', $user->refresh()->balance);
