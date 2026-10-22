@@ -22,4 +22,18 @@ return [
     'readings_window_minutes' => 2,
     'voltage_v' => 220,
     'phases' => 3,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Simulação de distribuição de potência
+    |--------------------------------------------------------------------------
+    |
+    | Menor potência considerada viável para um carregador no balanceamento.
+    | Quando a capacidade da instalação não permite manter todos os veículos
+    | acima desse valor, a simulação sinaliza que novas recargas devem ser
+    | bloqueadas. O controle físico é uma integração futura.
+    |
+    */
+
+    'minimum_allocation_kw' => 1.4,
 ];

@@ -250,6 +250,9 @@ Route::middleware('auth')->group(function () {
                 Route::post('/demanda/consumo/sincronizar', [DemandControlController::class, 'syncFromFirestore'])
                     ->name('demand-control.sync');
 
+                Route::get('/demanda/consumo/distribuicao', [DemandControlController::class, 'simulate'])
+                    ->name('demand-control.simulate');
+
                 Route::get('/carregadores', [ManagerChargerController::class, 'index'])
                     ->name('chargers.index');
 

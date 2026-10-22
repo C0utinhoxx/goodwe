@@ -26,6 +26,7 @@
                 ['name'=>'Resumo de tarifas','route'=>'manager.demand.index','hash'=>'resumo-tarifas'],
                 ['name'=>'Histórico de alterações','route'=>'manager.demand.index','hash'=>'historico-tarifas'],
                 ['name'=>'Controle de consumo','route'=>'manager.demand-control.index'],
+                ['name'=>'Distribuição inteligente','route'=>'manager.demand-control.index','hash'=>'distribuicao-inteligente'],
             ]],
         ];
         $links[] = ['name'=>'Meu Estabelecimento','route'=>$establishmentRoute,'active'=>'manager.establishment.*','icon'=>'store','description'=>'Dados e configurações','children'=>[
