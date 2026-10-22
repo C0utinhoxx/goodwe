@@ -89,7 +89,16 @@ class TotemSessionService
         }
 
         try {
-            $this->openSession($user, $totemId)?->update([
+            $session = $this->openSession($user, $totemId);
+
+            // O polling consulta o status a cada segundo. Sem esta checagem,
+            // cada consulta regravava a sessão e reiniciava `started_at`,
+            // atrasando a resposta e corrompendo o horário real de início.
+            if ($session === null || $session->charging_state === self::STATE_CHARGING) {
+                return;
+            }
+
+            $session->update([
                 'charging_state' => self::STATE_CHARGING,
                 'started_at' => now(),
             ]);

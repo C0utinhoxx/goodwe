@@ -17,7 +17,9 @@ class ChargingSessionController extends Controller
     {
         abort_unless($session->user_id === $request->user()->id, 403);
         abort_if($session->is_demo, 404);
-        $session->load(['establishment', 'charger', 'coupon', 'reservation']);
+        // A view só usa o estabelecimento e o cupom; carregar `charger` e
+        // `reservation` custava duas consultas por abertura da tela.
+        $session->load(['establishment', 'coupon']);
 
         return view('user/recarga-pagamento', ['session' => $session, 'user' => $request->user(), 'coupons' => $request->user()->coupons()->where('is_demo', false)->where('status', 'available')->latest()->get()]);
     }

@@ -21,6 +21,12 @@ class FakeFirestoreService extends FirestoreService
     /** Simula uma falha de conexão com o Firebase quando true. */
     public bool $shouldFail = false;
 
+    /** Quantidade de chamadas de leitura em lote (BatchGet). */
+    public int $batchReadCalls = 0;
+
+    /** Quantidade de chamadas de escrita em lote (BatchWrite). */
+    public int $batchWriteCalls = 0;
+
     public function __construct() {}
 
     public function getDocumentData(string $collection, string $documentId): ?array
@@ -28,6 +34,31 @@ class FakeFirestoreService extends FirestoreService
         $this->failIfNeeded();
 
         return $this->documents["{$collection}/{$documentId}"] ?? null;
+    }
+
+    public function getDocumentsData(array $paths): array
+    {
+        $this->failIfNeeded();
+        $this->batchReadCalls++;
+
+        $results = [];
+
+        foreach ($paths as $path) {
+            $results[$path] = $this->documents[$path] ?? null;
+        }
+
+        return $results;
+    }
+
+    public function setDocumentsMerge(array $documents): void
+    {
+        $this->failIfNeeded();
+        $this->batchWriteCalls++;
+
+        foreach ($documents as $path => $data) {
+            [$collection, $documentId] = explode('/', $path, 2);
+            $this->setDocumentMerge($collection, $documentId, $data);
+        }
     }
 
     public function setDocumentMerge(string $collection, string $documentId, array $data): void

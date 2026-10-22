@@ -21,11 +21,20 @@ use Throwable;
  *  - Usuário autenticado no Laravel => documento "users/WEB_USER_{id}" no Firestore
  *  - Comando de carga               => documento "totems/{totemId}.comando_web"
  *  - O totem (IoT) escuta "comando_web" e inicia/para a recarga
+ *
+ * Otimizações do fluxo:
+ *  - documentos da TAG e do totem são lidos em um único BatchGet;
+ *  - canal do ESP e espelho do totem são gravados no mesmo commit;
+ *  - o polling usa leitura sempre atual e não regrava a sessão a cada consulta;
+ *  - iniciar/parar respondem JSON quando chamados por AJAX, sem recarregar a página.
  */
 class TotemChargingController extends Controller
 {
     /** Tarifa padrão usada quando o totem ainda não tem `tarifa_kwh`. */
     private const DEFAULT_TARIFF = 5.50;
+
+    /** Estados em que o equipamento ainda está processando um comando. */
+    private const FAST_POLL_STATES = ['iniciar', 'aguardando_pin', 'parar'];
 
     public function __construct(
         private readonly FirestoreService $firestore,
@@ -52,6 +61,8 @@ class TotemChargingController extends Controller
      *
      * O status é lido primeiro do documento da TAG (users/{TAG}) — que é o
      * canal que o ESP consome — e, na falta dele, do espelho em totems/{id}.
+     * As duas leituras acontecem em um único BatchGet para a tela abrir mais
+     * rápido.
      */
     public function show(string $totemId): View
     {
@@ -59,22 +70,19 @@ class TotemChargingController extends Controller
         $tagUid = $this->tagUid($user);
 
         try {
-            $firestoreUser = $this->userDocumentData($tagUid) ?? [];
+            $documents = $this->firestore->getDocumentsData([
+                "users/{$tagUid}",
+                "totems/{$totemId}",
+            ]);
+
+            $firestoreUser = $documents["users/{$tagUid}"] ?? [];
+            $totem = $documents["totems/{$totemId}"] ?? [];
         } catch (Throwable $e) {
             // Se o Firestore estiver indisponível, a tela ainda abre com os
             // dados locais do usuário para não bloquear o fluxo de recarga.
             report($e);
 
             $firestoreUser = [];
-        }
-
-        try {
-            // Lê o documento com o cache curtíssimo do polling: a tarifa
-            // alterada no gestor chega à tela sem esperar o cache longo.
-            $totem = $this->totemStatus($totemId);
-        } catch (Throwable $e) {
-            report($e);
-
             $totem = [];
         }
 
@@ -95,6 +103,9 @@ class TotemChargingController extends Controller
             'tarifaKwh' => isset($totem['tarifa_kwh'])
                 ? (float) $totem['tarifa_kwh']
                 : self::DEFAULT_TARIFF,
+            'pollingInterval' => max(250, (int) config('totems.polling_interval_ms', 1000)),
+            'idlePollingInterval' => max(1000, (int) config('totems.idle_polling_interval_ms', 4000)),
+            'fastPollStates' => self::FAST_POLL_STATES,
         ]);
     }
 
@@ -111,38 +122,82 @@ class TotemChargingController extends Controller
      * o `comando_web` para "aguardando_pin". O front-end deteta essa mudança
      * via polling e abre a modal para o utilizador digitar o PIN.
      */
-    public function iniciar(string $totemId): RedirectResponse
+    public function iniciar(Request $request, string $totemId): RedirectResponse|JsonResponse
     {
-        $user = Auth::user();
+        $user = $request->user();
         $tagUid = $this->tagUid($user);
 
         try {
-            $saldo = $this->syncSaldo($user, $tagUid);
+            // Uma única ida ao Firestore devolve a TAG (saldo/comando) e o
+            // totem (tarifa). Antes eram duas leituras sequenciais.
+            $documents = $this->firestore->getDocumentsData([
+                "users/{$tagUid}",
+                "totems/{$totemId}",
+            ]);
+
+            $firestoreUser = $documents["users/{$tagUid}"];
+            $totem = $documents["totems/{$totemId}"] ?? [];
+
+            // A carteira Laravel é a fonte de cobrança. O espelho do Firestore
+            // só é elevado quando está atrás, preservando o comportamento antigo.
+            $carteira = (float) $user->balance;
+            $saldo = $firestoreUser === null
+                ? $carteira
+                : (float) ($firestoreUser['saldo_pontos'] ?? 0);
+
+            if ($carteira > $saldo) {
+                $saldo = $carteira;
+            }
 
             if ($saldo <= 0) {
-                return redirect()->route('totens.carregar', $totemId)
-                    ->with('error', __('totens.no_balance'));
+                // Documento ainda inexistente: cria com os dados locais antes
+                // de bloquear, como fazia a sincronização de saldo anterior.
+                if ($firestoreUser === null) {
+                    $this->firestore->setDocumentMerge('users', $tagUid, [
+                        'nome' => $user->name,
+                        'saldo_pontos' => $carteira,
+                        'status_tag' => 'ativo',
+                        'comando_web' => 'espera',
+                    ]);
+                }
+
+                return $this->commandResponse(
+                    $request,
+                    $totemId,
+                    false,
+                    __('totens.no_balance'),
+                    422
+                );
             }
 
             // Lê a tarifa do totem (fallback: 5.50)
-            $totem = $this->firestore->getDocumentData('totems', $totemId) ?? [];
             $tarifaKwh = isset($totem['tarifa_kwh'])
                 ? (float) $totem['tarifa_kwh']
                 : self::DEFAULT_TARIFF;
 
-            // 1) Comando para o ESP: canal que ele consome em tempo real
-            $this->firestore->setDocumentMerge('users', $tagUid, [
-                'comando_web' => 'iniciar',
-            ]);
+            $userPayload = ['comando_web' => 'iniciar'];
 
-            // 2) Espelho no documento do totem (status na tela + TAG autenticada)
-            //    Reseta o pin_digitado para garantir que o ESP32 gera um novo PIN.
-            //    `tarifa_kwh` não é reescrito aqui: uma edição concorrente no
-            //    gestor poderia ser sobrescrita com o valor antigo lido acima.
-            $this->firestore->setDocumentMerge('totems', $totemId, [
-                'comando_web' => 'iniciar',
-                'tag_uid' => $tagUid,
-                'pin_digitado' => '',
+            if ($firestoreUser === null) {
+                $userPayload += [
+                    'nome' => $user->name,
+                    'saldo_pontos' => $carteira,
+                    'status_tag' => 'ativo',
+                ];
+            } elseif ($carteira > (float) ($firestoreUser['saldo_pontos'] ?? 0)) {
+                $userPayload['saldo_pontos'] = $carteira;
+            }
+
+            // 1) Comando para o ESP (canal que ele consome em tempo real) e
+            //    2) espelho no totem (status na tela + TAG autenticada), no
+            //    mesmo commit. `tarifa_kwh` não é reescrito aqui: uma edição
+            //    concorrente no gestor poderia ser sobrescrita com o valor antigo.
+            $this->firestore->setDocumentsMerge([
+                "users/{$tagUid}" => $userPayload,
+                "totems/{$totemId}" => [
+                    'comando_web' => 'iniciar',
+                    'tag_uid' => $tagUid,
+                    'pin_digitado' => '',
+                ],
             ]);
 
             $this->forgetTotemData($totemId);
@@ -151,11 +206,22 @@ class TotemChargingController extends Controller
             // do gestor (o comando no Firestore é só o canal do equipamento).
             $this->sessions->start($user, $totemId, $tarifaKwh);
 
-            return redirect()->route('totens.carregar', $totemId)
-                ->with('success', __('totens.started', ['totem' => $totemId]));
+            return $this->commandResponse(
+                $request,
+                $totemId,
+                true,
+                __('totens.started', ['totem' => $totemId])
+            );
         } catch (Throwable $e) {
-            return redirect()->route('totens.carregar', $totemId)
-                ->with('error', __('totens.start_failed', ['error' => $e->getMessage()]));
+            report($e);
+
+            return $this->commandResponse(
+                $request,
+                $totemId,
+                false,
+                __('totens.start_failed', ['error' => $e->getMessage()]),
+                500
+            );
         }
     }
 
@@ -182,15 +248,21 @@ class TotemChargingController extends Controller
 
             $this->forgetTotemData($totemId);
 
-            return response()->json([
-                'success' => true,
-                'message' => __('totens.pin_sent'),
-            ]);
+            return response()
+                ->json([
+                    'success' => true,
+                    'message' => __('totens.pin_sent'),
+                ])
+                ->header('Cache-Control', 'no-store');
         } catch (Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => __('totens.pin_failed', ['error' => $e->getMessage()]),
-            ], 500);
+            report($e);
+
+            return response()
+                ->json([
+                    'success' => false,
+                    'message' => __('totens.pin_failed', ['error' => $e->getMessage()]),
+                ], 500)
+                ->header('Cache-Control', 'no-store');
         }
     }
 
@@ -200,6 +272,9 @@ class TotemChargingController extends Controller
      * Retorna os campos relevantes do documento `totems/{totemId}` para que
      * o front-end possa monitorizar o `comando_web` e reagir em tempo real
      * (ex: abrir a modal quando `comando_web === 'aguardando_pin'`).
+     *
+     * A resposta não é cacheada: o polling precisa ver a mudança do ESP o
+     * quanto antes — é ela que libera o código/PIN para o usuário.
      */
     public function status(string $totemId): JsonResponse
     {
@@ -212,21 +287,25 @@ class TotemChargingController extends Controller
             // `pending_pin` para que o painel do gestor mostre a recarga ativa.
             $this->sessions->syncState(Auth::user(), $totemId, $comando);
 
-            return response()->json([
-                'success' => true,
-                'comando_web' => $comando,
-                'pin_gerado' => (string) ($totem['pin_gerado'] ?? ''),
-                'tag_uid' => (string) ($totem['tag_uid'] ?? ''),
-                'tarifa_kwh' => isset($totem['tarifa_kwh'])
-                    ? (float) $totem['tarifa_kwh']
-                    : self::DEFAULT_TARIFF,
-            ]);
+            return response()
+                ->json([
+                    'success' => true,
+                    'comando_web' => $comando,
+                    'pin_gerado' => (string) ($totem['pin_gerado'] ?? ''),
+                    'tag_uid' => (string) ($totem['tag_uid'] ?? ''),
+                    'tarifa_kwh' => isset($totem['tarifa_kwh'])
+                        ? (float) $totem['tarifa_kwh']
+                        : self::DEFAULT_TARIFF,
+                ])
+                ->header('Cache-Control', 'no-store');
         } catch (Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'comando_web' => '',
-                'message' => $e->getMessage(),
-            ], 500);
+            return response()
+                ->json([
+                    'success' => false,
+                    'comando_web' => '',
+                    'message' => $e->getMessage(),
+                ], 500)
+                ->header('Cache-Control', 'no-store');
         }
     }
 
@@ -234,20 +313,16 @@ class TotemChargingController extends Controller
      * Envia o comando `parar` para o ESP (users/{TAG}.comando_web) e espelha
      * no totem, interrompendo a recarga remotamente.
      */
-    public function parar(string $totemId): RedirectResponse
+    public function parar(Request $request, string $totemId): RedirectResponse|JsonResponse
     {
-        $user = Auth::user();
+        $user = $request->user();
         $tagUid = $this->tagUid($user);
 
         try {
-            // 1) Comando para o ESP: canal que ele consome em tempo real
-            $this->firestore->setDocumentMerge('users', $tagUid, [
-                'comando_web' => 'parar',
-            ]);
-
-            // 2) Espelho no documento do totem (status na tela)
-            $this->firestore->setDocumentMerge('totems', $totemId, [
-                'comando_web' => 'parar',
+            // 1) Comando para o ESP e 2) espelho no totem em um só commit.
+            $this->firestore->setDocumentsMerge([
+                "users/{$tagUid}" => ['comando_web' => 'parar'],
+                "totems/{$totemId}" => ['comando_web' => 'parar'],
             ]);
 
             $this->forgetTotemData($totemId);
@@ -256,12 +331,50 @@ class TotemChargingController extends Controller
             //    consumo e o valor da recarga cheguem ao painel do gestor.
             $this->sessions->finish($user, $totemId, $this->totemData($totemId));
 
-            return redirect()->route('totens.carregar', $totemId)
-                ->with('success', __('totens.stopped', ['totem' => $totemId]));
+            return $this->commandResponse(
+                $request,
+                $totemId,
+                true,
+                __('totens.stopped', ['totem' => $totemId])
+            );
         } catch (Throwable $e) {
-            return redirect()->route('totens.carregar', $totemId)
-                ->with('error', __('totens.stop_failed', ['error' => $e->getMessage()]));
+            report($e);
+
+            return $this->commandResponse(
+                $request,
+                $totemId,
+                false,
+                __('totens.stop_failed', ['error' => $e->getMessage()]),
+                500
+            );
         }
+    }
+
+    /**
+     * Resposta de iniciar/parar.
+     *
+     * Chamadas AJAX recebem JSON (a tela não recarrega e já começa a
+     * consultar o status); formulários sem JavaScript continuam usando o
+     * redirect com mensagem na sessão.
+     */
+    private function commandResponse(
+        Request $request,
+        string $totemId,
+        bool $success,
+        string $message,
+        int $status = 200
+    ): RedirectResponse|JsonResponse {
+        if ($request->expectsJson()) {
+            return response()
+                ->json(['success' => $success, 'message' => $message], $status)
+                ->header('Cache-Control', 'no-store');
+        }
+
+        $redirect = redirect()->route('totens.carregar', $totemId);
+
+        return $success
+            ? $redirect->with('success', $message)
+            : $redirect->with('error', $message);
     }
 
     /**
@@ -285,10 +398,10 @@ class TotemChargingController extends Controller
     /**
      * Dados do totem usados pelo polling do front-end.
      *
-     * A tela consulta este endpoint a cada `POLLING_INTERVAL` (2s); um cache
-     * curtíssimo colapsa chamadas repetidas (várias abas/dispositivos no mesmo
-     * totem) sem atrasar a troca de estado percebida pelo usuário. O cache é
-     * invalidado em cada escrita (iniciar/parar/PIN).
+     * O padrão é sem cache (`status_cache_seconds = 0`): o polling precisa
+     * enxergar a transição para "aguardando_pin" assim que o ESP a gravar.
+     * Quem tiver muitas abas no mesmo totem pode elevar o TTL para reduzir
+     * chamadas ao Firestore.
      *
      * @return array<string, mixed>
      */
@@ -296,25 +409,8 @@ class TotemChargingController extends Controller
     {
         return $this->rememberLocally(
             "totems:status:{$totemId}",
-            (int) config('totems.status_cache_seconds', 1),
+            (int) config('totems.status_cache_seconds', 0),
             fn (): array => $this->firestore->getDocumentData('totems', $totemId) ?? []
-        );
-    }
-
-    /**
-     * Documento da TAG do usuário no Firestore, com cache curto.
-     *
-     * É lido apenas na renderização da tela (saldo/status inicial); o estado
-     * em tempo real vem do endpoint de status em polling.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function userDocumentData(string $tagUid): ?array
-    {
-        return $this->rememberLocally(
-            "users:document:{$tagUid}",
-            (int) config('totems.user_cache_seconds', 10),
-            fn (): ?array => $this->firestore->getDocumentData('users', $tagUid)
         );
     }
 
@@ -350,44 +446,5 @@ class TotemChargingController extends Controller
         $tagFisica = filled($user->tag_uid) ? strtoupper((string) $user->tag_uid) : '';
 
         return $tagFisica !== '' ? $tagFisica : "WEB_USER_{$user->id}";
-    }
-
-    /**
-     * Garante que o documento do usuário exista na coleção `users` do Firestore
-     * e devolve o saldo real (fonte de verdade para liberar a recarga).
-     *
-     * A carteira Laravel (`balance`) é a fonte de cobrança do sistema: quando
-     * ela possui valor maior que o espelho do Firestore, o documento é
-     * atualizado para não bloquear o usuário com saldo desatualizado.
-     */
-    private function syncSaldo(User $user, string $tagUid): float
-    {
-        $firestoreUser = $this->userDocumentData($tagUid);
-        $carteira = (float) $user->balance;
-
-        if ($firestoreUser === null) {
-            // Documento ainda não existe: cria com os dados do usuário Laravel
-            $this->firestore->setDocumentMerge('users', $tagUid, [
-                'nome' => $user->name,
-                'saldo_pontos' => $carteira,
-                'status_tag' => 'ativo',
-                'comando_web' => 'espera',
-            ]);
-            Cache::forget("users:document:{$tagUid}");
-
-            return $carteira;
-        }
-
-        $saldo = (float) ($firestoreUser['saldo_pontos'] ?? 0);
-
-        if ($carteira > $saldo) {
-            $saldo = $carteira;
-            $this->firestore->setDocumentMerge('users', $tagUid, [
-                'saldo_pontos' => $saldo,
-            ]);
-            Cache::forget("users:document:{$tagUid}");
-        }
-
-        return $saldo;
     }
 }

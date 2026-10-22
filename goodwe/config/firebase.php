@@ -28,4 +28,24 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Token OAuth compartilhado
+    |--------------------------------------------------------------------------
+    |
+    | Sem este cache, cada requisição que fala com o Firestore busca um novo
+    | token no Google antes da operação — atrasando o início da recarga e o
+    | polling do PIN. O token é guardado no cache da aplicação até expirar.
+    |
+    | `store` vazio usa o cache padrão (CACHE_STORE).
+    |
+    */
+
+    'auth_cache' => [
+        'enabled' => filter_var(env('FIREBASE_AUTH_CACHE', true), FILTER_VALIDATE_BOOL),
+        'store' => env('FIREBASE_AUTH_CACHE_STORE'),
+        'prefix' => env('FIREBASE_AUTH_CACHE_PREFIX', 'firebase-auth-'),
+        'lifetime' => (int) env('FIREBASE_AUTH_CACHE_LIFETIME', 1500),
+    ],
+
 ];

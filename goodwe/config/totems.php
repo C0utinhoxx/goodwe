@@ -33,18 +33,30 @@ return [
     | Cache das leituras do Firestore
     |--------------------------------------------------------------------------
     |
-    | `status_cache_seconds` cobre o endpoint consultado pelo polling da tela
-    | de recarga (a cada 2s): um valor baixo colapsa chamadas repetidas do
-    | mesmo totem sem atrasar a troca de estado percebida pelo usuário.
-    |
-    | `user_cache_seconds` cobre o documento da TAG lido na abertura da tela
-    | (saldo/status inicial), invalidado a cada escrita.
+    | O endpoint de status é consultado pelo polling da tela de recarga.
+    | O padrão é zero (leitura sempre atual): o token OAuth agora é
+    | compartilhado entre requisições, então cada consulta custa apenas um
+    | round-trip curto ao Firestore. Aumente o valor se houver muitas abas
+    | abertas no mesmo totem e for necessário reduzir o consumo de quota.
     |
     | Valores menores ou iguais a zero desativam o cache.
     |
     */
 
-    'status_cache_seconds' => (int) env('TOTEMS_STATUS_CACHE_SECONDS', 1),
+    'status_cache_seconds' => (int) env('TOTEMS_STATUS_CACHE_SECONDS', 0),
 
-    'user_cache_seconds' => (int) env('TOTEMS_USER_CACHE_SECONDS', 10),
+    /*
+    |--------------------------------------------------------------------------
+    | Intervalo do polling na tela de recarga
+    |--------------------------------------------------------------------------
+    |
+    | `polling_interval_ms` é usado enquanto o equipamento ainda está
+    | processando um comando (iniciar, aguardando PIN, parar). O intervalo
+    | ocioso evita consultas desnecessárias durante uma recarga estável.
+    |
+    */
+
+    'polling_interval_ms' => (int) env('TOTEMS_POLLING_INTERVAL_MS', 1000),
+
+    'idle_polling_interval_ms' => (int) env('TOTEMS_IDLE_POLLING_INTERVAL_MS', 4000),
 ];

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ChargingEvent;
 use App\Models\ChargingReservation;
 use App\Models\ChargingSession;
 use App\Models\User;
@@ -24,28 +23,41 @@ class WebChargingService
     public function start(User $user, ChargingReservation $reservation): ChargingSession
     {
         abort_unless(self::available(), 403);
-        abort_unless($reservation->user_id === $user->id && ! $reservation->is_demo && ! $reservation->charger->is_demo, 403);
-        $this->reservations->expire($reservation);
+        $charger = $reservation->charger;
+        abort_unless($reservation->user_id === $user->id && ! $reservation->is_demo && ! $charger->is_demo, 403);
 
-        return DB::transaction(function () use ($user, $reservation) {
-            $charger = ChargerLock::acquire($reservation->charger_id);
-            UserBalanceLock::acquire($user->id);
-            $existing = $user->chargingSessions()->where('charging_reservation_id', $reservation->id)->first();
-            if ($existing) {
-                if (! $existing->isWebSimulation()) {
-                    throw ValidationException::withMessages(['reservation' => 'Esta reserva já possui uma sessão confirmada pelo equipamento.']);
-                }
+        // A expiração só custa locks e transação quando a reserva já venceu;
+        // antes disso era trabalho pago em todos os inícios.
+        if ($reservation->expires_at->isPast()) {
+            $this->reservations->expire($reservation);
+        }
 
-                return $existing;
+        $existing = $user->chargingSessions()->where('charging_reservation_id', $reservation->id)->first();
+        if ($existing) {
+            if (! $existing->isWebSimulation()) {
+                throw ValidationException::withMessages(['reservation' => 'Esta reserva já possui uma sessão confirmada pelo equipamento.']);
             }
-            $this->metered->assertCanAuthorize($user, $charger, $reservation->id);
-            $session = $this->metered->startConfirmed($user, $charger, 'web-test-reservation:'.$reservation->id, $reservation->id);
-            $session->update(['payment_method' => ChargingSession::PAYMENT_SIMULATED, 'simulation' => ['clock_at' => now()->toIso8601String(), 'power_kw' => $charger->power_kw, 'elapsed_seconds' => 0, 'speed' => 1]]);
-            $event = ChargingEvent::where('event_key', "session:{$session->id}:start_confirmed:start")->firstOrFail();
-            $event->update(['metadata' => $event->metadata + ['simulated' => true, 'physical_confirmation' => false, 'command_dispatched' => false, 'source' => 'web_test']]);
 
-            return $session->refresh();
-        }, 5);
+            return $existing;
+        }
+
+        if (($charger->activation_status !== null && $charger->activation_status !== 'active') || $charger->physical_status !== 'available' || $charger->active_session_id) {
+            throw ValidationException::withMessages(['charger' => 'Este equipamento não pode receber uma nova autorização.']);
+        }
+
+        // `startConfirmed` repete as validações de saldo, carregador,
+        // reserva e demanda sob lock; chamar antes `assertCanAuthorize`
+        // duplicava a ronda de locks no caminho crítico do início.
+        return $this->metered->startConfirmed(
+            $user,
+            $charger,
+            'web-test-reservation:'.$reservation->id,
+            $reservation->id,
+            [
+                'payment_method' => ChargingSession::PAYMENT_SIMULATED,
+                'simulation' => ['clock_at' => now()->toIso8601String(), 'power_kw' => $charger->power_kw, 'elapsed_seconds' => 0, 'speed' => 1],
+            ]
+        );
     }
 
     public function advance(User $user, ChargingSession $session, ?int $speed = null, bool $end = false): ChargingSession
@@ -82,14 +94,14 @@ class WebChargingService
             $locked->update(['simulation' => [...$state, 'elapsed_seconds' => $elapsed, 'clock_at' => now()->toIso8601String(), 'speed' => $speed ?? $state['speed']]]);
             if ($energyUnits > EnergyBilling::units($locked->measured_energy_kwh)) {
                 $sequence = $locked->last_meter_sequence + 1;
-                $locked = $this->metered->recordConsumption($locked, $energy, $sequence, 'web-tick:'.$sequence);
+                $locked = $this->metered->recordConsumptionLocked($locked, $payer, $energy, $sequence, 'web-tick:'.$sequence);
             }
             if ($end || $atLimit || $locked->charging_state === 'stop_requested' || $elapsed >= 86400) {
-                $locked = $this->metered->endConfirmed($locked, $energy, 'web-test-end', false);
+                $locked = $this->metered->endConfirmedLocked($locked, $charger, $payer, $energy, 'web-test-end', false);
                 $charger->update(['physical_status' => 'available']);
             }
 
-            return $locked->refresh();
+            return $locked;
         }, 5);
     }
 }

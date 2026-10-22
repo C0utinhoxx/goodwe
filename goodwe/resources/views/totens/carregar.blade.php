@@ -3,23 +3,40 @@
     // vermelho da marca = ativo/ao vivo, âmbar = aguardando, cinza = inativo.
     // Definido antes do layout porque o <x-slot name="header"> é renderizado
     // antes do conteúdo principal.
+    $chargingStatus = [
+        'label' => __('totens.status_charging'),
+        'pill' => 'border-[#e53935]/30 bg-[#e53935]/5',
+        'text' => 'text-[#e53935]',
+        'dot' => 'bg-[#e53935]',
+        'ping' => true,
+    ];
+
+    $waitingStatus = [
+        'label' => __('totens.status_waiting'),
+        'pill' => 'border-amber-500/30 bg-amber-500/10',
+        'text' => 'text-amber-500 dark:text-amber-400',
+        'dot' => 'bg-amber-500',
+        'ping' => false,
+    ];
+
+    $stoppedStatus = [
+        'label' => __('totens.status_stopped'),
+        'pill' => 'border-gray-200 bg-gray-100 dark:border-[#343843] dark:bg-[#343843]',
+        'text' => 'text-gray-500 dark:text-[#a0a0a0]',
+        'dot' => 'bg-gray-400 dark:bg-[#a0a0a0]',
+        'ping' => false,
+    ];
+
     $statuses = [
-        'iniciar' => [
-            'label' => __('totens.status_charging'),
-            'pill' => 'border-[#e53935]/30 bg-[#e53935]/5',
-            'text' => 'text-[#e53935]',
-            'dot' => 'bg-[#e53935]',
-            'ping' => true,
-        ],
-        'espera' => [
-            'label' => __('totens.status_waiting'),
-            'pill' => 'border-amber-500/30 bg-amber-500/10',
-            'text' => 'text-amber-500 dark:text-amber-400',
-            'dot' => 'bg-amber-500',
-            'ping' => false,
-        ],
-        'parar' => [
-            'label' => __('totens.status_stopped'),
+        // O ESP mantém "iniciar" enquanto prepara a sessão e passa a
+        // "aguardando_pin" quando o código já está disponível.
+        'iniciar' => $chargingStatus,
+        'carregando' => $chargingStatus,
+        'aguardando_pin' => $waitingStatus,
+        'espera' => $waitingStatus,
+        'parar' => $stoppedStatus,
+        'offline' => [
+            'label' => __('totens.status_offline'),
             'pill' => 'border-gray-200 bg-gray-100 dark:border-[#343843] dark:bg-[#343843]',
             'text' => 'text-gray-500 dark:text-[#a0a0a0]',
             'dot' => 'bg-gray-400 dark:bg-[#a0a0a0]',
@@ -27,13 +44,7 @@
         ],
     ];
 
-    $status = $statuses[$statusKey] ?? [
-        'label' => __('totens.status_offline'),
-        'pill' => 'border-gray-200 bg-gray-100 dark:border-[#343843] dark:bg-[#343843]',
-        'text' => 'text-gray-500 dark:text-[#a0a0a0]',
-        'dot' => 'bg-gray-400 dark:bg-[#a0a0a0]',
-        'ping' => false,
-    ];
+    $status = $statuses[$statusKey] ?? $statuses['offline'];
 @endphp
 
 <x-user-layout>
@@ -64,14 +75,12 @@
             </div>
 
             {{-- Status em tempo real (campo comando_web no Firestore) --}}
-            <div class="flex items-center gap-2 rounded-full border px-3 py-1.5 {{ $status['pill'] }}">
-                <span class="relative flex h-2.5 w-2.5 {{ $status['dot'] }}">
-                    @if ($status['ping'])
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 {{ $status['dot'] }}"></span>
-                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 {{ $status['dot'] }}"></span>
-                    @endif
+            <div data-status-pill class="flex items-center gap-2 rounded-full border px-3 py-1.5 {{ $status['pill'] }}">
+                <span data-status-dot class="relative flex h-2.5 w-2.5 {{ $status['dot'] }}">
+                    <span data-status-ping class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 {{ $status['dot'] }} {{ $status['ping'] ? '' : 'hidden' }}"></span>
+                    <span data-status-core class="relative inline-flex rounded-full h-2.5 w-2.5 {{ $status['dot'] }}"></span>
                 </span>
-                <span class="text-xs font-medium {{ $status['text'] }}">{{ $status['label'] }}</span>
+                <span data-status-label class="text-xs font-medium {{ $status['text'] }}">{{ $status['label'] }}</span>
             </div>
         </div>
     </x-slot>
@@ -127,10 +136,11 @@
 
             <div class="mt-4 space-y-3">
                 {{-- Inicia a recarga (comando_web = iniciar) --}}
-                <form method="POST" action="{{ route('totens.iniciar', $totemId) }}">
+                <form method="POST" action="{{ route('totens.iniciar', $totemId) }}" data-totem-command="start">
                     @csrf
                     <button
                         type="submit"
+                        data-totem-submit
                         @disabled($saldo <= 0)
                         class="w-full rounded-lg bg-[#e53935] px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#c62828] hover:shadow-[0_4px_15px_rgba(229,57,53,0.4)] active:scale-[0.95] active:shadow-none disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none dark:disabled:bg-[#343843] dark:hover:bg-[#e53935]"
                     >
@@ -150,10 +160,11 @@
                 @endif
 
                 {{-- Interrompe a recarga (comando_web = parar) --}}
-                <form method="POST" action="{{ route('totens.parar', $totemId) }}">
+                <form method="POST" action="{{ route('totens.parar', $totemId) }}" data-totem-command="stop">
                     @csrf
                     <button
                         type="submit"
+                        data-totem-submit
                         class="w-full rounded-lg border border-[#e53935] px-6 py-3 text-sm font-semibold text-[#e53935] transition-all duration-200 hover:bg-[#e53935]/10 hover:shadow-[0_4px_10px_rgba(229,57,53,0.3)] active:scale-[0.95] active:shadow-none"
                     >
                         <span class="inline-flex items-center justify-center gap-2">
@@ -164,6 +175,13 @@
                         </span>
                     </button>
                 </form>
+
+                <p
+                    data-totem-feedback
+                    class="hidden rounded-lg px-3 py-2 text-xs font-medium"
+                    role="status"
+                    aria-live="polite"
+                ></p>
             </div>
         </div>
     </section>
@@ -251,7 +269,8 @@
     {{-- ============================================================
         SCRIPT DE MONITORIZAÇÃO E CONTROLO DA MODAL
         ============================================================
-        Faz polling a cada 2 segundos ao endpoint de status do totem.
+        Consulta o status em intervalos curtos (1s) enquanto o equipamento
+        processa um comando e mais longos quando a recarga está estável.
         Quando o ESP32 altera comando_web para "aguardando_pin", abre
         automaticamente a modal para o utilizador digitar o PIN.
         ============================================================ --}}
@@ -259,9 +278,13 @@
         (function() {
             // Configuração
             const TOTEM_ID = @json($totemId);
-            const POLLING_INTERVAL = 2000; // 2 segundos
             const STATUS_URL = @json(route('totens.status', $totemId));
             const PIN_URL = @json(route('totens.pin', $totemId));
+            const POLLING_INTERVAL = @json($pollingInterval);
+            const IDLE_POLLING_INTERVAL = @json($idlePollingInterval);
+            const FAST_POLL_STATES = @json($fastPollStates);
+            const STATUS_PRESENTATION = @json($statuses);
+            const INITIAL_COMMAND = @json($statusKey);
 
             // Elementos do DOM
             const modal = document.getElementById('pin-modal');
@@ -271,11 +294,19 @@
             const pinSubmit = document.getElementById('pin-submit');
             const pinCancel = document.getElementById('pin-cancel');
             const tariffAmount = document.getElementById('tariff-amount');
+            const feedback = document.querySelector('[data-totem-feedback]');
+            const statusPill = document.querySelector('[data-status-pill]');
+            const statusDot = document.querySelector('[data-status-dot]');
+            const statusPing = document.querySelector('[data-status-ping]');
+            const statusCore = document.querySelector('[data-status-core]');
+            const statusLabel = document.querySelector('[data-status-label]');
 
             // Estado interno
-            let pollingInterval = null;
+            let pollTimer = null;
             let isModalOpen = false;
-            let lastComando = '';
+            let checking = false;
+            let lastComando = INITIAL_COMMAND;
+            let pendingCommand = FAST_POLL_STATES.includes(INITIAL_COMMAND);
 
             /**
              * Abre a modal de PIN e foca no campo de input.
@@ -290,7 +321,7 @@
                 pinError.classList.add('hidden');
                 pinSubmit.disabled = false;
 
-                // Foca no campo após a animação de abertura
+                // Foca o campo após a animação de abertura
                 setTimeout(() => pinInput.focus(), 100);
             }
 
@@ -304,13 +335,68 @@
             }
 
             /**
+             * Exibe uma mensagem curta abaixo dos controles.
+             */
+            function setFeedback(message, isError) {
+                feedback.textContent = message || '';
+                feedback.classList.toggle('hidden', !message);
+                feedback.classList.toggle('text-[#e53935]', Boolean(isError));
+                feedback.classList.toggle('bg-[#e53935]/10', Boolean(isError));
+                feedback.classList.toggle('text-emerald-600', !isError && Boolean(message));
+                feedback.classList.toggle('bg-emerald-50', !isError && Boolean(message));
+                feedback.classList.toggle('dark:bg-emerald-500/10', !isError && Boolean(message));
+            }
+
+            /**
+             * Atualiza a pílula de status sem recarregar a página.
+             */
+            function applyStatus(comando) {
+                const presentation = STATUS_PRESENTATION[comando] || STATUS_PRESENTATION.offline;
+
+                statusPill.className = 'flex items-center gap-2 rounded-full border px-3 py-1.5 ' + presentation.pill;
+                statusDot.className = 'relative flex h-2.5 w-2.5 ' + presentation.dot;
+                statusCore.className = 'relative inline-flex rounded-full h-2.5 w-2.5 ' + presentation.dot;
+                statusPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ' + presentation.dot + (presentation.ping ? '' : ' hidden');
+                statusLabel.className = 'text-xs font-medium ' + presentation.text;
+                statusLabel.textContent = presentation.label;
+            }
+
+            function nextDelay() {
+                return pendingCommand || FAST_POLL_STATES.includes(lastComando)
+                    ? POLLING_INTERVAL
+                    : IDLE_POLLING_INTERVAL;
+            }
+
+            function schedulePoll(delay) {
+                clearTimeout(pollTimer);
+
+                if (document.hidden) return;
+
+                pollTimer = setTimeout(checkStatus, delay);
+            }
+
+            /**
              * Consulta o estado atual do totem via AJAX.
              * Se comando_web === 'aguardando_pin', abre a modal.
              * Se comando_web volta para 'espera' ou 'carregando', fecha a modal.
              */
             async function checkStatus() {
+                clearTimeout(pollTimer);
+
+                if (document.hidden) return;
+
+                // Evita requisições empilhadas quando o Firestore está lento.
+                if (checking) {
+                    schedulePoll(POLLING_INTERVAL);
+
+                    return;
+                }
+
+                checking = true;
+
                 try {
                     const response = await fetch(STATUS_URL, {
+                        cache: 'no-store',
                         headers: {
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest',
@@ -332,22 +418,35 @@
                         });
                     }
 
-                    const comando = data.comando_web;
+                    const comando = String(data.comando_web || '');
 
-                    // Deteta transição para "aguardando_pin"
-                    if (comando === 'aguardando_pin' && lastComando !== 'aguardando_pin') {
-                        openModal();
+                    if (comando !== lastComando) {
+                        applyStatus(comando);
+
+                        // Deteta transição para "aguardando_pin": o código já
+                        // está no equipamento e o usuário pode digitá-lo.
+                        if (comando === 'aguardando_pin') {
+                            openModal();
+                        }
+
+                        // Deteta fim da sessão PIN (carregamento iniciado ou cancelado)
+                        if (lastComando === 'aguardando_pin' && comando !== 'aguardando_pin') {
+                            closeModal();
+                        }
+
+                        if (comando === 'carregando' || comando === 'parar' || comando === 'espera') {
+                            pendingCommand = false;
+                            setFeedback('', false);
+                        }
+
+                        lastComando = comando;
                     }
-
-                    // Deteta fim da sessão PIN (carregamento iniciado ou cancelado)
-                    if ((comando === 'carregando' || comando === 'espera' || comando === 'iniciar') && lastComando === 'aguardando_pin') {
-                        closeModal();
-                    }
-
-                    lastComando = comando;
                 } catch (e) {
                     // Silencioso: falhas de rede não devem interromper o polling
                     console.warn('Falha ao consultar status do totem:', e);
+                } finally {
+                    checking = false;
+                    schedulePoll(nextDelay());
                 }
             }
 
@@ -389,9 +488,61 @@
                 }
             }
 
+            /**
+             * Envia iniciar/parar por AJAX: a tela não recarrega e o polling
+             * começa imediatamente, reduzindo o tempo até o equipamento reagir.
+             */
+            async function sendCommand(commandForm, kind) {
+                const button = commandForm.querySelector('[data-totem-submit]');
+
+                if (!button || button.disabled) return;
+
+                button.disabled = true;
+                setFeedback(@json(__('totens.status_waiting')), false);
+
+                try {
+                    const response = await fetch(commandForm.action, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: new FormData(commandForm),
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Não foi possível enviar o comando. Tente novamente.');
+                    }
+
+                    // O equipamento ainda vai processar o comando: consulta
+                    // em intervalos curtos até o status mudar.
+                    pendingCommand = true;
+                    lastComando = kind === 'start' ? 'iniciar' : 'parar';
+                    applyStatus(lastComando);
+                    setFeedback(data.message, false);
+
+                    checkStatus();
+                } catch (error) {
+                    setFeedback(error.message || 'Não foi possível enviar o comando. Tente novamente.', true);
+                } finally {
+                    button.disabled = false;
+                }
+            }
+
             // ============================================================
             // Event Listeners
             // ============================================================
+
+            // Iniciar / parar sem recarregar a página
+            document.querySelectorAll('form[data-totem-command]').forEach(function(commandForm) {
+                commandForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    sendCommand(commandForm, commandForm.dataset.totemCommand);
+                });
+            });
 
             // Submissão do formulário de PIN
             form.addEventListener('submit', function(e) {
@@ -426,10 +577,18 @@
                 this.value = this.value.replace(/\D/g, '').slice(0, 4);
             });
 
+            // Retoma o polling imediatamente ao voltar para a aba
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) checkStatus();
+            });
+
+            window.addEventListener('pagehide', function() {
+                clearTimeout(pollTimer);
+            });
+
             // ============================================================
             // Início do polling
             // ============================================================
-            pollingInterval = setInterval(checkStatus, POLLING_INTERVAL);
 
             // Primeira consulta imediata
             checkStatus();

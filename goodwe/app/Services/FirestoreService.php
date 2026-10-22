@@ -2,9 +2,13 @@
 
 namespace App\Services;
 
+use App\Support\LaravelCacheItemPool;
 use Google\Cloud\Firestore\DocumentReference;
 use Google\Cloud\Firestore\FirestoreClient;
+use Google\Rpc\Code;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
+use Throwable;
 
 class FirestoreService
 {
@@ -26,10 +30,46 @@ class FirestoreService
 
         $credentialsPath = $this->ensureCredentialsFile($credentialsPath);
 
-        $this->firestore = new FirestoreClient([
+        $this->firestore = new FirestoreClient($this->clientOptions($credentialsPath));
+    }
+
+    /**
+     * Opções do cliente Firestore.
+     *
+     * O token OAuth é guardado no cache da aplicação: sem isso, cada
+     * requisição HTTP (inclusive cada polling da tela de recarga) faz um novo
+     * round-trip ao Google antes de chegar ao Firestore.
+     *
+     * @return array<string, mixed>
+     */
+    private function clientOptions(string $credentialsPath): array
+    {
+        $options = [
             'projectId' => $this->projectId,
             'credentials' => $credentialsPath,
-        ]);
+        ];
+
+        if (! config('firebase.auth_cache.enabled', true)) {
+            return $options;
+        }
+
+        try {
+            $store = config('firebase.auth_cache.store');
+
+            $options['credentialsConfig'] = [
+                'authCache' => new LaravelCacheItemPool(
+                    Cache::store(filled($store) ? (string) $store : null),
+                    (string) config('firebase.auth_cache.prefix', 'firebase-auth-')
+                ),
+                'authCacheOptions' => [
+                    'lifetime' => (int) config('firebase.auth_cache.lifetime', 1500),
+                ],
+            ];
+        } catch (Throwable) {
+            // Sem cache o Firestore continua funcionando (apenas mais lento).
+        }
+
+        return $options;
     }
 
     /**
@@ -115,6 +155,110 @@ class FirestoreService
         }
 
         return $snapshot->data() ?? [];
+    }
+
+    /**
+     * Lê vários documentos em uma única chamada (BatchGetDocuments).
+     *
+     * A tela de recarga precisa do documento da TAG e do totem ao mesmo tempo;
+     * buscar os dois em um só round-trip corta pela metade o tempo de abertura.
+     *
+     * @param  string[]  $paths  Caminhos no formato "colecao/id".
+     * @return array<string, array<string, mixed>|null> Dados indexados pelo caminho.
+     */
+    public function getDocumentsData(array $paths): array
+    {
+        if ($paths === []) {
+            return [];
+        }
+
+        $snapshots = $this->firestore->documents(array_values($paths));
+        $results = [];
+
+        foreach (array_values($paths) as $index => $path) {
+            $snapshot = $snapshots[$index] ?? null;
+
+            $results[$path] = $snapshot !== null && $snapshot->exists()
+                ? ($snapshot->data() ?? [])
+                : null;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Grava vários documentos com merge em um único commit.
+     *
+     * O início da recarga precisa atualizar o canal do ESP (users/{TAG}) e o
+     * espelho do totem. Enviar os dois no mesmo batch economiza um round-trip
+     * no caminho crítico entre clicar em "Iniciar" e o equipamento reagir.
+     *
+     * @param  array<string, array<string, mixed>>  $documents  Dados indexados por "colecao/id".
+     */
+    public function setDocumentsMerge(array $documents): void
+    {
+        if ($documents === []) {
+            return;
+        }
+
+        // Para um único documento o merge direto já é uma chamada só.
+        if (count($documents) === 1) {
+            $path = array_key_first($documents);
+            [$collection, $documentId] = explode('/', $path, 2);
+            $this->setDocumentMerge($collection, $documentId, $documents[$path]);
+
+            return;
+        }
+
+        $writer = $this->firestore->bulkWriter([
+            'maxBatchSize' => 20,
+            'greedilySend' => true,
+            'isThrottlingEnabled' => false,
+        ]);
+
+        foreach ($documents as $path => $data) {
+            [$collection, $documentId] = explode('/', $path, 2);
+
+            $writer->set(
+                $this->firestore->collection($collection)->document($documentId),
+                $data,
+                ['merge' => true]
+            );
+        }
+
+        // `close()` espera as tentativas repetíveis, mas uma falha definitiva
+        // fica apenas registada no retorno. Sem esta verificação o totem
+        // receberia "iniciado" mesmo sem o comando ter chegado ao Firestore.
+        $this->assertWritesSucceeded($writer->close(), array_keys($documents));
+    }
+
+    /**
+     * Lança exceção quando algum write do BulkWriter falhou.
+     *
+     * @param  array{status?: array<int, array{code?: int, message?: string}>}  $response
+     * @param  string[]  $paths  Caminhos enviados, na mesma ordem dos writes.
+     */
+    private function assertWritesSucceeded(array $response, array $paths): void
+    {
+        $failures = [];
+
+        foreach ($response['status'] ?? [] as $writeId => $status) {
+            $code = (int) ($status['code'] ?? Code::OK);
+
+            if ($code === Code::OK) {
+                continue;
+            }
+
+            $path = $paths[$writeId] ?? "write #{$writeId}";
+            $message = $status['message'] ?? 'erro desconhecido';
+            $failures[] = "{$path}: {$message} (código {$code})";
+        }
+
+        if ($failures !== []) {
+            throw new RuntimeException(
+                'Falha ao gravar no Firestore: '.implode('; ', $failures)
+            );
+        }
     }
 
     public function saveDocument(string $collection, string $documentId, array $data): void

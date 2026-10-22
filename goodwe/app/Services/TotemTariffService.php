@@ -85,6 +85,7 @@ class TotemTariffService
         if ($tariff === null || (float) $tariff <= 0) {
             // Log para debug: tarifa inválida, não sincroniza
             info("TotemTariffService: Tarifa inválida para charger {$charger->code}: {$tariff}");
+
             return false;
         }
 
@@ -103,7 +104,7 @@ class TotemTariffService
         } catch (Throwable $e) {
             // Log detalhado do erro
             report($e);
-            error("TotemTariffService: Erro ao sincronizar tarifa para charger {$charger->code}: " . $e->getMessage());
+            logger()->error("TotemTariffService: Erro ao sincronizar tarifa para charger {$charger->code}: ".$e->getMessage());
 
             return false;
         }

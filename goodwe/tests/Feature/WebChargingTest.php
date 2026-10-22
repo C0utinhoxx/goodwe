@@ -81,7 +81,13 @@ class WebChargingTest extends TestCase
         $this->postJson(route('reservations.start-test', $reservation))->assertCreated()->assertJsonPath('session.id', $session->id);
         $this->assertSame('1.9000', $session->tariff_per_kwh);
         $this->assertTrue($session->isWebSimulation());
-        $this->get(route('charging-sessions.show', $session))->assertOk()->assertSee('Recarga em andamento')->assertSee('Encerrar recarga');
+        // A simulação já nasce no create: a tela não precisa de updates extra
+        // no caminho crítico do início.
+        $this->assertSame(ChargingSession::PAYMENT_SIMULATED, $session->payment_method);
+        $this->assertSame(0, $session->simulation['elapsed_seconds']);
+        $this->assertNotNull($session->simulation['clock_at']);
+        $this->get(route('charging-sessions.show', $session))->assertOk()->assertSee('Recarga em andamento')->assertSee('Encerrar recarga')
+            ->assertSee('data-charging-clock-at', false)->assertSee('data-charging-elapsed', false);
         $this->travel(300)->seconds();
         $this->postJson(route('charging-sessions.advance-test', $session), ['speed' => 60, 'energy_kwh' => 999999])->assertOk()->assertJsonPath('session.measured_energy_kwh', '2.5000');
         $this->travel(55)->seconds();
@@ -154,6 +160,22 @@ class WebChargingTest extends TestCase
         $this->assertDatabaseCount('transactions', 1);
         $this->travel(1)->hour();
         $this->postJson(route('charging-sessions.end-test', $session))->assertOk()->assertJsonPath('session.measured_energy_kwh', '0.5250');
+    }
+
+    public function test_repeated_advance_in_the_same_second_does_not_duplicate_consumption(): void
+    {
+        $charger = $this->charger();
+        $user = User::factory()->create(['balance' => 100]);
+        $this->actingAs($user);
+        $session = $this->start($this->reserve($charger));
+        $this->travel(30)->seconds();
+
+        $first = $this->postJson(route('charging-sessions.advance-test', $session))->assertOk()->json('session');
+        $second = $this->postJson(route('charging-sessions.advance-test', $session))->assertOk()->json('session');
+
+        $this->assertSame($first['measured_energy_kwh'], $second['measured_energy_kwh']);
+        $this->assertSame($first['simulation']['elapsed_seconds'], $second['simulation']['elapsed_seconds']);
+        $this->assertSame(1, ChargingEvent::where('charging_session_id', $session->id)->where('type', 'meter')->count());
     }
 
     public function test_insufficient_payment_keeps_balance_coupon_and_session_unchanged(): void

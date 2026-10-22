@@ -683,6 +683,122 @@ class TotemChargingTest extends TestCase
         $this->assertArrayNotHasKey('totems/totem_02', $this->firestore->documents);
     }
 
+    public function test_show_reads_tag_and_totem_in_a_single_batch(): void
+    {
+        $user = User::factory()->create(['balance' => 10]);
+        $tagUid = "WEB_USER_{$user->id}";
+
+        $this->firestore->seed('users', $tagUid, ['saldo_pontos' => 10]);
+        $this->firestore->seed('totems', 'TOT-01', ['comando_web' => 'espera', 'tarifa_kwh' => 2.5]);
+
+        $this->actingAs($user)->get(route('totens.carregar', 'TOT-01'))->assertOk();
+
+        $this->assertSame(1, $this->firestore->batchReadCalls);
+    }
+
+    public function test_iniciar_reads_and_writes_firestore_in_single_batches(): void
+    {
+        $user = User::factory()->create(['balance' => 30]);
+        $tagUid = "WEB_USER_{$user->id}";
+
+        $this->firestore->seed('users', $tagUid, ['saldo_pontos' => 30]);
+        $this->firestore->seed('totems', 'TOT-01', ['tarifa_kwh' => 2.5]);
+
+        $this->actingAs($user)
+            ->postJson(route('totens.iniciar', 'TOT-01'))
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        // A TAG e o totem são lidos em um BatchGet e gravados em um BatchWrite.
+        $this->assertSame(1, $this->firestore->batchReadCalls);
+        $this->assertSame(1, $this->firestore->batchWriteCalls);
+        $this->assertSame('iniciar', $this->firestore->documents["users/{$tagUid}"]['comando_web']);
+        $this->assertSame('iniciar', $this->firestore->documents['totems/TOT-01']['comando_web']);
+    }
+
+    public function test_iniciar_returns_json_error_when_balance_is_insufficient(): void
+    {
+        $user = User::factory()->create(['balance' => 0]);
+        $this->firestore->seed('users', "WEB_USER_{$user->id}", ['saldo_pontos' => 0]);
+
+        $this->actingAs($user)
+            ->postJson(route('totens.iniciar', 'TOT-01'))
+            ->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => __('totens.no_balance'),
+            ]);
+
+        $this->assertArrayNotHasKey('totems/TOT-01', $this->firestore->documents);
+    }
+
+    public function test_parar_returns_json_without_redirecting_for_ajax(): void
+    {
+        $user = User::factory()->create();
+        $this->firestore->seed('totems', 'TOT-01', ['comando_web' => 'carregando']);
+
+        $this->actingAs($user)
+            ->postJson(route('totens.parar', 'TOT-01'))
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertSame('parar', $this->firestore->documents['totems/TOT-01']['comando_web']);
+    }
+
+    public function test_status_uses_fresh_reads_by_default_so_the_pin_appears_without_delay(): void
+    {
+        $this->assertSame(0, config('totems.status_cache_seconds'));
+
+        $user = User::factory()->create();
+        $this->firestore->seed('totems', 'TOT-01', ['comando_web' => 'iniciar']);
+
+        $this->actingAs($user)->getJson(route('totens.status', 'TOT-01'))
+            ->assertJsonPath('comando_web', 'iniciar');
+
+        // O ESP grava "aguardando_pin" e o polling enxerga na hora.
+        $this->firestore->seed('totems', 'TOT-01', [
+            'comando_web' => 'aguardando_pin',
+            'pin_gerado' => '4321',
+        ]);
+
+        $this->actingAs($user)->getJson(route('totens.status', 'TOT-01'))
+            ->assertJsonPath('comando_web', 'aguardando_pin')
+            ->assertJsonPath('pin_gerado', '4321');
+    }
+
+    public function test_polling_does_not_rewrite_the_session_after_it_starts_charging(): void
+    {
+        $user = User::factory()->create(['balance' => 30]);
+
+        $this->actingAs($user)->post(route('totens.iniciar', 'totem_01'));
+        $this->firestore->seed('totems', 'totem_01', ['comando_web' => 'carregando']);
+
+        $this->actingAs($user)->getJson(route('totens.status', 'totem_01'))->assertOk();
+
+        $session = ChargingSession::firstOrFail();
+        $startedAt = $session->started_at;
+
+        $this->travel(5)->seconds();
+        $this->actingAs($user)->getJson(route('totens.status', 'totem_01'))->assertOk();
+
+        // O polling não pode reiniciar o horário real da recarga a cada consulta.
+        $this->assertTrue($startedAt->equalTo($session->fresh()->started_at));
+    }
+
+    public function test_recharge_view_is_wired_for_ajax_commands_and_fast_polling(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get(route('totens.carregar', 'TOT-01'))
+            ->assertOk()
+            ->assertSee('data-totem-command="start"', false)
+            ->assertSee('data-totem-command="stop"', false)
+            ->assertSee('data-totem-feedback', false)
+            ->assertSee('const IDLE_POLLING_INTERVAL', false)
+            ->assertSee('const FAST_POLL_STATES', false)
+            ->assertSee('1000', false);
+    }
+
     public function test_manager_tariff_change_survives_a_firestore_outage(): void
     {
         $manager = User::factory()->create(['is_admin' => true]);
