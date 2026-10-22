@@ -211,6 +211,156 @@ function setupChat() {
         } catch (_) { addMessage('Não foi possível reiniciar a conversa.', 'bot', true); }
         finally { setBusy(false); input.focus(); }
     });
+
+    // Acompanhamento dos tickets na mesma janela, sem alterar a triagem da IA.
+    const iaView = widget.querySelector('[data-chat-ia-view]');
+    const ticketsView = widget.querySelector('[data-chat-tickets-view]');
+    const ticketsList = widget.querySelector('[data-chat-tickets-list]');
+    const ticketsItems = widget.querySelector('[data-chat-tickets-items]');
+    const ticketsNotice = widget.querySelector('[data-chat-tickets-notice]');
+    const ticketDetail = widget.querySelector('[data-chat-ticket-detail]');
+    const ticketHeading = widget.querySelector('[data-chat-ticket-heading]');
+    const ticketStatus = widget.querySelector('[data-chat-ticket-status]');
+    const ticketMessages = widget.querySelector('[data-chat-ticket-messages]');
+    const ticketReplyForm = widget.querySelector('[data-chat-ticket-reply-form]');
+    const ticketReply = widget.querySelector('[data-chat-ticket-reply]');
+    const ticketSend = widget.querySelector('[data-chat-ticket-send]');
+    const ticketNotice = widget.querySelector('[data-chat-ticket-notice]');
+    const ticketText = JSON.parse(widget.dataset.ticketTranslations || '{}');
+    const translateTicket = key => ticketText[key] || key;
+    const ticketLocale = document.documentElement.lang || 'pt-BR';
+    let selectedTicketId = null;
+    let ticketsBusy = false;
+
+    const ticketStatusLabel = status => ({
+        aguardando: translateTicket('status_pending'),
+        em_atendimento: translateTicket('status_progress'),
+        resolvido: translateTicket('status_resolved'),
+    })[status] || status || translateTicket('status_unknown');
+
+    const setTicketsBusy = value => {
+        ticketsBusy = value;
+        ticketSend.disabled = value;
+        ticketReply.disabled = value;
+        ticketsView.setAttribute('aria-busy', String(value));
+    };
+
+    const ticketsBase = widget.dataset.ticketsUrl.replace(/\/$/, '');
+    const ticketUrl = id => `${ticketsBase}/${encodeURIComponent(id)}`;
+
+    const openTicket = async id => {
+        if (ticketsBusy) return;
+        setTicketsBusy(true);
+        ticketsNotice.textContent = '';
+        ticketNotice.textContent = '';
+        try {
+            const data = await request(ticketUrl(id));
+            selectedTicketId = id;
+            const ticket = data.ticket || {};
+            ticketHeading.textContent = translateTicket('ticket_heading').replace(':id', ticket.id);
+            ticketStatus.textContent = ticketStatusLabel(ticket.status);
+            ticketMessages.replaceChildren();
+            const addTicketMessage = (author, content) => {
+                const block = document.createElement('div');
+                block.className = 'gw-chat-ticket-message';
+                const label = document.createElement('small');
+                label.textContent = author;
+                const body = document.createElement('div');
+                body.textContent = content || '';
+                block.append(label, body);
+                ticketMessages.append(block);
+            };
+            addTicketMessage(translateTicket('initial_message'), data.mensagem_inicial ?? ticket.mensagem);
+            (data.mensagens || []).forEach(msg => addTicketMessage(msg.remetente_nome || translateTicket('participant'), msg.mensagem));
+            ticketsList.hidden = true;
+            ticketDetail.hidden = false;
+            ticketReplyForm.hidden = ticket.status === 'resolvido';
+            if (ticket.status === 'resolvido') ticketNotice.textContent = translateTicket('resolved_notice');
+        } catch (error) {
+            ticketsNotice.textContent = error.message || translateTicket('open_error');
+        } finally {
+            setTicketsBusy(false);
+        }
+    };
+
+    const loadTickets = async () => {
+        if (ticketsBusy) return;
+        setTicketsBusy(true);
+        ticketDetail.hidden = true;
+        ticketsList.hidden = false;
+        selectedTicketId = null;
+        ticketsItems.replaceChildren();
+        ticketsNotice.textContent = translateTicket('loading');
+        try {
+            const data = await request(ticketsBase);
+            const tickets = data.tickets?.data || [];
+            ticketsNotice.textContent = tickets.length
+                ? ''
+                : translateTicket('empty');
+            tickets.forEach(ticket => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'gw-chat-ticket-item';
+                const title = document.createElement('strong');
+                title.textContent = `Ticket #${ticket.id} · ${ticketStatusLabel(ticket.status)}`;
+                const summary = document.createElement('span');
+                summary.textContent = ticket.motivo || ticket.mensagem || translateTicket('fallback_subject');
+                const date = document.createElement('small');
+                date.textContent = ticket.created_at
+                    ? new Date(ticket.created_at).toLocaleString(ticketLocale)
+                    : '';
+                button.append(title, summary, date);
+                button.addEventListener('click', () => openTicket(ticket.id));
+                ticketsItems.append(button);
+            });
+            if (data.tickets?.next_page_url) {
+                ticketsNotice.textContent = translateTicket('pagination');
+            }
+        } catch (error) {
+            ticketsNotice.textContent = error.message || translateTicket('load_error');
+        } finally {
+            setTicketsBusy(false);
+        }
+    };
+
+    widget.querySelectorAll('[data-chat-tab]').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const showTickets = tab.dataset.chatTab === 'tickets';
+            iaView.hidden = showTickets;
+            ticketsView.hidden = !showTickets;
+            widget.querySelectorAll('[data-chat-tab]').forEach(button => {
+                button.setAttribute('aria-selected', String(button === tab));
+            });
+            if (showTickets) loadTickets();
+            else input.focus();
+        });
+    });
+
+    widget.querySelector('[data-chat-tickets-back]')?.addEventListener('click', loadTickets);
+
+    ticketReplyForm?.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (ticketsBusy || !selectedTicketId) return;
+        const text = ticketReply.value.trim();
+        if (!text) return;
+        setTicketsBusy(true);
+        ticketNotice.textContent = '';
+        try {
+            await request(`${ticketUrl(selectedTicketId)}/responder`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensagem: text }),
+            });
+            ticketReply.value = '';
+            const id = selectedTicketId;
+            setTicketsBusy(false);
+            await openTicket(id);
+        } catch (error) {
+            ticketNotice.textContent = error.message || translateTicket('send_error');
+        } finally {
+            setTicketsBusy(false);
+        }
+    });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupPortal);

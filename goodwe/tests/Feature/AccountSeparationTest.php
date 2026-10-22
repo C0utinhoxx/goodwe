@@ -41,7 +41,11 @@ class AccountSeparationTest extends TestCase
         $this->assertSame('0.00', $manager->balance);
         $this->assertSame('0.00', $manager->points);
         $this->assertDatabaseCount('establishments', 0);
-        $this->get(route('manager.establishment.setup'))->assertOk()->assertSee('Cadastrar estabelecimento');
+
+        $this->get(route('manager.establishment.setup'))
+        ->assertOk()
+        ->assertSee(__('bulk.cadastrar_estabelecimento'));
+
     }
 
     public function test_manager_registration_uses_existing_validation_and_global_email_uniqueness(): void

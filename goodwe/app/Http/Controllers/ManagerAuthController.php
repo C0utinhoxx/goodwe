@@ -37,7 +37,7 @@ class ManagerAuthController extends Controller
 
     public function authenticate(LoginRequest $request): RedirectResponse
     {
-        $credentials = [...$request->safe()->only(['email', 'password']), 'is_admin' => true];
+        $credentials = [...$request->safe()->only(['email', 'password']), 'is_admin' => true, 'is_support' => false];
         if (! Auth::attempt($credentials, $request->boolean('lembrar'))) {
             return back()->withErrors(['email' => __('auth.manager_failed')])->onlyInput('email');
         }

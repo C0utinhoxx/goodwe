@@ -87,22 +87,37 @@ class DemandControlService
     {
         $firestore = app(FirestoreService::class);
         $entries = [];
+        $now = now();
+        $windowMinutes = max(1, (int) config('demand.readings_window_minutes', 2));
+        $oldestAllowed = $now->copy()->subMinutes($windowMinutes);
 
         foreach ($establishment->chargers()->where('is_demo', false)->get() as $charger) {
             $totem = $firestore->getDocumentData('totems', $charger->code);
-            if ($totem === null || $totem === []) {
+
+            if (! is_array($totem) || $totem === []) {
                 continue;
             }
 
             $powerKw = $totem['consumo_kw'] ?? $totem['active_power_kw'] ?? null;
             $currentA = $totem['corrente_a'] ?? $totem['current_a'] ?? null;
+
             if ($powerKw === null && $currentA === null) {
                 continue;
             }
 
-            $recordedAt = isset($totem['medido_em'])
-                ? Carbon::parse($totem['medido_em'])
-                : now();
+            if (! isset($totem['medido_em']) || $totem['medido_em'] === '') {
+                continue;
+            }
+
+            try {
+                $recordedAt = Carbon::parse($totem['medido_em']);
+            } catch (\Throwable $exception) {
+                continue;
+            }
+
+            if ($recordedAt->isFuture() || $recordedAt->lt($oldestAllowed)) {
+                continue;
+            }
 
             $normalized = $this->normalizeReportedPowerAndCurrent([
                 'active_power_kw' => $powerKw ?? 0,
@@ -136,8 +151,7 @@ class DemandControlService
      */
     private function storeReadingsBatch(Establishment $establishment, array $entries): int
     {
-        $existing = DemandReading::where('establishment_id', $establishment->id)
-            ->whereIn('external_id', array_column($entries, 'external_id'))
+        $existing = DemandReading::where('establishment_id', $establishment->id)            ->whereIn('external_id', array_column($entries, 'external_id'))
             ->lockForUpdate()
             ->get()
             ->keyBy('external_id');
@@ -189,7 +203,7 @@ class DemandControlService
      * A seleção da leitura mais recente por carregador acontece no banco
      * (GROUP BY + junção), evitando carregar todas as leituras da janela para
      * deduplicar em PHP.
-     *
+ *
      * @return Collection<int, DemandReading>
      */
     public function latestReadingsByCharger(Establishment $establishment, ?CarbonInterface $since = null): Collection
@@ -204,7 +218,7 @@ class DemandControlService
             ->groupBy('charger_id');
 
         return DemandReading::query()
-            ->joinSub($latestPerCharger, 'latest_reading', function (JoinClause $join): void {
+            ->joinSub($latestPerCharger, 'latest_reading', function (JoinClause$join): void {
                 $join->on('latest_reading.charger_id', '=', 'demand_readings.charger_id')
                     ->on('latest_reading.latest_recorded_at', '=', 'demand_readings.recorded_at');
             })
@@ -249,7 +263,7 @@ class DemandControlService
      * agregada dentro da capacidade configurada. Lança ValidationException
      * quando a capacidade seria excedida.
      */
-    public function assertCanStartSession(Establishment $establishment, Charger $charger): void
+    public function assertCanStartSession(Establishment $establishment, Charger$charger): void
     {
         if (! $establishment->hasDemandLimit()) {
             return;
@@ -271,7 +285,7 @@ class DemandControlService
 
         if ($exceedsPower || $exceedsCurrent) {
             throw ValidationException::withMessages([
-                'charger' => 'A demanda ativa dos carregadores em recarga mais este equipamento excederia a capacidade elétrica configurada. Aguarde uma sessão encerrar.',
+                'charger' => 'A demanda ativa dos carregadores em recarga mais este equipamento excederia a capacidade elétrica configurada. Aguarde uma sessãoencerrar.',
             ]);
         }
     }
@@ -321,7 +335,7 @@ class DemandControlService
                 'charger_id' => $session->charger_id,
                 'charger_name' => $session->charger_name,
                 'user_name' => $session->user?->name,
-                'measured_energy_kwh' => $session->measured_energy_kwh !== null ? (float) $session->measured_energy_kwh : null,
+                'measured_energy_kwh' => $session->measured_energy_kwh !== null? (float) $session->measured_energy_kwh : null,
                 'started_at' => $session->started_at?->toIso8601String(),
             ])->values(),
         ];
@@ -367,10 +381,9 @@ class DemandControlService
     {
         $powerKw = $this->normalizeNonNegative($data['active_power_kw'] ?? 0, 'active_power_kw');
         $currentA = $this->normalizeNonNegative($data['current_a'] ?? null, 'current_a')
-            ?? round(self::estimateCurrentA($powerKw ?? 0.0, $data['voltage_v'] ?? null), 3);
+            ?? round(self::estimateCurrentA($powerKw ?? 0.0, $data['voltage_v']?? null), 3);
 
-        return ['power_kw' => $powerKw ?? 0.0, 'current_a' => $currentA ?? 0.0];
-    }
+        return ['power_kw' => $powerKw ?? 0.0, 'current_a' => $currentA ?? 0.0];    }
 
     /**
      * Rejeita o reenvio de uma leitura já registrada com conteúdo divergente.

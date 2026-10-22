@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AtendimentoHumanoController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ChargingController;
 use App\Http\Controllers\ChargingSessionController;
 use App\Http\Controllers\ChatbotController;
@@ -267,6 +268,27 @@ Route::middleware('auth')->group(function () {
 
                 Route::get('/demanda', [DemandPricingController::class, 'index'])
                     ->name('demand.index');
+
+               Route::post('/notificacoes/inscrever', [
+             PushSubscriptionController::class,
+                    'store',
+                    ])
+                     ->middleware('throttle:10,1')
+                       ->name('notifications.subscribe');
+
+                Route::get('/notificacoes/chave-publica', function () {
+    return response()->json([
+        'publicKey' => config('webpush.vapid.public_key'),
+    ]);
+})->name('notifications.public-key');
+
+                   Route::delete('/notificacoes/inscrever', [
+                PushSubscriptionController::class,
+                   'destroy',
+])
+                   ->middleware('throttle:10,1')
+                   ->name('notifications.unsubscribe');
+
 
                 Route::post('/demanda/{peak}/decisao', [DemandPricingController::class, 'decide'])
                     ->name('demand.decide');

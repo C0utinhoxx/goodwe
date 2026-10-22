@@ -1,9 +1,9 @@
 <x-user-layout>
     <x-slot name="header">
         <div class="gw-dashboard-heading">
-            <div><p class="pt-eyebrow">SUA OPERAÇÃO</p><h1>Visão geral</h1><p class="pt-muted pt-subheading">{{ $establishment->name }} · {{ $establishment->address }}</p></div>
+            <div><p class="pt-eyebrow">{{ __('bulk.sua_operacao') }}</p><h1>{{ __('bulk.visao_geral') }}</h1><p class="pt-muted pt-subheading">{{ $establishment->name }} · {{ $establishment->address }}</p></div>
             <div class="gw-dashboard-filters">
-                <form method="GET" action="{{ route('manager.dashboard') }}" class="gw-period-filter"><label for="period" class="sr-only">{{ __('manager.period_label') }}</label><select name="period" id="period" class="gw-select">@foreach([7,30,90] as $days)<option value="{{ $days }}" @selected($period === $days)>{{ __('manager.period_'.$days) }}</option>@endforeach</select><button type="submit" class="gw-button gw-button-secondary">Aplicar</button></form>
+                <form method="GET" action="{{ route('manager.dashboard') }}" class="gw-period-filter"><label for="period" class="sr-only">{{ __('manager.period_label') }}</label><select name="period" id="period" class="gw-select">@foreach([7,30,90] as $days)<option value="{{ $days }}" @selected($period === $days)>{{ __('manager.period_'.$days) }}</option>@endforeach</select><button type="submit" class="gw-button gw-button-secondary">{{ __('bulk.aplicar') }}</button></form>
                 <a href="{{ route('manager.dashboard.export', ['period'=>$period]) }}" class="gw-button gw-button-secondary"><i data-lucide="arrow-down" aria-hidden="true"></i>{{ __('manager.export_csv') }}</a>
             </div>
         </div>
@@ -18,7 +18,7 @@
             <article class="gw-metric gw-card"><span class="gw-metric-icon"><i data-lucide="{{ $metric['icon'] }}" aria-hidden="true"></i></span><p>{{ $metric['label'] }}</p><strong>{{ $metric['value'] }}@isset($metric['unit'])<small>{{ $metric['unit'] }}</small>@endisset</strong></article>
         @endforeach
     </section>
-    <details class="gw-methodology"><summary>Como os indicadores são calculados</summary><p>Receita considera pagamentos de recarga com transação aprovada. Valores pendentes não compõem a receita. Energia considera o consumo registrado, inclusive de sessões ainda não pagas. O custo médio considera somente sessões pagas.</p></details>
+    <details class="gw-methodology"><summary>{{ __('bulk.como_os_indicadores_sao_calculados') }}</summary><p>Receita considera pagamentos de recarga com transação aprovada. Valores pendentes não compõem a receita. Energia considera o consumo registrado, inclusive de sessões ainda não pagas. O custo médio considera somente sessões pagas.</p></details>
     <section class="gw-status-strip gw-card" aria-label="Disponibilidade dos carregadores">
         @foreach(['total'=>'Carregadores','available'=>'Disponíveis','reserved'=>'Reservados','in_use'=>'Em uso','unavailable'=>'Indisponíveis'] as $status=>$label)
             <div><span class="gw-status-indicator gw-status-{{ $status }}"></span><p>{{ $label }}</p><strong>{{ $chargerCounts[$status] }}</strong></div>
@@ -156,7 +156,7 @@
                 {{ __('manager.top_users') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('manager.top_users_subtitle') }}</p>
-            <p class="gw-table-hint">Deslize a tabela para ver todas as colunas.</p><div class="mt-5 overflow-x-auto" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal">
+            <p class="gw-table-hint">{{ __('bulk.deslize_a_tabela_para_ver_todas_as_colunas') }}</p><div class="mt-5 overflow-x-auto" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal">
                 <table class="w-full text-left text-sm">
                     <thead class="border-b border-gray-200 text-gray-500 dark:border-[#343843] dark:text-[#a0a0a0]">
                         <tr>
@@ -212,7 +212,7 @@
                     <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ $establishment->phone ?? '-' }}</p>
                 </div>
                 <div>
-                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">Tarifa-base</p>
+                    <p class="text-sm text-gray-500 dark:text-[#a0a0a0]">{{ __('bulk.tarifa_base') }}</p>
                     <p class="mt-1 font-medium text-gray-900 dark:text-white">R$ {{ number_format($establishment->cost_per_kwh, 4, ',', '.') }}/kWh</p>
                 </div>
             </div>
@@ -227,7 +227,7 @@
         </div>
         <p class="pt-form-note mt-2">{{ $includeTestSessions ? 'Neste ambiente de testes, as recargas de teste também compõem os totais e gráficos do painel.' : 'Recargas de teste aparecem nesta lista, mas não compõem os indicadores nem o faturamento real.' }}</p>
 
-        <p class="gw-table-hint">Deslize a tabela para ver todas as colunas.</p><div class="mt-5 overflow-x-auto" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal">
+        <p class="gw-table-hint">{{ __('bulk.deslize_a_tabela_para_ver_todas_as_colunas') }}</p><div class="mt-5 overflow-x-auto" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal">
             <table class="w-full min-w-[700px] text-left text-sm">
                 <thead class="border-b border-gray-200 text-gray-500 dark:border-[#343843] dark:text-[#a0a0a0]">
                     <tr>
@@ -244,7 +244,7 @@
                         <tr class="border-b border-gray-200 dark:border-[#343843]">
                             <td class="py-4 text-gray-900 dark:text-white">{{ $session->created_at->format('d/m/Y H:i') }}</td>
                             <td class="py-4 text-gray-900 dark:text-white">{{ $session->user->name ?? '-' }}</td>
-                            <td class="py-4 text-gray-900 dark:text-white">{{ $session->charger_name }}@if($session->isWebSimulation())<small class="pt-origin"><span class="pt-status neutral">Recarga de teste</span></small>@endif</td>
+                            <td class="py-4 text-gray-900 dark:text-white">{{ $session->charger_name }}@if($session->isWebSimulation())<small class="pt-origin"><span class="pt-status neutral">{{ __('bulk.recarga_de_teste') }}</span></small>@endif</td>
                             <td class="py-4 text-gray-900 dark:text-white">{{ number_format($session->energy_kwh, 1, ',', '.') }} kWh</td>
                             <td class="py-4 text-gray-900 dark:text-white">R$ {{ number_format($session->amount_charged, 2, ',', '.') }}</td>
                             <td class="py-4">

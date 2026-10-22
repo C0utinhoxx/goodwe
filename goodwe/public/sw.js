@@ -1,38 +1,21 @@
+
 /*
  * GoodWe PWA - Service Worker
  *
- * Estrategia de cache (conservadora de proposito):
+ * Navegacao: prioriza a rede.
+ * Arquivos estaticos: utiliza cache e atualiza em segundo plano.
+ * Paginas privadas e APIs: nao sao armazenadas no cache.
  *
- *   1. Navegacao (index.html)  -> NETWORK FIRST
- *      Sempre tenta a rede. So usa o cache se a rede falhar.
- *      => Depois de um deploy o usuario recebe o HTML novo
- *         imediatamente, sem depender de cache.
- *
- *   2. Assets estaticos (css/js/imagens) -> STALE WHILE REVALIDATE
- *      Responde instantaneamente do cache e atualiza em segundo plano.
- *      Risco baixo: no proximo carregamento ja vem a versao nova.
- *
- *   3. Tudo o que for de outra origem (CDN, fontes, API) -> NAO E CACHEADO.
- *      Vai direto para a rede.
- *
- * Regra de ouro: nao cachear sw.js nem manifest.json, senao o navegador
- * ficaria preso numa versao antiga do proprio service worker.
- *
- * Para publicar uma mudanca que afete o cache, altere CACHE_VERSION.
- * O activate apaga todos os caches antigos automaticamente.
+ * Notificacoes push:
+ * Recebe alertas e abre a pagina de demanda do gestor.
  */
 
-// v2: charger-map.js/css e o Leaflet self-hosted (public/vendor/leaflet)
-// mudaram — sem isto o stale-while-revalidate continuaria servindo a versao
-// antiga do mapa cacheada na primeira visita apos o deploy.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_PREFIX = 'goodwe-pwa-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
-/* Resolvidos contra a URL do proprio sw.js -> funcionam na raiz do dominio. */
 const OFFLINE_FALLBACK = new URL('./', self.location.href).href;
 
-/* Lista minima do "app shell". Nao inclua arquivos que mudam sozinhos. */
 const PRECACHE_URLS = [
     './',
     './manifest.json',
@@ -45,35 +28,41 @@ const PRECACHE_URLS = [
     './icons/apple-touch-icon.png',
 ];
 
-/* INSTALL: pré-carrega o app shell. */
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
         const cache = await caches.open(CACHE_NAME);
-        // allSettled: se UM arquivo falhar, o install nao inteiro quebra.
-        // 'reload' ignora o cache HTTP para pegar a versao mais recente.
+
         await Promise.allSettled(
-            PRECACHE_URLS.map((url) =>
-                cache.add(new Request(new URL(url, self.location.href).href, { cache: 'reload' }))
-            )
+            PRECACHE_URLS.map((url) => {
+                const address = new URL(url, self.location.href).href;
+
+                return cache.add(new Request(address, {
+                    cache: 'reload',
+                }));
+            })
         );
+
         await self.skipWaiting();
     })());
 });
 
-/* ACTIVATE: limpa versoes antigas e assume o controle das abas abertas. */
 self.addEventListener('activate', (event) => {
     event.waitUntil((async () => {
         const keys = await caches.keys();
+
         await Promise.all(
             keys
-                .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+                .filter((key) => {
+                    return key.startsWith(CACHE_PREFIX)
+                        && key !== CACHE_NAME;
+                })
                 .map((key) => caches.delete(key))
         );
+
         await self.clients.claim();
     })());
 });
 
-/* Permite forcar a ativacao via postMessage. */
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
@@ -83,66 +72,221 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
     const request = event.request;
 
-    // 1. Apenas GET. POST da API passa direto.
-    if (request.method !== 'GET') return;
+    if (request.method !== 'GET') {
+        return;
+    }
 
     const url = new URL(request.url);
 
-    // 2. Somente mesma origem. CDN, tiles, fontes e API ficam de fora.
-    if (url.origin !== self.location.origin) return;
+    if (url.origin !== self.location.origin) {
+        return;
+    }
 
-    // 3. Nunca cachear o proprio SW nem o manifest.
-    if (url.pathname.endsWith('/sw.js') || url.pathname.endsWith('/manifest.json')) return;
+    if (
+        url.pathname.endsWith('/sw.js') ||
+        url.pathname.endsWith('/manifest.json')
+    ) {
+        return;
+    }
 
-    // 4. Navegacao -> network first (prioriza atualizacao).
     if (request.mode === 'navigate') {
         event.respondWith(networkFirst(request));
         return;
     }
 
-    // 5. Demais assets mesma origem -> stale while revalidate.
+    if (!isStaticAsset(url)) {
+        return;
+    }
+
     event.respondWith(staleWhileRevalidate(request));
 });
 
-/* HTML: rede primeiro, cache so como reserva offline. */
+function isStaticAsset(url) {
+    const path = url.pathname.toLowerCase();
+
+    return (
+        path.startsWith('/build/') ||
+        path.startsWith('/css/') ||
+        path.startsWith('/js/') ||
+        path.startsWith('/imagens/') ||
+        path.startsWith('/icons/') ||
+        path.startsWith('/vendor/') ||
+        /\.(css|js|png|jpg|jpeg|webp|svg|gif|ico|woff|woff2)$/.test(path)
+    );
+}
+
 async function networkFirst(request) {
-    const cache = await caches.open(CACHE_NAME);
     try {
         const response = await fetch(request);
-        // Guarda sempre sob a MESMA chave para nao encher o cache com
-        // variantes do tipo /?utm=1, /?ref=abc...
-        if (response && response.ok && response.type === 'basic') {
-            cache.put(OFFLINE_FALLBACK, response.clone());
+
+        const url = new URL(request.url);
+
+        if (
+            response &&
+            response.ok &&
+            response.type === 'basic' &&
+            url.pathname === '/' &&
+            !url.search
+        ) {
+            const cache = await caches.open(CACHE_NAME);
+
+            await cache.put(
+                OFFLINE_FALLBACK,
+                response.clone()
+            );
         }
+
         return response;
     } catch (error) {
-        const cached =
-            (await cache.match(OFFLINE_FALLBACK)) ||
-            (await cache.match('./'));
-        if (cached) return cached;
+        if (new URL(request.url).pathname === '/') {
+            const cache = await caches.open(CACHE_NAME);
+
+            const cached = await cache.match(OFFLINE_FALLBACK);
+
+            if (cached) {
+                return cached;
+            }
+        }
+
         throw error;
     }
 }
 
-/* Assets: cache instantaneo + revalidacao em segundo plano. */
 async function staleWhileRevalidate(request) {
     const cache = await caches.open(CACHE_NAME);
+
     const cached = await cache.match(request);
 
     const fromNetwork = fetch(request)
         .then((response) => {
-            if (response && response.ok && response.type === 'basic') {
+            if (
+                response &&
+                response.ok &&
+                response.type === 'basic'
+            ) {
                 cache.put(request, response.clone());
             }
+
             return response;
         })
         .catch(() => null);
 
-    if (cached) return cached;
+    if (cached) {
+        return cached;
+    }
 
     const network = await fromNetwork;
-    if (network) return network;
 
-    // Sem cache e sem rede: deixa o erro do fetch propagar.
+    if (network) {
+        return network;
+    }
+
     return fetch(request);
+}
+
+/*
+ * NOTIFICACOES PUSH
+ */
+
+self.addEventListener('push', (event) => {
+    let data = {};
+
+    if (event.data) {
+        try {
+            data = event.data.json();
+        } catch (error) {
+            data = {
+                body: event.data.text(),
+            };
+        }
+    }
+
+    const title = typeof data.title === 'string'
+        ? data.title
+        : 'GoodWe - Alerta de demanda';
+
+    const body = typeof data.body === 'string'
+        ? data.body
+        : 'Um novo alerta foi registrado no estabelecimento.';
+
+    const options = {
+        body: body,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        tag: typeof data.tag === 'string'
+            ? data.tag
+            : 'goodwe-demand-alert',
+        data: {
+            url: getSafeNotificationUrl(data.url),
+        },
+        requireInteraction: false,
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(title, options)
+    );
+});
+
+/*
+ * CLIQUE NA NOTIFICACAO
+ */
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const targetUrl = getSafeNotificationUrl(
+        event.notification.data &&
+        event.notification.data.url
+    );
+
+    event.waitUntil((async () => {
+        const windows = await self.clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true,
+        });
+
+        for (const client of windows) {
+            if (client.url === targetUrl && 'focus' in client) {
+                return client.focus();
+            }
+        }
+
+        if (self.clients.openWindow) {
+            return self.clients.openWindow(targetUrl);
+        }
+    })());
+});
+
+/*
+ * Evita abrir enderecos externos por notificacoes.
+ */
+
+function getSafeNotificationUrl(value) {
+    const fallback = new URL(
+        '/gestor/demanda',
+        self.location.origin
+    ).href;
+
+    if (
+        typeof value !== 'string' ||
+        !value.startsWith('/') ||
+        value.startsWith('//')
+    ) {
+        return fallback;
+    }
+
+    try {
+        const url = new URL(value, self.location.origin);
+
+        if (
+            url.origin !== self.location.origin ||
+            url.pathname !== '/gestor/demanda'
+        ) {
+            return fallback;
+        }
+
+        return url.href;
+    } catch (error) {
+        return fallback;
+    }
 }

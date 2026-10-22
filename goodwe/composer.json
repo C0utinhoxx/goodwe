@@ -16,6 +16,7 @@
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
         "mercadopago/dx-php": "^3.16",
+        "minishlink/web-push": "11.0",
         "stripe/stripe-php": "*"
     },
     "require-dev": {

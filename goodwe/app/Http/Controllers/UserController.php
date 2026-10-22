@@ -75,7 +75,16 @@ class UserController extends Controller
 
     public function logar(LoginRequest $request): RedirectResponse
     {
-        $credentials = [...$request->safe()->only(['email', 'password']), 'is_admin' => false];
+        $supportAccess = $request->query('acesso') === 'suporte';
+
+        $credentials = $request->safe()->only(['email', 'password']);
+
+        if ($supportAccess) {
+            $credentials['is_support'] = true;
+        } else {
+            $credentials['is_admin'] = false;
+            $credentials['is_support'] = false;
+        }
 
         if (! Auth::attempt($credentials, $request->boolean('lembrar'))) {
             return back()->withErrors([
@@ -87,8 +96,8 @@ class UserController extends Controller
 
         $user = Auth::user();
 
-        // Perfil Suporte
-        if ($user->isSuporte()) {
+        // O login do suporte e o login comum são acessos separados.
+        if ($supportAccess) {
             return redirect()
                 ->route('support.dashboard')
                 ->with('success', __('auth.logged_in'));
@@ -147,7 +156,7 @@ class UserController extends Controller
             ]);
 
             return back()->withErrors([
-                'email' => 'Entre em contato com a administração para recuperar o acesso.',
+                'email' => 'Entre em contato com a administração para recuperaro acesso.',
             ]);
         }
 
@@ -299,12 +308,19 @@ class UserController extends Controller
 
     public function logout(): RedirectResponse
     {
-        $loginRoute = auth()->user()?->isGestor() ? 'manager.login' : 'user.login';
+        $user = auth()->user();
+        $loginRoute = $user?->isGestor() && ! $user?->isSuporte()
+            ? 'manager.login'
+            : 'user.login';
+        $supportAccess = (bool) ($user?->isSuporte() ?? false);
+
         Auth::logout();
 
         request()->session()->invalidate();
         request()->session()->regenerateToken();
 
-        return redirect()->route($loginRoute);
+        return $supportAccess
+            ? redirect()->route('user.login', ['acesso' => 'suporte'])
+            : redirect()->route($loginRoute);
     }
 }

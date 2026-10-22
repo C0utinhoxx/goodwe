@@ -209,7 +209,7 @@
                         <th class="px-3 py-3 font-medium">{{ $t['requester'] }}</th>
                         <th class="px-3 py-3 font-medium">{{ $t['subject'] }}</th>
                         <th class="px-3 py-3 font-medium">{{ $t['date'] }}</th>
-                        <th class="px-3 py-3 font-medium">Status</th>
+                        <th class="px-3 py-3 font-medium">{{ __('bulk.status') }}</th>
                         <th class="px-3 py-3 font-medium text-right">{{ $t['action'] }}</th>
                     </tr>
                 </thead>

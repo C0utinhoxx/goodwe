@@ -31,12 +31,58 @@ class ChatbotController extends Controller
         $user = $request->user();
         $establishment = $user->establishment;
         $locale = app()->getLocale();
+        $idiomaSalvo = $request->session()->get('manager_chat_language');
+
+if ($idiomaSalvo && in_array($idiomaSalvo, ['pt', 'en', 'es'], true)) {
+    $locale = $idiomaSalvo;
+}
         if (! $establishment) {
             return response()->json([
                 'answer' => 'Nenhum estabelecimento foi encontrado para este gestor.',
             ]);
         }
         $message = trim($request->input('message'));
+        $mensagemMinuscula = mb_strtolower($message);
+
+$pedidosIdioma = [
+    'pt' => [
+        'fale em português',
+        'falar em português',
+        'responda em português',
+        'converse em português',
+        'speak portuguese',
+        'habla portugués',
+    ],
+    'en' => [
+        'fale em inglês',
+        'responda em inglês',
+        'speak english',
+        'respond in english',
+        'habla inglés',
+    ],
+    'es' => [
+        'fale em espanhol',
+        'responda em espanhol',
+        'speak spanish',
+        'respond in spanish',
+        'habla español',
+    ],
+];
+
+foreach ($pedidosIdioma as $codigo => $frases) {
+    foreach ($frases as $frase) {
+        if (str_contains($mensagemMinuscula, $frase)) {
+            $locale = $codigo;
+
+            $request->session()->put(
+                'manager_chat_language',
+                $codigo
+            );
+
+            break 2;
+        }
+    }
+}
 
         // Um pedido genérico de ticket não é motivo para encaminhamento.
         // Primeiro, o gestor precisa explicar qual problema deseja resolver.
@@ -190,11 +236,34 @@ class ChatbotController extends Controller
                 "Conector: {$charger->connector} | ".
                 "Status: {$status}\n";
         }
-        $languageInstruction = match ($locale) {
-            'en' => 'Always respond in English.',
-            'es' => 'Responde siempre en español.',
-            default => 'Responda sempre em português do Brasil.',
+         $languageInstruction = match ($locale) {
+            'en' => 'The default language is English.',
+            'es' => 'El idioma predeterminado es español.',
+            default => 'O idioma padrão é português do Brasil.',
         };
+
+        $languageInstruction .= <<<'IDIOMA'
+
+REGRAS DE IDIOMA E ATENDIMENTO
+- Use o idioma padrão da plataforma enquanto o usuário não solicitar outro idioma.
+- Se o usuário pedir para conversar em português, inglês ou espanhol, respeite essa preferência.
+- Continue usando o idioma solicitado nas próximas mensagens, até o usuário pedir outro.
+- Consulte o histórico para identificar a preferência de idioma mais recente.
+- Uma solicitação de mudança de idioma não deve gerar ticket.
+- Seja sempre educado, respeitoso, prestativo e profissional.
+- Responda de maneira natural, sem parecer um robô.
+- Demonstre compreensão quando o usuário relatar problemas.
+- Explique as soluções de maneira simples e clara.
+- Não repita cumprimentos desnecessariamente.
+- Não invente informações ou prometa soluções que não possa realizar.
+- Mantenha todas as regras de segurança e atendimento humano.
+- O idioma da mensagem do usuário não determina o idioma da resposta.
+- Se o usuário escolheu espanhol, continue respondendo em espanhol mesmo que ele escreva em português ou inglês.
+- Só altere o idioma quando houver um pedido explícito de mudança.
+- Nunca interprete uma pergunta comum em outro idioma como pedido de mudança.
+- A preferência de idioma salva na sessão tem prioridade sobre o idioma da mensagem e o idioma da plataforma.
+- Responda sempre no idioma indicado pela preferência ativa da conversa.
+IDIOMA;
         $managerName = $this->safeText(
             $user->name ?? 'Não informado'
         );
@@ -547,21 +616,24 @@ PROMPT;
         return 'manager_chat_history.scoped_v1.'.($establishment?->id ?? 'none');
     }
 
-    private function saveHistory(
+        private function saveHistory(
         $establishment,
         string $message,
         string $answer
     ): void {
         $key = $this->historyKey($establishment);
         $history = session($key, []);
+
         $history[] = [
             'role' => 'user',
             'content' => $message,
         ];
+
         $history[] = [
             'role' => 'assistant',
             'content' => $answer,
         ];
+
         session([$key => $history]);
     }
 

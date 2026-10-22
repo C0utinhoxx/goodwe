@@ -1,3 +1,4 @@
+
 @if(request()->routeIs('manager.*'))
     <x-manager-legacy-layout>
         @if(isset($header))
@@ -24,66 +25,154 @@
     <meta name="apple-mobile-web-app-title" content="GoodWe">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
+
     <script>
         (() => {
             const theme = localStorage.getItem('theme');
-            document.documentElement.classList.toggle('dark', theme === 'dark' || (!theme && matchMedia('(prefers-color-scheme: dark)').matches));
+            document.documentElement.classList.toggle(
+                'dark',
+                theme === 'dark' || (!theme && matchMedia('(prefers-color-scheme: dark)').matches)
+            );
         })();
     </script>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
 </head>
 <body class="pt-body portal-ui min-h-screen antialiased">
-    <a href="#main-content" class="gw-skip-link">Pular para o conteúdo</a>
-    @php
-        $links = [
-            ['name'=>__('portal.home'),'route'=>'user.home','active'=>'user.home','icon'=>'house','description'=>'Resumo da sua conta'],
-            // A listagem de carregadores ficou restrita ao painel do gestor. O
-            // usuário encontra estações pelo mapa da tela "Recarga" (totens.index).
-            ['name'=>__('nav.recharge'),'route'=>'totens.index','active'=>['totens.*','chargers.*','reservations.*','charging-sessions.*'],'icon'=>'battery-charging','description'=>__('nav.recharge_hint')],
-            ['name'=>__('nav.wallet'),'route'=>'wallet.index','active'=>'wallet.*','icon'=>'wallet','description'=>'Saldo e movimentações','children'=>[
-                ['name'=>'Adicionar saldo','route'=>'wallet.deposit.form'],
-                ['name'=>'Histórico financeiro','route'=>'wallet.history'],
-            ]],
-            ['name'=>__('portal.points'),'route'=>'points.index','active'=>'points.*','icon'=>'gift','description'=>'Recompensas e cupons','children'=>[
-                ['name'=>'Recompensas','route'=>'points.index','hash'=>'recompensas'],
-                ['name'=>'Meus cupons','route'=>'points.index','hash'=>'meus-cupons'],
-                ['name'=>'Histórico de pontos','route'=>'points.index','hash'=>'historico-pontos'],
-            ]],
-            ['name'=>__('nav.profile'),'route'=>'user.profile','active'=>'user.profile','icon'=>'user','description'=>'Dados, veículos e preferências','children'=>[
-                ['name'=>'Dados pessoais','route'=>'user.profile','hash'=>'dados-pessoais'],
-                ['name'=>'Meus veículos','route'=>'user.profile','hash'=>'meus-veiculos'],
-                ['name'=>'Preferências','route'=>'user.profile','hash'=>'preferencias'],
-            ]],
-        ];
+    <a href="#main-content" class="gw-skip-link">{{ __('bulk.pular_para_o_conteudo') }}</a>
 
-        if (auth()->user()?->isSuporte()) {
+    @php
+        $isSupport = (bool) auth()->user()?->isSuporte();
+
+        if ($isSupport) {
             $links = [
-                ['name'=>__('support.overview_title'),'route'=>'support.dashboard','active'=>'support.*','icon'=>'life-buoy','description'=>__('support.support_panel')],
-            ] + $links;
+                [
+                    'name' => __('support.sidebar_subtitle'),
+                    'route' => 'support.dashboard',
+                    'active' => 'support.*',
+                    'icon' => 'life-buoy',
+                    'description' => __('pointsui.menu_support_description'),
+                ],
+            ];
+
+            $homeRoute = 'support.dashboard';
+            $layoutTitle = __('screen.central_de_suporte');
+        } else {
+            $links = [
+                [
+                    'name' => __('portal.home'),
+                    'route' => 'user.home',
+                    'active' => 'user.home',
+                    'icon' => 'house',
+                    'description' => __('pointsui.menu_home_description'),
+                ],
+                [
+                    'name' => __('nav.recharge'),
+                    'route' => 'totens.index',
+                    'active' => ['totens.*', 'chargers.*', 'reservations.*', 'charging-sessions.*'],
+                    'icon' => 'battery-charging',
+                    'description' => __('nav.recharge_hint'),
+                ],
+                [
+                    'name' => __('nav.wallet'),
+                    'route' => 'wallet.index',
+                    'active' => 'wallet.*',
+                    'icon' => 'wallet',
+                    'description' => __('pointsui.menu_wallet_description'),
+                    'children' => [
+                        ['name' => __('pointsui.menu_add_balance'), 'route' => 'wallet.deposit.form'],
+                        ['name' => __('pointsui.menu_financial_history'), 'route' => 'wallet.history'],
+                    ],
+                ],
+                [
+                    'name' => __('portal.points'),
+                    'route' => 'points.index',
+                    'active' => 'points.*',
+                    'icon' => 'gift',
+                    'description' => __('pointsui.menu_rewards_description'),
+                    'children' => [
+                        ['name' => __('pointsui.menu_rewards'), 'route' => 'points.index', 'hash' => 'recompensas'],
+                        ['name' => __('pointsui.menu_my_coupons'), 'route' => 'points.index', 'hash' => 'meus-cupons'],
+                        ['name' => __('pointsui.menu_points_history'), 'route' => 'points.index', 'hash' => 'historico-pontos'],
+                    ],
+                ],
+                [
+                    'name' => __('nav.profile'),
+                    'route' => 'user.profile',
+                    'active' => 'user.profile',
+                    'icon' => 'user',
+                    'description' => __('pointsui.menu_profile_description'),
+                    'children' => [
+                        ['name' => __('pointsui.menu_personal_data'), 'route' => 'user.profile', 'hash' => 'dados-pessoais'],
+                        ['name' => __('pointsui.menu_vehicles'), 'route' => 'user.profile', 'hash' => 'meus-veiculos'],
+                        ['name' => __('pointsui.menu_preferences'), 'route' => 'user.profile', 'hash' => 'preferencias'],
+                    ],
+                ],
+            ];
+
+            $homeRoute = 'user.home';
+            $layoutTitle = $pageTitle ?? __('nav.home');
         }
     @endphp
-    <div class="pt-shell" data-portal-shell data-portal-role="user">
+
+    <div
+        class="pt-shell"
+        data-portal-shell
+        data-portal-role="{{ $isSupport ? 'support' : 'user' }}"
+    >
         <div class="pt-mobile-overlay" data-mobile-close hidden></div>
-        <x-portal-sidebar :links="$links" home="user.home" />
+
+        <x-portal-sidebar :links="$links" :home="$homeRoute" />
+
         <div class="pt-main-shell">
-            <x-portal-topbar :title="$pageTitle ?? 'Início'" />
+            <x-portal-topbar :title="$layoutTitle" />
+
             <main class="pt-content" id="main-content" tabindex="-1">
-                @if(isset($header))<div class="pt-page-head">{{ $header }}</div>@endif
-                @if(session('success'))<div class="pt-alert pt-alert-success" role="status">{{ session('success') }}</div>@endif
-                @if(session('error'))<div class="pt-alert pt-alert-error" role="alert">{{ session('error') }}</div>@endif
-                @if($errors->any())<div class="pt-alert pt-alert-error" role="alert"><strong>Confira os campos:</strong> {{ $errors->first() }}</div>@endif
+
+                @if(isset($header))
+                    <div class="pt-page-head">{{ $header }}</div>
+                @endif
+
+                @if(session('success'))
+                    <div class="pt-alert pt-alert-success" role="status">
+                        {{ session('success') }}
+                    </div>
+                @endif
+
+                @if(session('error'))
+                    <div class="pt-alert pt-alert-error" role="alert">
+                        {{ session('error') }}
+                    </div>
+                @endif
+
+                @if($errors->any())
+                    <div class="pt-alert pt-alert-error" role="alert">
+                        <strong>{{ __('bulk.confira_os_campos') }}</strong>
+                        {{ $errors->first() }}
+                    </div>
+                @endif
+
                 {{ $slot }}
-                <footer class="pt-footer"><span>© {{ date('Y') }} PowerTag · Challenge GoodWe</span><span>Energia inteligente, conectando pessoas.</span></footer>
+
+                <footer class="pt-footer">
+                    <span>© {{ date('Y') }} PowerTag · Challenge GoodWe</span>
+                    <span>{{ $isSupport ? __('screen.central_de_suporte') : __('footer.user_tagline') }}</span>
+                </footer>
             </main>
         </div>
     </div>
+
     <x-portal-commands />
-    <x-user-chat-widget />
+
+    @unless($isSupport)
+        <x-user-chat-widget />
+    @endunless
+
     <script src="{{ asset('js/theme.js') }}"></script>
-<script src="{{ asset('js/pwa.js') }}"></script>
-@stack('scripts')
+    <script src="{{ asset('js/pwa.js') }}"></script>
+
+    @stack('scripts')
 </body>
 </html>
-
 @endif
