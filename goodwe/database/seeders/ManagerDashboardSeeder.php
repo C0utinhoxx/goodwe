@@ -24,6 +24,12 @@ class ManagerDashboardSeeder extends Seeder
     /** Quantidade de dias de histórico usada para alimentar os filtros de 7/30/90 dias. */
     private const HISTORY_DAYS = 90;
 
+    /**
+     * Abaixo deste total, o histórico é considerado incompleto (por exemplo,
+     * um boot interrompido no meio da carga) e o seeder roda novamente.
+     */
+    private const MIN_COMPLETE_SESSIONS = 400;
+
     public function run(): void
     {
         $manager = $this->manager();
@@ -32,11 +38,12 @@ class ManagerDashboardSeeder extends Seeder
         // Em produção o entrypoint chama este seeder a cada boot. Depois da
         // primeira carga, preservamos as sessões existentes (inclusive as
         // recargas reais feitas pelos totens) e evitamos reescrever o painel.
+        // Uma carga parcial (boot interrompido) é refeita.
         if (app()->environment('production') && ChargingSession::query()
             ->where('establishment_id', $establishment->id)
             ->where('is_demo', true)
-            ->exists()) {
-            $this->command->info('Histórico de demonstração já existe; seeder ignorado.');
+            ->count() >= self::MIN_COMPLETE_SESSIONS) {
+            $this->command->info('Histórico de demonstração completo já existe; seeder ignorado.');
 
             return;
         }
@@ -177,7 +184,7 @@ class ManagerDashboardSeeder extends Seeder
 
         $tariff = (float) $establishment->cost_per_kwh;
         $start = now()->subDays(self::HISTORY_DAYS - 1)->startOfDay();
-        $created = 0;
+        $rows = [];
 
         for ($day = 0; $day < self::HISTORY_DAYS; $day++) {
             $date = $start->copy()->addDays($day);
@@ -257,39 +264,40 @@ class ManagerDashboardSeeder extends Seeder
                     }
                 }
 
-                $session = ChargingSession::create([
+                $rows[] = [
                     'user_id' => $driver->id,
                     'establishment_id' => $establishment->id,
                     'charger_id' => $charger->id,
                     'charger_name' => $charger->name,
-                    'tariff_per_kwh' => $tariff,
-                    'energy_kwh' => $status === ChargingSession::STATUS_CANCELLED ? 0 : $energy,
-                    'measured_energy_kwh' => $status === ChargingSession::STATUS_CANCELLED ? '0.0000' : $energy,
-                    'original_amount' => $gross,
-                    'discount_amount' => $discount,
-                    'amount_charged' => $status === ChargingSession::STATUS_CANCELLED ? 0 : $amount,
+                    'tariff_per_kwh' => number_format($tariff, 4, '.', ''),
+                    'energy_kwh' => number_format($status === ChargingSession::STATUS_CANCELLED ? 0 : $energy, 2, '.', ''),
+                    'measured_energy_kwh' => number_format($status === ChargingSession::STATUS_CANCELLED ? 0 : $energy, 4, '.', ''),
+                    'original_amount' => number_format($gross, 2, '.', ''),
+                    'discount_amount' => number_format($discount, 2, '.', ''),
+                    'amount_charged' => number_format($status === ChargingSession::STATUS_CANCELLED ? 0 : $amount, 2, '.', ''),
                     'payment_method' => $paymentMethod,
                     'status' => $status,
                     'charging_state' => 'ended',
                     'payment_status' => $paymentStatus,
                     'last_meter_sequence' => mt_rand(1, 500),
-                    'started_at' => $startedAt,
-                    'ended_at' => $endedAt,
-                    'last_meter_at' => $endedAt,
-                    'paid_at' => $paidAt,
-                ]);
-
-                $session->forceFill([
+                    'started_at' => $startedAt->format('Y-m-d H:i:s'),
+                    'ended_at' => $endedAt->format('Y-m-d H:i:s'),
+                    'last_meter_at' => $endedAt->format('Y-m-d H:i:s'),
+                    'paid_at' => $paidAt?->format('Y-m-d H:i:s'),
                     'is_demo' => true,
-                    'created_at' => $startedAt,
-                    'updated_at' => $endedAt,
-                ])->saveQuietly();
-
-                $created++;
+                    'created_at' => $startedAt->format('Y-m-d H:i:s'),
+                    'updated_at' => $endedAt->format('Y-m-d H:i:s'),
+                ];
             }
         }
 
-        return $created;
+        // Inserção em blocos: o boot do Render não pode ficar preso em ~800
+        // comandos individuais (create + save) durante a primeira carga.
+        foreach (array_chunk($rows, 100) as $chunk) {
+            ChargingSession::insert($chunk);
+        }
+
+        return count($rows);
     }
 
     /**
