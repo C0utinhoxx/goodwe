@@ -21,5 +21,8 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // Conta de demonstração do gestor com carregadores e histórico fake.
+        $this->call(ManagerDashboardSeeder::class);
     }
 }
