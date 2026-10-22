@@ -32,5 +32,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- A taxa de reserva varia por dia da semana; a suíte padrão roda com
+             ela desligada para manter os testes determinísticos. Os testes da
+             taxa ativam config('reservations.fee_enabled') explicitamente. -->
+        <env name="RESERVATION_FEE_ENABLED" value="false"/>
     </php>
 </phpunit>

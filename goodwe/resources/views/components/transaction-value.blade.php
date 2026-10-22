@@ -2,7 +2,7 @@
 @php
     $confirmed = $transaction->status === 'approved';
     $pointsCredit = $transaction->type === 'cashback';
-    $debit = $transaction->type === 'charge_payment';
+    $debit = in_array($transaction->type, ['charge_payment', 'reservation_fee'], true);
 @endphp
 <span class="{{ $confirmed && !$debit ? 'pt-positive' : '' }}">
     @if($pointsCredit)

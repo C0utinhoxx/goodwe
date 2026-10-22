@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientBalanceException;
 use App\Models\Charger;
 use App\Models\ChargingEvent;
 use App\Models\ChargingReservation;
 use App\Models\Establishment;
 use App\Models\PointMovement;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -17,12 +19,17 @@ class ReservationService
     /** Guard que evita varrer reservas vencidas a cada requisição do portal. */
     private const EXPIRE_DUE_GUARD_KEY = 'reservations:expire-due-guard';
 
+    public function __construct(
+        private ReservationFeeCalculator $fees,
+        private ReservationTagService $tags,
+    ) {}
+
     public function reserve(User $user, Charger $charger, string $key): ChargingReservation
     {
         abort_if($charger->is_demo, 404);
         $this->expireForCharger($charger);
 
-        return DB::transaction(function () use ($user, $charger, $key) {
+        $reservation = DB::transaction(function () use ($user, $charger, $key) {
             $lockedCharger = ChargerLock::acquire($charger->id);
             $establishment = Establishment::whereKey($lockedCharger->establishment_id)->lockForUpdate()->firstOrFail();
             $lockedCharger->setRelation('establishment', $establishment);
@@ -45,6 +52,7 @@ class ReservationService
                 throw ValidationException::withMessages(['charger' => 'Configuração de reserva inválida.']);
             }
             $seconds = $establishment->reservation_tolerance_minutes * 60;
+            $fee = $this->fees->quote($lockedCharger);
             $reservation = ChargingReservation::create([
                 'user_id' => $user->id,
                 'charger_id' => $lockedCharger->id,
@@ -52,16 +60,64 @@ class ReservationService
                 'idempotency_key' => $key,
                 'status' => 'active',
                 'tariff_per_kwh' => $lockedCharger->currentTariff(),
+                'reservation_fee' => $fee['enabled'] ? $fee['amount'] : '0.00',
                 'tolerance_seconds' => $seconds,
                 'no_show_penalty_points' => $establishment->no_show_penalty_points,
                 'reserved_at' => now(),
                 'expires_at' => now()->addSeconds($seconds),
             ]);
+            $this->chargeFee($reservation, $lockedCharger, $fee);
             $lockedCharger->update(['active_reservation_id' => $reservation->id]);
-            $this->event($reservation, 'reserved', ['tariff_per_kwh' => $reservation->tariff_per_kwh, 'tolerance_seconds' => $seconds]);
+            $this->event($reservation, 'reserved', [
+                'tariff_per_kwh' => $reservation->tariff_per_kwh,
+                'tolerance_seconds' => $seconds,
+                'reservation_fee' => $reservation->reservation_fee,
+                'fee_base_amount' => $fee['base_amount'],
+                'fee_percent' => $fee['percent'],
+                'fee_average_minutes' => $fee['average_minutes'],
+            ]);
 
             return $reservation;
         }, 5);
+
+        $this->tags->sync($reservation);
+
+        return $reservation;
+    }
+
+    /**
+     * Cobra a taxa de reserva do saldo no ato da confirmação.
+     *
+     * A taxa é cobrada uma única vez (a regra de idempotência retorna antes
+     * daqui) e nunca é devolvida — nem em cancelamento, nem em ausência.
+     * Saldo insuficiente desfaz a transação inteira: nada é reservado.
+     *
+     * @param  array{enabled: bool, amount: string, base_amount: string, percent: int, average_minutes: int, is_weekend: bool}  $fee
+     */
+    private function chargeFee(ChargingReservation $reservation, Charger $charger, array $fee): void
+    {
+        if (! $fee['enabled'] || DecimalAmount::units($fee['amount']) <= 0) {
+            return;
+        }
+
+        if (! User::whereKey($reservation->user_id)
+            ->where('balance', '>=', $fee['amount'])
+            ->decrement('balance', $fee['amount'])) {
+            throw new InsufficientBalanceException(
+                'Saldo insuficiente para pagar a taxa de reserva de R$ '
+                .number_format((float) $fee['amount'], 2, ',', '.')
+                .'. Adicione créditos à carteira.'
+            );
+        }
+
+        Transaction::create([
+            'user_id' => $reservation->user_id,
+            'type' => Transaction::TYPE_RESERVATION_FEE,
+            'amount' => $fee['amount'],
+            'description' => 'Taxa de reserva - '.$charger->name,
+            'reference' => 'reservation-fee:'.$reservation->id,
+            'status' => Transaction::STATUS_APPROVED,
+        ]);
     }
 
     public function cancel(User $user, ChargingReservation $reservation): ChargingReservation
@@ -69,7 +125,7 @@ class ReservationService
         abort_unless($reservation->user_id === $user->id, 403);
         $this->expire($reservation);
 
-        return DB::transaction(function () use ($user, $reservation) {
+        $cancelled = DB::transaction(function () use ($user, $reservation) {
             $charger = ChargerLock::acquire($reservation->charger_id);
             UserBalanceLock::acquire($user->id);
             $locked = ChargingReservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
@@ -87,11 +143,15 @@ class ReservationService
 
             return $locked;
         }, 5);
+
+        $this->tags->sync($cancelled);
+
+        return $cancelled;
     }
 
     public function expire(ChargingReservation $reservation): bool
     {
-        return DB::transaction(function () use ($reservation) {
+        $expired = DB::transaction(function () use ($reservation) {
             $charger = ChargerLock::acquire($reservation->charger_id);
             $user = UserBalanceLock::acquire($reservation->user_id);
             $locked = ChargingReservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
@@ -121,6 +181,12 @@ class ReservationService
 
             return true;
         }, 5);
+
+        if ($expired) {
+            $this->tags->sync($reservation);
+        }
+
+        return $expired;
     }
 
     public function expireForCharger(Charger $charger): void

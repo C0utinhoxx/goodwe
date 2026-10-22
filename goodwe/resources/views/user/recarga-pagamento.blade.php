@@ -1,6 +1,7 @@
 <x-user-layout>
     <x-slot name="pageTitle">Minha recarga</x-slot>
     <x-slot name="header"><div><p class="pt-eyebrow">SESSÃO #{{ $session->id }}</p><h1 class="pt-heading">{{ $session->charger_name }}</h1><p class="pt-muted pt-subheading">{{ $session->establishment?->name ?? 'Estabelecimento não informado no registro anterior' }}</p></div></x-slot>
+    <x-flash-messages />
     <section class="pt-card">
         @if($session->isWebSimulation() && $session->charging_state !== 'ended')
             <x-charging-test-controls :session="$session" />
@@ -26,5 +27,33 @@
             <dl class="pt-payment-summary"><div><dt>Cupom utilizado</dt><dd>{{ $session->coupon ? $session->coupon->name.' · '.$session->coupon->discount_percent.'% OFF' : 'Sem cupom' }}</dd></div><div><dt>Desconto</dt><dd>R$ {{ number_format($session->discount_amount, 2, ',', '.') }}</dd></div><div class="pt-payment-total"><dt>Valor pago</dt><dd>R$ {{ number_format($session->amount_charged, 2, ',', '.') }}</dd></div><div><dt>Transação</dt><dd>#{{ $session->transaction_id }}</dd></div></dl>
         @endif
         <a class="pt-text-link pt-mt" href="{{ route('wallet.history') }}">Consultar histórico <i data-lucide="arrow-right"></i></a>
+    </section>
+
+    {{-- ============================================================
+        RESERVA DO PONTO (sempre visível)
+        A pessoa acaba de fazer uma recarga: aqui ela já pode garantir
+        o mesmo equipamento para a próxima. A taxa segue a regra — base
+        (tarifa × duração média × potência) + acréscimo do dia (seg–qui
+        menor, sex–dom maior) — e é exibida antes da confirmação.
+        ============================================================ --}}
+    <section class="pt-card pt-mt" id="reservar-este-carregador">
+        <div class="pt-card-heading"><div><p class="pt-eyebrow">RESERVA IMEDIATA</p><h2>Vai carregar de novo? Reserve este ponto</h2></div></div>
+        @if($reserveCharger)
+            <p class="pt-muted">Reserve o {{ $reserveCharger->name }} agora e garanta o ponto com a tarifa travada. Não há agendamento futuro: a reserva vale a partir da confirmação, pelo prazo de tolerância do estabelecimento.</p>
+            @if($reserveFee['enabled'])
+                <dl class="pt-payment-summary">
+                    <div><dt>Taxa de reserva</dt><dd>R$ {{ number_format((float) $reserveFee['amount'], 2, ',', '.') }}</dd></div>
+                    <div><dt>Base da taxa</dt><dd>R$ {{ number_format((float) $reserveFee['base_amount'], 2, ',', '.') }} · média de {{ $reserveFee['average_minutes'] }} min × {{ (float) $reserveCharger->power_kw }} kW × tarifa</dd></div>
+                    <div><dt>Regra por dia</dt><dd>Seg–qui +{{ config('reservations.fee_percent_weekday') }}% · Sex–dom +{{ config('reservations.fee_percent_weekend') }}%</dd></div>
+                </dl>
+                <p class="pt-form-note">Hoje aplica-se <strong>+{{ $reserveFee['percent'] }}%</strong>. A taxa é cobrada do seu saldo no ato da confirmação e <strong>não é devolvida</strong> em cancelamento ou ausência.</p>
+            @else
+                <p class="pt-form-note">Nenhuma taxa ativa no momento: se houver cobrança, o valor é informado antes de você confirmar.</p>
+            @endif
+            <form method="POST" action="{{ route('reservations.store', $reserveCharger->code) }}">@csrf<input type="hidden" name="idempotency_key" value="{{ Illuminate\Support\Str::uuid() }}"><div class="pt-form-actions"><button type="submit" class="pt-button pt-button-primary">Reservar agora{{ $reserveFee['enabled'] ? ' · R$ '.number_format((float) $reserveFee['amount'], 2, ',', '.') : '' }}</button></div></form>
+        @else
+            <p class="pt-muted">Este registro anterior não aponta um carregador cadastrado, então a reserva não pode ser feita direto aqui. Escolha um ponto na lista de carregadores.</p>
+            <div class="pt-form-actions"><a href="{{ route('chargers.index') }}" class="pt-button pt-button-outline">Ver carregadores disponíveis</a></div>
+        @endif
     </section>
 </x-user-layout>

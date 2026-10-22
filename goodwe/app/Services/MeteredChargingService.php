@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 /** Receives normalized, authenticated confirmations from the future IoT adapter, never from web forms. */
 class MeteredChargingService
 {
-    public function __construct(private ReservationService $reservations, private DemandControlService $demand) {}
+    public function __construct(private ReservationService $reservations, private DemandControlService $demand, private ReservationTagService $tags) {}
 
     /** Checks eligibility before the future adapter authorizes energy; this does not start a session or hold cash. */
     public function assertCanAuthorize(User $user, Charger $charger, ?int $reservationId = null): void
@@ -52,7 +52,7 @@ class MeteredChargingService
         abort_if($charger->is_demo, 404);
         $this->reservations->expireForCharger($charger);
 
-        return DB::transaction(function () use ($user, $charger, $externalSessionId, $reservationId, $attributes) {
+        $session = DB::transaction(function () use ($user, $charger, $externalSessionId, $reservationId, $attributes) {
             $lockedCharger = ChargerLock::acquire($charger->id);
             $establishment = Establishment::whereKey($lockedCharger->establishment_id)->lockForUpdate()->firstOrFail();
             $lockedUser = UserBalanceLock::acquire($user->id);
@@ -108,6 +108,14 @@ class MeteredChargingService
 
             return $session;
         }, 5);
+
+        // A reserva consumida libera o flag `tag_reservada` no Firestore:
+        // o ponto passou de garantido para sessão em andamento.
+        if ($reservationId !== null && ($startedReservation = ChargingReservation::find($reservationId)) !== null) {
+            $this->tags->sync($startedReservation);
+        }
+
+        return $session;
     }
 
     public function recordConsumption(ChargingSession $session, string $cumulativeEnergy, int $sequence, string $eventId): ChargingSession

@@ -28,6 +28,8 @@ class Transaction extends Model
 
     public const TYPE_POINTS_REDEEM = 'points_redeem';
 
+    public const TYPE_RESERVATION_FEE = 'reservation_fee';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_APPROVED = 'approved';
