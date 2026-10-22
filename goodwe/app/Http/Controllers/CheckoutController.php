@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\PaymentGatewayInterface;
 use App\Http\Requests\StoreCheckoutRequest;
 use App\Models\Transaction;
 use App\Services\WalletService;
@@ -16,7 +17,32 @@ class CheckoutController extends Controller
 {
     public function __construct(
         private readonly WalletService $walletService,
+        private readonly PaymentGatewayInterface $gateway,
     ) {}
+
+    /**
+     * Checkout legado (contrato PaymentGatewayInterface). Mantido para os
+     * fluxos que ainda apontam para a rota nomeada `checkout`.
+     */
+    public function checkout(StoreCheckoutRequest $request)
+    {
+        $amount = round((float) $request->validated('amount'), 2);
+        $user = $request->user();
+
+        $transaction = Transaction::create([
+            'user_id' => $user->id,
+            'type' => Transaction::TYPE_DEPOSIT,
+            'amount' => $amount,
+            'description' => "Deposito via MercadoPago de R$ {$amount}",
+            'status' => Transaction::STATUS_PENDING,
+        ]);
+
+        $preference = $this->gateway->createPreference($user, $amount, (string) $transaction->id);
+
+        $transaction->update(['reference' => $preference['id']]);
+
+        return redirect()->to($preference['init_point']);
+    }
 
     /**
      * Cria a transação pendente e redireciona para o Stripe Checkout
@@ -50,7 +76,7 @@ class CheckoutController extends Controller
                 'quantity' => 1,
             ]],
             // {CHECKOUT_SESSION_ID} é trocado pelo Stripe pelo id real da sessão
-            'success_url' => route('pagamento.sucesso') . '?session_id={CHECKOUT_SESSION_ID}',
+            'success_url' => route('pagamento.sucesso').'?session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => route('pagamento.erro'),
         ]);
 
@@ -162,7 +188,7 @@ class CheckoutController extends Controller
         ];
 
         if (! in_array($event->type, [...$succeeded, ...$failed], true)) {
-            return response('ignorado: ' . $event->type, 200);
+            return response('ignorado: '.$event->type, 200);
         }
 
         $session = $event->data->object;
@@ -180,13 +206,13 @@ class CheckoutController extends Controller
                 ->first();
 
             if (! $transaction) {
-                $motivo = 'transacao nao encontrada: ' . $session->client_reference_id;
+                $motivo = 'transacao nao encontrada: '.$session->client_reference_id;
 
                 return;
             }
 
             if ($transaction->status !== Transaction::STATUS_PENDING) {
-                $motivo = 'status ja era: ' . $transaction->status;
+                $motivo = 'status ja era: '.$transaction->status;
 
                 return;
             }
@@ -222,7 +248,7 @@ class CheckoutController extends Controller
                 return;
             }
 
-            $motivo = 'pagamento nao confirmado: ' . $session->payment_status;
+            $motivo = 'pagamento nao confirmado: '.$session->payment_status;
         });
 
         return response($motivo, 200);
