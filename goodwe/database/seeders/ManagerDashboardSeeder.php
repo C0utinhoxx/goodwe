@@ -7,7 +7,6 @@ use App\Models\ChargingSession;
 use App\Models\Establishment;
 use App\Models\User;
 use Carbon\Carbon;
-use Faker\Factory;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -29,6 +28,19 @@ class ManagerDashboardSeeder extends Seeder
     {
         $manager = $this->manager();
         $establishment = $this->establishment($manager);
+
+        // Em produção o entrypoint chama este seeder a cada boot. Depois da
+        // primeira carga, preservamos as sessões existentes (inclusive as
+        // recargas reais feitas pelos totens) e evitamos reescrever o painel.
+        if (app()->environment('production') && ChargingSession::query()
+            ->where('establishment_id', $establishment->id)
+            ->where('is_demo', true)
+            ->exists()) {
+            $this->command->info('Histórico de demonstração já existe; seeder ignorado.');
+
+            return;
+        }
+
         $chargers = $this->chargers($establishment);
         $drivers = $this->drivers();
 
@@ -159,8 +171,9 @@ class ManagerDashboardSeeder extends Seeder
             ->where('is_demo', true)
             ->delete();
 
-        $faker = Factory::create('pt_BR');
-        $faker->seed(20261022);
+        // Gerador determinístico nativo: em produção o Composer roda com
+        // --no-dev e a Faker (require-dev) não está disponível na imagem.
+        mt_srand(20261022);
 
         $tariff = (float) $establishment->cost_per_kwh;
         $start = now()->subDays(self::HISTORY_DAYS - 1)->startOfDay();
@@ -177,8 +190,8 @@ class ManagerDashboardSeeder extends Seeder
 
             $weekend = $date->isWeekend();
             $quantity = $weekend
-                ? $faker->numberBetween(2, 5)
-                : $faker->numberBetween(3, 7);
+                ? mt_rand(2, 5)
+                : mt_rand(3, 7);
 
             // Garante movimento nos últimos sete dias, independente do sorteio.
             if ($day >= self::HISTORY_DAYS - 7) {
@@ -189,16 +202,16 @@ class ManagerDashboardSeeder extends Seeder
                 /** @var Charger $charger */
                 $charger = $chargers[$index % $chargers->count()];
                 /** @var User $driver */
-                $driver = $drivers[$faker->numberBetween(0, $drivers->count() - 1)];
+                $driver = $drivers[mt_rand(0, $drivers->count() - 1)];
 
-                $startedAt = Carbon::instance($faker->dateTimeBetween($dayStart, $dayEnd));
+                $startedAt = Carbon::createFromTimestamp(mt_rand($dayStart->timestamp, $dayEnd->timestamp));
                 $energy = ($index === 0 && $day >= self::HISTORY_DAYS - 7)
-                    ? $faker->randomFloat(1, 18, 55)
-                    : $faker->randomFloat(1, 5, 62);
+                    ? $this->randomFloat(18, 55, 1)
+                    : $this->randomFloat(5, 62, 1);
 
                 $energy = round($energy, 2);
                 $gross = round($energy * $tariff, 2);
-                $discount = $faker->boolean(12) ? round($gross * 0.10, 2) : 0.0;
+                $discount = mt_rand(1, 100) <= 12 ? round($gross * 0.10, 2) : 0.0;
                 $amount = round($gross - $discount, 2);
                 $duration = max(10, (int) round($energy / ((float) $charger->power_kw * 0.55) * 60));
                 $endedAt = $startedAt->copy()->addMinutes($duration);
@@ -213,7 +226,7 @@ class ManagerDashboardSeeder extends Seeder
                 // que os gráficos de energia e receita nunca fiquem vazios.
                 $status = $index === 0
                     ? ChargingSession::STATUS_COMPLETED
-                    : $faker->randomElement([
+                    : $this->randomElement([
                         ChargingSession::STATUS_COMPLETED,
                         ChargingSession::STATUS_COMPLETED,
                         ChargingSession::STATUS_COMPLETED,
@@ -222,7 +235,7 @@ class ManagerDashboardSeeder extends Seeder
                         ChargingSession::STATUS_CANCELLED,
                     ]);
 
-                $paymentMethod = $faker->randomElement([
+                $paymentMethod = $this->randomElement([
                     ChargingSession::PAYMENT_WALLET,
                     ChargingSession::PAYMENT_WALLET,
                     ChargingSession::PAYMENT_WALLET,
@@ -238,7 +251,7 @@ class ManagerDashboardSeeder extends Seeder
 
                 $paidAt = null;
                 if ($status === ChargingSession::STATUS_COMPLETED) {
-                    $paidAt = $endedAt->copy()->addMinutes($faker->numberBetween(1, 30));
+                    $paidAt = $endedAt->copy()->addMinutes(mt_rand(1, 30));
                     if ($paidAt->isFuture()) {
                         $paidAt = now();
                     }
@@ -259,7 +272,7 @@ class ManagerDashboardSeeder extends Seeder
                     'status' => $status,
                     'charging_state' => 'ended',
                     'payment_status' => $paymentStatus,
-                    'last_meter_sequence' => $faker->numberBetween(1, 500),
+                    'last_meter_sequence' => mt_rand(1, 500),
                     'started_at' => $startedAt,
                     'ended_at' => $endedAt,
                     'last_meter_at' => $endedAt,
@@ -277,6 +290,22 @@ class ManagerDashboardSeeder extends Seeder
         }
 
         return $created;
+    }
+
+    /**
+     * @template T
+     *
+     * @param  array<int, T>  $items
+     * @return T
+     */
+    private function randomElement(array $items): mixed
+    {
+        return $items[mt_rand(0, count($items) - 1)];
+    }
+
+    private function randomFloat(float $min, float $max, int $decimals): float
+    {
+        return round($min + (mt_rand() / mt_getrandmax()) * ($max - $min), $decimals);
     }
 
     private function forgetDashboardCache(Establishment $establishment): void

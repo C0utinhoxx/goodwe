@@ -106,4 +106,25 @@ class ManagerDashboardSeederTest extends TestCase
         $this->assertSame($demoSessions, ChargingSession::where('is_demo', true)->count());
         $this->assertDatabaseHas('charging_sessions', ['id' => $realSession->id, 'is_demo' => false]);
     }
+
+    public function test_production_seeder_is_skipped_after_the_first_demo_load(): void
+    {
+        $this->app['env'] = 'production';
+
+        $this->artisan('db:seed', [
+            '--class' => ManagerDashboardSeeder::class,
+            '--force' => true,
+        ])->assertSuccessful();
+
+        $sessionIds = ChargingSession::where('is_demo', true)->orderBy('id')->pluck('id')->all();
+
+        $this->assertNotEmpty($sessionIds);
+
+        $this->artisan('db:seed', [
+            '--class' => ManagerDashboardSeeder::class,
+            '--force' => true,
+        ])->assertSuccessful();
+
+        $this->assertSame($sessionIds, ChargingSession::where('is_demo', true)->orderBy('id')->pluck('id')->all());
+    }
 }

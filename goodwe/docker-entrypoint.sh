@@ -174,7 +174,26 @@ if [ "$migrated" -eq 0 ]; then
 fi
 
 ###############################################################################
-# 4.1) Cache de configuração, rotas, views e eventos
+# 4.1) Dados de demonstração do gestor
+#
+#    O plano gratuito do Render não oferece shell/preDeployCommand. Este passo
+#    garante que a conta gestor.powertag@test.com tenha os totens e o histórico
+#    simulado do dashboard já no primeiro boot.
+#
+#    O seeder é idempotente e, em produção, se ignora quando o histórico de
+#    demonstração já existe. Para desativar em um ambiente real, defina
+#    SEED_DEMO_DATA=false nas variáveis do Render.
+###############################################################################
+if [ "${SEED_DEMO_DATA:-true}" = "true" ] && [ "$migrated" -eq 1 ]; then
+    entry_log "Semeando dados de demonstração do gestor (se necessário)."
+
+    if ! php artisan db:seed --class='Database\Seeders\ManagerDashboardSeeder' --force --no-interaction; then
+        entry_log "AVISO: falha ao semear os dados de demonstração; seguindo com o boot."
+    fi
+fi
+
+###############################################################################
+# 4.2) Cache de configuração, rotas, views e eventos
 #
 #    Compilado em RUNTIME (não no build) porque as envs do provedor — em
 #    especial FIREBASE_CREDENTIALS_JSON — só existem quando o container sobe.
