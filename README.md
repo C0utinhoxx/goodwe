@@ -1,6 +1,16 @@
 
 <div align="center">
-  <img src="public/imagens/powertag-logo-preto.png" alt="Logotipo PowerTag" width="190">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="Logo-PowerTag-Branco.png">
+    <source media="(prefers-color-scheme: light)" srcset="Logo-PoerTag-Preto(1).png">
+    <img src="Logo-PowerTag-Branco.png" alt="Logotipo PowerTag" width="230">
+  </picture>
+
+  <h1>PowerTag — Gestão Inteligente de Recarga de Veículos Elétricos</h1>
+
+  <strong>Challenge GoodWe 2026 · FIAP · Ciência da Computação · 1CCPX — Equipe 2</strong>
+</div>
+
 
   # PowerTag — Gestão Inteligente de Recarga de Veículos Elétricos
 
