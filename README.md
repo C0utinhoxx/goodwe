@@ -62,6 +62,7 @@ A expansão da eletromobilidade exige mais do que instalar carregadores. Um oper
 **Curso / turma:** Ciência da Computação · 1CCPX · 2º semestre de 2026  
 **SERS:** Prof. André Tritiack de Farias  
 **PCP:** Prof. Alexandre Russi Junior  
+**Aplicação Web:** https://goodwe-1lzr.onrender.com
 **Repositório:** https://github.com/C0utinhoxx/goodwe
 
 ---
